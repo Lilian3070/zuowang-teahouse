@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>坐忘茗舍 · 茶 · 器 · 琴</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">坐忘茗舍</div>
+  <button class="nav-toggle" id="navToggle" aria-label="菜单">
+    <span></span><span></span><span></span>
+  </button>
+  <ul id="navMenu">
+    <li><a href="#tea">精选茗茶</a></li>
+    <li><a href="#teaware">茶器美学</a></li>
+    <li><a href="#qindao">琴道传习</a></li>
+    <li><a href="#zhuoqin">斫琴甄选</a></li>
+    <li><a href="#booking">茶席预约</a></li>
+    <li><a href="#about">坐忘故事</a></li>
+    <li><a href="#contact">寻访茗舍</a></li>
+  </ul>
+</nav>
+
+<header class="hero">
+  <div class="brand-title">
+    <h1>坐忘茗舍</h1>
+    <img class="brand-seal" src="assets/店铺印章.png" alt="坐忘茗舍 印章">
+  </div>
+  <p class="tagline">于一室茶烟古琴声中，坐忘外物。</p>
+  <div class="scroll-hint">向下滚动 ↓</div>
+</header>
+
+<section id="tea">
+  <div class="section-head">
+    <span class="eyebrow">TEA</span>
+    <h2>精选茗茶</h2>
+    <p>严选原产地名茶，蕴山水之韵，聚匠心之味。<br>点击下方品牌，探寻专属茶品专区。</p>
+    <div class="divider"></div>
+  </div>
+  <p class="demo-note">以下为已合作的精选茶叶品牌，品牌信息真实，旗下具体茶品暂为示例数据，正式上线前会替换为各品牌真实的茶品信息。</p>
+  <div class="grid-3" id="brandGrid">
+    <div class="card brand-card">
+      <div class="card-media"><img src="assets/品牌-正山堂.jpg" alt="正山堂·骏眉中国 品牌logo"></div>
+      <div class="card-body">
+        <h3>正山堂 · 骏眉中国</h3>
+        <p>高端红茶奠基者，传承四百年正山小种底蕴，开创清香甘醇新红茶。</p>
+        <button class="explore-btn" type="button" data-brand="zhengshantang">探索系列 →</button>
+      </div>
+    </div>
+    <div class="card brand-card">
+      <div class="card-media"><img src="assets/品牌-和星岩.jpg" alt="和星岩 品牌logo"></div>
+      <div class="card-body">
+        <h3>和星岩</h3>
+        <p>专注武夷核心正岩山场，传承传统炭焙工艺，臻选岩骨花香之味。</p>
+        <button class="explore-btn" type="button" data-brand="hexingyan">探索系列 →</button>
+      </div>
+    </div>
+    <div class="card brand-card">
+      <div class="card-media"><img src="assets/品牌-品古村.jpg" alt="品古村 品牌logo"></div>
+      <div class="card-body">
+        <h3>品古村</h3>
+        <p>深耕高山野生茶源，遵循古法采制，保留最纯粹自然的山野气韵。</p>
+        <button class="explore-btn" type="button" data-brand="pinguvillage">探索系列 →</button>
+      </div>
+    </div>
+    </div>
+  </div>
+</section>
+
+<section id="teaware">
+  <div class="section-head">
+    <span class="eyebrow">TEAWARE</span>
+    <h2>茶器美学</h2>
+    <p>器以载道，器利茶发。<br>严选名窑匠作与工美茶具，点击分类，寻一具贴心茶器。</p>
+    <div class="divider"></div>
+  </div>
+  <p class="demo-note">以下分类为结构占位，用于演示"分类 → 产品"两级浏览效果，正式上线前会替换为真实的茶具分类与产品信息。</p>
+  <div class="grid-4" id="teawareGrid">
+    <div class="card teaware-card">
+      <div class="card-media">【实拍图占位】</div>
+      <div class="card-body">
+        <h3>泡茶主器</h3>
+        <p>手感顺畅，出水断水利落，兼具实用与观赏价值。</p>
+        <button class="explore-btn" type="button" data-category="zhuchaqi">查看茶具 →</button>
+      </div>
+    </div>
+    <div class="card teaware-card">
+      <div class="card-media">【实拍图占位】</div>
+      <div class="card-body">
+        <h3>品茗杯盏</h3>
+        <p>观茶汤之色，品茶香之韵，寻一只称手的专属主人杯。</p>
+        <button class="explore-btn" type="button" data-category="pinmingbei">查看茶具 →</button>
+      </div>
+    </div>
+    <div class="card teaware-card">
+      <div class="card-media">【实拍图占位】</div>
+      <div class="card-body">
+        <h3>茶席雅设</h3>
+        <p>点缀案头茶席，营造静谧雅致的品茶氛围。</p>
+        <button class="explore-btn" type="button" data-category="chaxiyashe">查看茶具 →</button>
+      </div>
+    </div>
+    <div class="card teaware-card">
+      <div class="card-media">【实拍图占位】</div>
+      <div class="card-body">
+        <h3>名窑匠作</h3>
+        <p>严选名窑大工精制，独一无二的匠心器物。</p>
+        <button class="explore-btn" type="button" data-category="mingyao">查看茶具 →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="qindao">
+  <div class="section-head">
+    <span class="eyebrow">GUQIN · 传习</span>
+    <h2>琴道传习</h2>
+    <p>【占位文案】以琴修身，以道传习——介绍古琴课程的教学理念与授课形式。</p>
+    <div class="divider"></div>
+  </div>
+  <div class="split reverse">
+    <div>
+      <h3>【占位】课程与报名</h3>
+      <p>【占位文案】介绍课程形式（一对一 / 小班）、适合零基础还是有一定基础的学员、教学老师简介，以及报名方式。</p>
+      <ul class="tag-list">
+        <li>【零基础入门】</li>
+        <li>【进阶课程】</li>
+        <li>【线下授课】</li>
+        <li>【报名咨询】</li>
+      </ul>
+    </div>
+    <div class="media">【授课场景实拍图占位】</div>
+  </div>
+</section>
+
+<section id="zhuoqin">
+  <div class="section-head">
+    <span class="eyebrow">GUQIN · 斫琴</span>
+    <h2>斫琴甄选</h2>
+    <p>【占位文案】一器一物，皆经甄选而来——介绍店内古琴的选材、斫琴师渊源与制作理念。</p>
+    <div class="divider"></div>
+  </div>
+  <div class="split">
+    <div class="media">【古琴实拍图占位】</div>
+    <div>
+      <h3>【占位】斫琴师 / 品牌来源</h3>
+      <p>【占位文案】介绍店内古琴的选材、斫琴师或品牌来源、价位区间，可附一段关于"斫琴如修心"的品牌理念。</p>
+      <ul class="tag-list">
+        <li>【琴材/款式】</li>
+        <li>【价位区间】</li>
+        <li>【可预约试音】</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="booking" class="booking">
+  <div class="section-head">
+    <span class="eyebrow">TEA ROOM</span>
+    <h2>茶室体验 · 包厢预约</h2>
+    <p>【占位文案】介绍包厢环境与氛围，说明可自主泡茶，也可由店内代为泡茶。</p>
+    <div class="divider"></div>
+  </div>
+  <div class="booking-panel">
+    <div class="booking-info">
+      <h3>预约须知【占位】</h3>
+      <ul>
+        <li>包厢数量与容纳人数【占位】</li>
+        <li>自主泡茶 / 代泡茶两种模式说明【占位】</li>
+        <li>营业时间【占位】</li>
+        <li>费用说明【占位】</li>
+      </ul>
+      <p style="font-size:0.85rem; color:#d9cdae; margin-top:24px;">
+        此表单目前仅为前端展示，暂未连接后台，正式上线前需要接入真实的提交方式（如邮件、微信通知等）。
+      </p>
+    </div>
+    <form class="booking-form" id="bookingForm">
+      <label for="name">姓名</label>
+      <input type="text" id="name" name="name" placeholder="请输入姓名" required>
+
+      <label for="phone">联系电话</label>
+      <input type="tel" id="phone" name="phone" placeholder="请输入手机号" required>
+
+      <label for="mode">泡茶方式</label>
+      <select id="mode" name="mode">
+        <option>自主泡茶</option>
+        <option>店内代泡</option>
+        <option>还没想好，先咨询</option>
+      </select>
+
+      <label for="datetime">期望到访时间</label>
+      <input type="text" id="datetime" name="datetime" placeholder="例如：8月30日下午2点左右">
+
+      <label for="note">备注</label>
+      <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
+
+      <button type="submit" class="submit-btn">提交预约意向</button>
+      <div class="form-status" id="formStatus">已收到您的预约意向，我们会尽快通过电话或微信与您确认。</div>
+    </form>
+  </div>
+</section>
+
+<section id="about" class="about">
+  <div class="section-head">
+    <span class="eyebrow">ABOUT</span>
+    <h2>关于坐忘茗舍</h2>
+    <div class="divider"></div>
+  </div>
+  <div class="story">
+    <p class="story-title">坐忘茗舍 · 诗意栖居</p>
+    <p>"坐忘"，源自先贤的智慧，是心灵的一种至高止息。在繁华与浮躁之中，我们构筑了这一处"坐忘茗舍"，只为寻一处安顿身心的清幽。</p>
+    <p>这里，是茗品的栖息之所。我们不仅是在售茶，更是在传承一种源自山野的灵气。严选高山原产地明前好茶，从岩骨花香的武夷岩茶到清雅不凡的明前绿茶，每一叶都保留着自然的呼吸。我们设一方静谧茶席，宜围炉煮雪，谈笑有鸿儒；亦宜一盏独酌，任竹影摇曳，澄澈内心。</p>
+    <p>这里，是七弦清音的传习之地。心远地偏，古音缭绕。我们致力于弘扬古琴这一流传千年的文人乐器。这里既有甄选良材古木、传统髹漆工艺斫制而成的传世名琴，也是传习琴道的雅集之所。减字谱里的启蒙、指法纠偏、余音微体验，我们愿带你在七弦之间，寻得那份久违的松透沉静。</p>
+    <p>入舍，可卸下红尘琐事；坐忘，可回归心灵本真。一茶一琴，一坐一忘。我们在坐忘茗舍，静候每一位知音。</p>
+    <p>【占位文案】主理人 / 老师的简介，与茶、古琴的渊源。</p>
+  </div>
+</section>
+
+<section id="contact" class="contact">
+  <div class="section-head">
+    <span class="eyebrow">CONTACT</span>
+    <h2>联系我们</h2>
+    <p>欢迎通过以下方式咨询茶叶、茶具、古琴课程或包厢预约</p>
+    <div class="divider"></div>
+  </div>
+  <div class="contact-grid">
+    <div class="contact-item">
+      <div class="qr"><img src="assets/微信二维码.jpg" alt="坐忘茗舍 微信二维码"></div>
+      <h3>微信咨询</h3>
+      <p>扫码添加微信</p>
+    </div>
+    <div class="contact-item">
+      <div class="qr icon">☎</div>
+      <h3>电话</h3>
+      <p>18668788289</p>
+    </div>
+    <a class="contact-item map-link" href="https://www.amap.com/search?query=温州市鹿城区松台街道蛟翔巷111号" target="_blank" rel="noopener">
+      <div class="qr icon">📍</div>
+      <h3>地址</h3>
+      <p>温州市鹿城区松台街道蛟翔巷111号</p>
+      <p class="map-cta">点击在高德地图中查看 →</p>
+    </a>
+  </div>
+</section>
+
+<footer>
+  © 坐忘茗舍 · 本页为网站原型稿，内容与图片均为占位，尚未正式上线
+</footer>
+
+<div class="brand-modal" id="brandModal" aria-hidden="true">
+  <div class="brand-modal-overlay" id="brandModalOverlay"></div>
+  <div class="brand-modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalBrandName">
+    <button class="modal-close" id="modalClose" type="button" aria-label="关闭">✕</button>
+    <div class="modal-header">
+      <span class="eyebrow" id="modalEyebrow">BRAND</span>
+      <h3 id="modalBrandName">品牌名称</h3>
+      <p id="modalBrandDesc">品牌介绍</p>
+    </div>
+    <div class="modal-products" id="modalProducts"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
