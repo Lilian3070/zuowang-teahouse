@@ -354,9 +354,10 @@
   .poster-admin-card { width: 160px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
   .poster-admin-img { width: 160px; aspect-ratio: 2/3; background-size: cover; background-position: center; background-color: var(--surface); }
   .poster-admin-title { font-size: 12px; padding: 6px 10px; color: var(--ink); font-weight: 600; }
-  .poster-admin-actions { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; border-top: 1px solid var(--border); }
-  .poster-admin-actions .poster-btn-row { display: flex; gap: 5px; }
-  .poster-admin-actions .poster-btn-row button { flex: 1; }
+  .poster-admin-actions { display: flex; gap: 5px; padding: 8px 10px; border-top: 1px solid var(--border); align-items: center; }
+  .poster-admin-actions .poster-sort-col { display: flex; flex-direction: column; gap: 2px; }
+  .poster-admin-actions .poster-sort-col .sort-btn { padding: 2px 8px; font-size: 11px; }
+  .poster-admin-actions .btn-edit, .poster-admin-actions .btn-delete { flex: 1; }
 
   @media (max-width: 680px) {
     /* 顶栏 */
@@ -913,14 +914,12 @@ function renderPosters(posters, section) {
       <div class="poster-admin-img" style="background-image:url('${p.image_url}')"></div>
       ${p.title ? `<div class="poster-admin-title">${p.title}</div>` : ''}
       <div class="poster-admin-actions">
-        <div class="poster-btn-row">
+        <div class="poster-sort-col">
           <button class="sort-btn" onclick="movePoster('${p.id}', -1)">↑</button>
           <button class="sort-btn" onclick="movePoster('${p.id}', 1)">↓</button>
         </div>
-        <div class="poster-btn-row">
-          <button class="btn-edit" onclick="openPosterEdit('${p.id}','${(p.title||'').replace(/'/g,"\\'")}','${p.image_url}')">编辑</button>
-          <button class="btn-delete" onclick="deletePoster('${p.id}')">删除</button>
-        </div>
+        <button class="btn-edit" onclick="openPosterEdit('${p.id}','${(p.title||'').replace(/'/g,"\\'")}','${p.image_url}')">编辑</button>
+        <button class="btn-delete" onclick="deletePoster('${p.id}')">删除</button>
       </div>
     </div>
   `).join('') + '</div>';
