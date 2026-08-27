@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const media = p.image_url
       ? `<img src="${p.image_url}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover">`
       : '【产品实拍图占位】';
-    const spec = p.price || p.spec || '';
+    const spec = p.price ? `¥${p.price}` : (p.spec || '');
     const desc = p.description || p.category || '';
     card.innerHTML = `
       <div class="product-media">${media}</div>
