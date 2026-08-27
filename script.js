@@ -50,33 +50,34 @@ document.addEventListener('DOMContentLoaded', () => {
       pauseTimeout = setTimeout(() => { paused = false; }, 4000);
     }
 
-    // 吸附到最近一张卡片
-    function snapTo(fromTX) {
+    // 吸附到最近一张卡片，dur 可传入让手感连贯
+    function snapTo(fromTX, dur) {
       const sw = slotW();
       if (!sw) { animating = false; return; }
       const nearest = Math.round(-fromTX / sw) * sw;
       const target = -nearest;
-      const startTX = fromTX, dur = 280, t0 = performance.now();
+      const startTX = fromTX, d = dur || 380, t0 = performance.now();
       cancelAnimationFrame(rafId);
       animating = true;
       function tick(now) {
-        const p = Math.min((now - t0) / dur, 1);
-        setTX(startTX + (target - startTX) * (1 - Math.pow(1 - p, 3)));
+        const p = Math.min((now - t0) / d, 1);
+        // ease-out cubic：起步柔和，收尾缓慢
+        setTX(startTX + (target - startTX) * (1 - Math.pow(1 - p, 2.5)));
         if (p < 1) rafId = requestAnimationFrame(tick);
         else animating = false;
       }
       rafId = requestAnimationFrame(tick);
     }
 
-    // 惯性 → 减速 → 自动吸附
+    // 惯性 → 柔和减速 → 吸附
     function glide(vel) {
       let v = vel;
       cancelAnimationFrame(rafId);
       animating = true;
       function tick() {
-        if (Math.abs(v) < 0.5) { snapTo(tx); return; }
+        if (Math.abs(v) < 0.4) { snapTo(tx, 420); return; }
         setTX(tx + v);
-        v *= 0.92;
+        v *= 0.94;  // 更慢的摩擦，停顿感更自然
         rafId = requestAnimationFrame(tick);
       }
       rafId = requestAnimationFrame(tick);
@@ -121,7 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mouseup', () => {
       if (!md) return; md = false;
       track.classList.remove('grabbing');
-      glide(mVel * 15); // 向右拖 mVel>0 → vel 正 → tx 继续增 ✓
+      if (Math.abs(mVel) > 0.1) glide(mVel * 12);
+      else snapTo(tx, 380);
     });
 
     // ── 触摸滑动（手机端）──
@@ -154,7 +156,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     grid.addEventListener('touchend', () => {
       if (!tc) return; tc = false;
-      if (horiz) glide(tVel * 15); // 向右滑 tVel>0 → vel 正 → tx 继续增 ✓
+      if (horiz) {
+        if (Math.abs(tVel) > 0.1) glide(tVel * 12);
+        else snapTo(tx, 380); // 手指慢慢抬起，直接吸附
+      } else {
+        snapTo(tx, 380); // 方向未判定，也吸附一下
+      }
     }, { passive: true });
 
     const observer = new IntersectionObserver(entries => {
