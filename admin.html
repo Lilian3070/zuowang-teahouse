@@ -1012,6 +1012,7 @@ async function cropAndCompress(file, ratioW, ratioH) {
 }
 
 function setVisiblePoster(id, visible) {
+  const grid = document.getElementById('posterSortGrid');
   const card = document.querySelector(`.poster-admin-card[data-id="${id}"]`);
   if (!card) return;
   const showBtn = card.querySelector('.vs-btn-show');
@@ -1026,8 +1027,20 @@ function setVisiblePoster(id, visible) {
     hideBtn.classList.add('vs-active-hide');
     img.classList.add('is-hidden');
   }
-  db.from('posters').update({ is_visible: visible }).eq('id', id).then(({ error }) => {
-    if (error) setVisiblePoster(id, !visible);
+  // 隐藏的沉到底部，显示的浮到最前
+  if (grid) {
+    if (!visible) {
+      grid.appendChild(card);
+    } else {
+      const firstHidden = [...grid.querySelectorAll('.poster-admin-card')].find(c => c.querySelector('.poster-admin-img.is-hidden'));
+      if (firstHidden) grid.insertBefore(card, firstHidden);
+    }
+  }
+  const cards = grid ? [...grid.querySelectorAll('.poster-admin-card')] : [];
+  const saves = [db.from('posters').update({ is_visible: visible }).eq('id', id)];
+  cards.forEach((c, i) => { c.dataset.sort = i; saves.push(db.from('posters').update({ sort_order: i }).eq('id', c.dataset.id)); });
+  Promise.all(saves).then(results => {
+    if (results[0].error) setVisiblePoster(id, !visible);
   });
 }
 
