@@ -915,6 +915,7 @@ function renderPosters(posters, section) {
       <div class="poster-admin-actions">
         <button class="sort-btn" onclick="movePoster('${p.id}', -1)">↑</button>
         <button class="sort-btn" onclick="movePoster('${p.id}', 1)">↓</button>
+        <button class="btn-edit" onclick="openPosterEdit('${p.id}','${(p.title||'').replace(/'/g,"\\'")}','${p.image_url}')">编辑</button>
         <button class="btn-delete" onclick="deletePoster('${p.id}')">删除</button>
       </div>
     </div>
@@ -1038,6 +1039,179 @@ document.getElementById('productModal').addEventListener('click', e => {
 document.getElementById('passwordModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closePasswordModal();
 });
+
+// ── 海报编辑弹窗 ──────────────────────────────────────
+let _posterEditId = null;
+let _posterOrigUrl = null;
+let _posterNewBlob = null;
+let _cropScale = 1, _cropX = 0, _cropY = 0;
+let _dragStart = null;
+
+function openPosterEdit(id, title, imageUrl) {
+  _posterEditId = id;
+  _posterOrigUrl = imageUrl;
+  _posterNewBlob = null;
+  document.getElementById('posterEditTitle').value = title;
+  document.getElementById('posterEditOverlay').style.display = 'block';
+  document.getElementById('posterEditModal').style.display = 'block';
+  loadCropImage(imageUrl);
+}
+
+function loadCropImage(url) {
+  const img = document.getElementById('posterCropImg');
+  const frame = document.getElementById('posterCropFrame');
+  const zoom = document.getElementById('posterZoom');
+  _cropScale = 1; _cropX = 0; _cropY = 0;
+  zoom.value = 1;
+  img.onload = () => {
+    // 初始让图片铺满 frame
+    const fw = frame.clientWidth, fh = frame.clientHeight;
+    const fitScale = Math.max(fw / img.naturalWidth, fh / img.naturalHeight);
+    _cropScale = fitScale;
+    zoom.min = fitScale * 0.8;
+    zoom.max = fitScale * 4;
+    zoom.step = fitScale * 0.01;
+    zoom.value = fitScale;
+    _cropX = (fw - img.naturalWidth * fitScale) / 2;
+    _cropY = (fh - img.naturalHeight * fitScale) / 2;
+    applyTransform();
+  };
+  img.src = url;
+}
+
+function applyTransform() {
+  const img = document.getElementById('posterCropImg');
+  img.style.transform = `translate(${_cropX}px, ${_cropY}px) scale(${_cropScale})`;
+  img.style.transformOrigin = '0 0';
+}
+
+document.getElementById('posterZoom').addEventListener('input', function() {
+  const frame = document.getElementById('posterCropFrame');
+  const img = document.getElementById('posterCropImg');
+  const fw = frame.clientWidth, fh = frame.clientHeight;
+  const cx = fw / 2, cy = fh / 2;
+  const oldScale = _cropScale;
+  _cropScale = parseFloat(this.value);
+  // 以中心点为基准缩放
+  _cropX = cx - (_cropScale / oldScale) * (cx - _cropX);
+  _cropY = cy - (_cropScale / oldScale) * (cy - _cropY);
+  applyTransform();
+});
+
+const frame = document.getElementById('posterCropFrame');
+frame.addEventListener('mousedown', e => {
+  e.preventDefault();
+  _dragStart = { x: e.clientX - _cropX, y: e.clientY - _cropY };
+  frame.style.cursor = 'grabbing';
+});
+document.addEventListener('mousemove', e => {
+  if (!_dragStart) return;
+  _cropX = e.clientX - _dragStart.x;
+  _cropY = e.clientY - _dragStart.y;
+  applyTransform();
+});
+document.addEventListener('mouseup', () => { _dragStart = null; frame.style.cursor = 'grab'; });
+
+// 触屏拖拽
+frame.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    _dragStart = { x: e.touches[0].clientX - _cropX, y: e.touches[0].clientY - _cropY };
+  }
+}, { passive: true });
+frame.addEventListener('touchmove', e => {
+  if (!_dragStart || e.touches.length !== 1) return;
+  e.preventDefault();
+  _cropX = e.touches[0].clientX - _dragStart.x;
+  _cropY = e.touches[0].clientY - _dragStart.y;
+  applyTransform();
+}, { passive: false });
+frame.addEventListener('touchend', () => { _dragStart = null; });
+
+function triggerPosterReplace() {
+  document.getElementById('posterReplaceInput').click();
+}
+document.getElementById('posterReplaceInput').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  _posterNewBlob = file;
+  loadCropImage(URL.createObjectURL(file));
+});
+
+function closePosterEdit() {
+  document.getElementById('posterEditOverlay').style.display = 'none';
+  document.getElementById('posterEditModal').style.display = 'none';
+  _posterEditId = null;
+  _posterNewBlob = null;
+}
+
+async function savePosterEdit() {
+  if (!_posterEditId) return;
+  const title = document.getElementById('posterEditTitle').value.trim();
+  showToast('保存中…');
+
+  let imageUrl = _posterOrigUrl;
+
+  if (_posterNewBlob) {
+    // 有换图：先裁剪成当前视口所见区域，再上传
+    const frame = document.getElementById('posterCropFrame');
+    const img = document.getElementById('posterCropImg');
+    const fw = frame.clientWidth, fh = frame.clientHeight;
+    const canvas = document.createElement('canvas');
+    const outW = 810, outH = 1080; // 3:4 输出分辨率
+    canvas.width = outW; canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    // 把当前可见区域画到 canvas
+    const scaleX = outW / fw, scaleY = outH / fh;
+    ctx.save();
+    ctx.scale(scaleX, scaleY);
+    ctx.translate(_cropX, _cropY);
+    ctx.scale(_cropScale, _cropScale);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.88));
+    const filename = `poster_edit_${_posterEditId}_${Date.now()}.jpg`;
+    const { error } = await db.storage.from('product-images').upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
+    if (error) { showToast('图片上传失败'); return; }
+    imageUrl = db.storage.from('product-images').getPublicUrl(filename).data.publicUrl;
+  }
+
+  await db.from('posters').update({ title: title || null, image_url: imageUrl }).eq('id', _posterEditId);
+  showToast('已保存');
+  closePosterEdit();
+  loadProducts();
+}
 </script>
+<!-- 海报编辑弹窗 -->
+<div id="posterEditOverlay" class="modal-overlay" style="display:none" onclick="closePosterEdit()"></div>
+<div id="posterEditModal" class="modal-box" style="display:none;max-width:520px">
+  <div class="modal-header">
+    <h2 class="modal-title">编辑海报</h2>
+    <button class="modal-close" onclick="closePosterEdit()">×</button>
+  </div>
+
+  <div style="margin-bottom:16px">
+    <label style="font-size:13px;color:var(--ink-muted);display:block;margin-bottom:6px">海报图片 <span style="font-size:11px">（拖拽调整位置，滑块调整大小）</span></label>
+    <div id="posterCropFrame" style="width:100%;aspect-ratio:3/4;background:#f0ece6;border-radius:8px;overflow:hidden;position:relative;cursor:grab;user-select:none;max-height:360px">
+      <img id="posterCropImg" src="" draggable="false" style="position:absolute;transform-origin:top left;max-width:none">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+      <span style="font-size:12px;color:var(--ink-muted)">缩小</span>
+      <input type="range" id="posterZoom" min="0.5" max="3" step="0.01" value="1" style="flex:1">
+      <span style="font-size:12px;color:var(--ink-muted)">放大</span>
+    </div>
+    <button onclick="triggerPosterReplace()" style="margin-top:8px;font-size:12px;padding:5px 12px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--ink-muted)">换一张图片</button>
+    <input type="file" id="posterReplaceInput" accept="image/*" style="display:none">
+  </div>
+
+  <div style="margin-bottom:20px">
+    <label style="font-size:13px;color:var(--ink-muted);display:block;margin-bottom:6px">显示文字（标题，可留空）</label>
+    <input type="text" id="posterEditTitle" placeholder="例：秋季古琴入门小班" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box">
+  </div>
+
+  <div style="display:flex;gap:10px;justify-content:flex-end">
+    <button onclick="closePosterEdit()" style="padding:10px 20px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer">取消</button>
+    <button onclick="savePosterEdit()" style="padding:10px 24px;background:var(--gold);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">保存</button>
+  </div>
+</div>
 </body>
 </html>
