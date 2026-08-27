@@ -571,7 +571,7 @@ function renderProducts(products) {
           <button class="sort-btn" onclick="moveProduct('${p.id}', 1)" title="下移">↓</button>
         </div>
         <div class="visibility-switch">
-          <button class="vs-btn vs-btn-show ${p.is_visible ? 'vs-active-show' : ''}" onclick="setVisible('${p.id}', true)">显示</button><button class="vs-btn vs-btn-hide ${!p.is_visible ? 'vs-active-hide' : ''}" onclick="setVisible('${p.id}', false)">隐藏</button>
+          <button class="vs-btn vs-btn-show ${p.is_visible ? 'vs-active-show' : ''}" onmousedown="event.preventDefault();setVisible('${p.id}', true)">显示</button><button class="vs-btn vs-btn-hide ${!p.is_visible ? 'vs-active-hide' : ''}" onmousedown="event.preventDefault();setVisible('${p.id}', false)">隐藏</button>
         </div>
         <button class="btn-edit" onclick="openEditModal('${p.id}')">编辑</button>
         <button class="btn-delete" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">删除</button>
