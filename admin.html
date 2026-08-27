@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>坐忘茗舍 · 管理后台</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #F7F3EC;
+    --surface: #EFEAD8;
+    --ink: #1C2B2B;
+    --ink-muted: #4A5C5A;
+    --gold: #A8894A;
+    --gold-soft: #EDE4CE;
+    --sage: #6B8C7A;
+    --border: #D8D0C0;
+    --red: #9B4A3E;
+    --red-soft: #F2E0DC;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: system-ui, sans-serif; font-size: 15px; line-height: 1.6; }
+
+  /* 登录页 */
+  #loginPage {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .login-box {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    width: 360px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+  .login-box h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .login-box p { color: var(--ink-muted); font-size: 13px; margin-bottom: 28px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .form-group input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus { border-color: var(--gold); }
+  .btn-primary {
+    width: 100%;
+    padding: 12px;
+    background: var(--gold);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity 0.2s;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .error-msg { color: var(--red); font-size: 13px; margin-top: 12px; text-align: center; min-height: 20px; }
+
+  /* 主后台 */
+  #adminPage { display: none; }
+  .top-bar {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .top-bar-title { font-weight: 700; font-size: 17px; color: var(--ink); }
+  .top-bar-right { display: flex; align-items: center; gap: 16px; }
+  .btn-logout {
+    padding: 7px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--ink-muted);
+  }
+  .btn-logout:hover { background: var(--bg); }
+
+  .admin-layout { display: flex; min-height: calc(100vh - 60px); }
+
+  /* 侧边栏 */
+  .sidebar {
+    width: 220px;
+    background: white;
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    flex-shrink: 0;
+  }
+  .sidebar-section { padding: 0 16px; margin-bottom: 8px; }
+  .sidebar-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    font-weight: 600;
+    padding: 0 8px;
+    margin-bottom: 4px;
+  }
+  .sidebar-item {
+    display: block;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+  .sidebar-item:hover { background: var(--bg); color: var(--ink); }
+  .sidebar-item.active { background: var(--gold-soft); color: var(--gold); font-weight: 600; }
+
+  /* 主内容 */
+  .main-content { flex: 1; padding: 32px; overflow-auto; }
+  .page-header { margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; }
+  .page-title { font-size: 22px; font-weight: 700; }
+  .page-subtitle { color: var(--ink-muted); font-size: 13px; margin-top: 4px; }
+
+  .btn-add {
+    padding: 10px 20px;
+    background: var(--gold);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-add:hover { opacity: 0.85; }
+
+  /* 分类选择器 */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--ink-muted);
+  }
+  .filter-chip:hover { border-color: var(--gold); color: var(--gold); }
+  .filter-chip.active { background: var(--gold); border-color: var(--gold); color: white; font-weight: 600; }
+
+  /* 商品卡片列表 */
+  .product-list { display: flex; flex-direction: column; gap: 10px; }
+  .product-row {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .product-row img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .product-row .no-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--ink-muted);
+    flex-shrink: 0;
+  }
+  .product-info { flex: 1; }
+  .product-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .product-meta { font-size: 12px; color: var(--ink-muted); }
+  .product-actions { display: flex; gap: 8px; }
+  .btn-edit, .btn-delete {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: white;
+    transition: all 0.15s;
+  }
+  .btn-edit:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-delete:hover { border-color: var(--red); color: var(--red); }
+  .badge-hidden {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: var(--red-soft);
+    color: var(--red);
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  /* 空状态 */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--ink-muted);
+  }
+  .empty-state p { margin-top: 8px; font-size: 13px; }
+
+  /* 模态框 */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    display: none;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 12px;
+    padding: 32px;
+    width: 520px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+  }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 24px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+  .btn-cancel {
+    padding: 10px 20px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .btn-save {
+    padding: 10px 24px;
+    background: var(--gold);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .modal .form-group select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--ink);
+    outline: none;
+  }
+  .modal .form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--ink);
+    outline: none;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+  }
+  .checkbox-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+  .checkbox-row input { width: 16px; height: 16px; cursor: pointer; }
+  .checkbox-row label { font-size: 14px; color: var(--ink); cursor: pointer; }
+
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: var(--ink);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .loading { text-align: center; color: var(--ink-muted); padding: 40px; }
+
+  .upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    color: var(--ink-muted);
+    font-size: 13px;
+    background: var(--bg);
+  }
+  .upload-area:hover { border-color: var(--gold); color: var(--gold); }
+</style>
+</head>
+<body>
+
+<!-- 登录页 -->
+<div id="loginPage">
+  <div class="login-box">
+    <h1>坐忘茗舍</h1>
+    <p>主理人管理后台，请登录</p>
+    <div class="form-group">
+      <label>邮箱</label>
+      <input type="email" id="loginEmail" placeholder="请输入邮箱">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="loginPassword" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn-primary" onclick="doLogin()">登录</button>
+    <div class="error-msg" id="loginError"></div>
+  </div>
+</div>
+
+<!-- 管理后台 -->
+<div id="adminPage">
+  <div class="top-bar">
+    <div class="top-bar-title">坐忘茗舍 · 管理后台</div>
+    <div class="top-bar-right">
+      <span id="userEmail" style="font-size:13px;color:var(--ink-muted)"></span>
+      <button class="btn-logout" onclick="doLogout()">退出登录</button>
+    </div>
+  </div>
+
+  <div class="admin-layout">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">内容管理</div>
+        <button class="sidebar-item active" onclick="switchTab('tea')">精选茗茶</button>
+        <button class="sidebar-item" onclick="switchTab('teaware')">茶器美学</button>
+        <button class="sidebar-item" onclick="switchTab('guqin')">琴道传习</button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="pageTitle">精选茗茶</div>
+          <div class="page-subtitle" id="pageSubtitle">管理茶叶品牌与产品</div>
+        </div>
+        <button class="btn-add" onclick="openAddModal()">+ 添加商品</button>
+      </div>
+
+      <div class="filter-bar" id="filterBar"></div>
+      <div id="productList"><div class="loading">加载中...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 添加/编辑商品模态框 -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">添加商品</div>
+    <div class="form-group">
+      <label>所属分类</label>
+      <select id="modalCategory"></select>
+    </div>
+    <div class="form-group">
+      <label>商品名称</label>
+      <input type="text" id="modalName" placeholder="例：骏眉红茶 · 特级">
+    </div>
+    <div class="form-group">
+      <label>简介</label>
+      <textarea id="modalDesc" placeholder="简短描述这款商品..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>价格（选填）</label>
+      <input type="text" id="modalPrice" placeholder="例：¥298 / 100g">
+    </div>
+    <div class="form-group">
+      <label>商品图片（选填）</label>
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('imageFileInput').click()">
+        <div id="uploadPlaceholder">点击选择图片，或拖拽图片到此处</div>
+        <img id="uploadPreview" style="display:none;max-width:100%;max-height:180px;border-radius:6px;margin-top:8px;">
+      </div>
+      <input type="file" id="imageFileInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
+      <div id="uploadStatus" style="font-size:12px;color:var(--ink-muted);margin-top:6px;"></div>
+      <input type="hidden" id="modalImage">
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="modalVisible" checked>
+      <label for="modalVisible">在网站上显示此商品</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-save" onclick="saveProduct()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://wmatsdnpbpcltuoynyrh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentTab = 'tea';
+let currentFilter = null;
+let editingId = null;
+let categoriesCache = [];
+
+const tabConfig = {
+  tea:      { title: '精选茗茶', subtitle: '管理茶叶品牌与产品', type: 'tea' },
+  teaware:  { title: '茶器美学', subtitle: '管理茶器分类与商品', type: 'teaware' },
+  guqin:    { title: '琴道传习', subtitle: '管理琴器分类与商品', type: 'guqin' },
+};
+
+// 登录
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  document.getElementById('loginError').textContent = '';
+  if (!email || !password) { document.getElementById('loginError').textContent = '请填写邮箱和密码'; return; }
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) { document.getElementById('loginError').textContent = '邮箱或密码错误'; return; }
+  showAdmin();
+}
+
+async function doLogout() {
+  await db.auth.signOut();
+  document.getElementById('adminPage').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'flex';
+}
+
+async function showAdmin() {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return;
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('adminPage').style.display = 'block';
+  document.getElementById('userEmail').textContent = user.email;
+  await loadCategories();
+  await loadProducts();
+}
+
+// 分类
+async function loadCategories() {
+  const { data } = await db.from('categories').select('*').order('sort_order');
+  categoriesCache = data || [];
+}
+
+function getCategoriesForTab() {
+  return categoriesCache.filter(c => c.type === tabConfig[currentTab].type);
+}
+
+function renderFilterBar() {
+  const cats = getCategoriesForTab();
+  const bar = document.getElementById('filterBar');
+  bar.innerHTML = cats.map(c =>
+    `<button class="filter-chip ${currentFilter === c.key ? 'active' : ''}" onclick="setFilter('${c.key}')">${c.name}</button>`
+  ).join('');
+}
+
+function setFilter(key) {
+  currentFilter = currentFilter === key ? null : key;
+  renderFilterBar();
+  loadProducts();
+}
+
+// 商品
+async function loadProducts() {
+  document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
+  const type = tabConfig[currentTab].type;
+  const cats = getCategoriesForTab().map(c => c.key);
+
+  let query = db.from('products').select('*, categories(name)').in('category_key', cats.length ? cats : ['__none__']).order('sort_order');
+  if (currentFilter) query = query.eq('category_key', currentFilter);
+
+  const { data, error } = await query;
+  renderProducts(data || []);
+  renderFilterBar();
+}
+
+function renderProducts(products) {
+  const el = document.getElementById('productList');
+  if (!products.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">📦</div><p>暂无商品，点击「添加商品」开始</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="product-list">' + products.map(p => `
+    <div class="product-row">
+      ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none'">` : '<div class="no-img">无图</div>'}
+      <div class="product-info">
+        <div class="product-name">${p.name} ${!p.is_visible ? '<span class="badge-hidden">已隐藏</span>' : ''}</div>
+        <div class="product-meta">${p.categories?.name || ''} ${p.price ? '· ' + p.price : ''}</div>
+        ${p.description ? `<div class="product-meta" style="margin-top:2px">${p.description}</div>` : ''}
+      </div>
+      <div class="product-actions">
+        <button class="btn-edit" onclick="openEditModal('${p.id}')">编辑</button>
+        <button class="btn-delete" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">删除</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
+
+// 模态框
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '添加商品';
+  document.getElementById('modalName').value = '';
+  document.getElementById('modalDesc').value = '';
+  document.getElementById('modalPrice').value = '';
+  document.getElementById('modalImage').value = '';
+  document.getElementById('modalVisible').checked = true;
+  populateCategorySelect();
+  document.getElementById('productModal').classList.add('open');
+}
+
+async function openEditModal(id) {
+  editingId = id;
+  const { data } = await db.from('products').select('*').eq('id', id).single();
+  if (!data) return;
+  document.getElementById('modalTitle').textContent = '编辑商品';
+  document.getElementById('modalName').value = data.name;
+  document.getElementById('modalDesc').value = data.description || '';
+  document.getElementById('modalPrice').value = data.price || '';
+  document.getElementById('modalImage').value = data.image_url || '';
+  document.getElementById('modalVisible').checked = data.is_visible;
+  document.getElementById('modalImage').value = data.image_url || '';
+  const preview = document.getElementById('uploadPreview');
+  const placeholder = document.getElementById('uploadPlaceholder');
+  if (data.image_url) {
+    preview.src = data.image_url;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  } else {
+    preview.style.display = 'none';
+    placeholder.style.display = 'block';
+  }
+  populateCategorySelect(data.category_key);
+  document.getElementById('productModal').classList.add('open');
+}
+
+function populateCategorySelect(selected) {
+  const cats = getCategoriesForTab();
+  const sel = document.getElementById('modalCategory');
+  sel.innerHTML = cats.map(c => `<option value="${c.key}" ${selected === c.key ? 'selected' : ''}>${c.name}</option>`).join('');
+}
+
+function closeModal() {
+  document.getElementById('productModal').classList.remove('open');
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadPlaceholder').style.display = 'block';
+  document.getElementById('uploadStatus').textContent = '';
+  document.getElementById('imageFileInput').value = '';
+  editingId = null;
+}
+
+// 图片压缩
+function compressImage(file, maxW = 1200, quality = 0.82) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+    };
+    img.src = url;
+  });
+}
+
+function handleImageSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const preview = document.getElementById('uploadPreview');
+  const placeholder = document.getElementById('uploadPlaceholder');
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('uploadStatus').textContent = '图片已选择，保存时自动上传';
+}
+
+async function uploadImageIfNeeded() {
+  const file = document.getElementById('imageFileInput').files[0];
+  if (!file) return document.getElementById('modalImage').value || null;
+  document.getElementById('uploadStatus').textContent = '上传中...';
+  const compressed = await compressImage(file);
+  const ext = 'jpg';
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { data, error } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
+  if (error) { showToast('图片上传失败'); return null; }
+  const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
+  document.getElementById('uploadStatus').textContent = '上传成功';
+  return publicUrl;
+}
+
+async function saveProduct() {
+  const name = document.getElementById('modalName').value.trim();
+  if (!name) { showToast('请填写商品名称'); return; }
+  const imageUrl = await uploadImageIfNeeded();
+  const payload = {
+    category_key: document.getElementById('modalCategory').value,
+    name,
+    description: document.getElementById('modalDesc').value.trim() || null,
+    price: document.getElementById('modalPrice').value.trim() || null,
+    image_url: imageUrl,
+    is_visible: document.getElementById('modalVisible').checked,
+  };
+  if (editingId) {
+    await db.from('products').update(payload).eq('id', editingId);
+    showToast('商品已更新');
+  } else {
+    await db.from('products').insert(payload);
+    showToast('商品已添加');
+  }
+  closeModal();
+  loadProducts();
+}
+
+async function deleteProduct(id, name) {
+  if (!confirm(`确定要删除「${name}」吗？`)) return;
+  await db.from('products').delete().eq('id', id);
+  showToast('已删除');
+  loadProducts();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  currentFilter = null;
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('pageTitle').textContent = tabConfig[tab].title;
+  document.getElementById('pageSubtitle').textContent = tabConfig[tab].subtitle;
+  loadProducts();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// 初始化
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) { showAdmin(); }
+})();
+
+// 点遮罩关闭模态框
+document.getElementById('productModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+</script>
+</body>
+</html>
