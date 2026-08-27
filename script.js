@@ -400,4 +400,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeEntryModal();
   });
+
+  // 海报加载
+  async function loadPosters(section, gridId, btnText, btnHref) {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    const { data } = await db.from('posters').select('*').eq('section', section).eq('is_visible', true).order('sort_order').order('created_at');
+    if (!data || !data.length) { grid.innerHTML = ''; return; }
+    grid.innerHTML = data.map(p => `
+      <div class="card poster-card">
+        <div class="card-media poster"><img src="${p.image_url}" alt="${p.title || '活动海报'}" loading="lazy"></div>
+        <div class="card-body">
+          ${p.title ? `<h3>${p.title}</h3>` : ''}
+          <a href="${btnHref}" class="cta-btn">${btnText}</a>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  loadPosters('qindao', 'qindaoGrid', '咨询报名 →', '#contact');
+  loadPosters('yaji',   'yajiGrid',   '联络掌柜 →', '#contact');
 });

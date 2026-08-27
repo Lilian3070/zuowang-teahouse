@@ -349,6 +349,15 @@
   }
   .upload-area:hover { border-color: var(--gold); color: var(--gold); }
 
+  /* 海报管理网格 */
+  .poster-admin-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+  .poster-admin-card { width: 180px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+  .poster-admin-img { width: 180px; height: 240px; background-size: cover; background-position: center; background-color: var(--surface); }
+  .poster-admin-title { font-size: 12px; padding: 6px 10px; color: var(--ink); font-weight: 600; }
+  .poster-admin-actions { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
+  .poster-admin-actions .sort-btn { flex: 1; }
+  .poster-admin-actions .btn-delete { flex: 1; }
+
   @media (max-width: 680px) {
     /* 顶栏 */
     .admin-header { padding: 0 16px; }
@@ -422,6 +431,8 @@
         <button class="sidebar-item active" onclick="switchTab('tea')">精选茗茶</button>
         <button class="sidebar-item" onclick="switchTab('teaware')">茶器美学</button>
         <button class="sidebar-item" onclick="switchTab('guqin')">斫琴甄选</button>
+        <button class="sidebar-item" onclick="switchTab('qindao')">琴道传习</button>
+        <button class="sidebar-item" onclick="switchTab('yaji')">坐忘雅集</button>
       </div>
     </div>
 
@@ -431,7 +442,8 @@
           <div class="page-title" id="pageTitle">精选茗茶</div>
           <div class="page-subtitle" id="pageSubtitle">管理茶叶品牌与产品</div>
         </div>
-        <button class="btn-add" onclick="openAddModal()">+ 添加商品</button>
+        <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
+        <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
@@ -518,6 +530,8 @@ const tabConfig = {
   tea:      { title: '精选茗茶', subtitle: '管理茶叶品牌与产品', type: 'tea' },
   teaware:  { title: '茶器美学', subtitle: '管理茶器分类与商品', type: 'teaware' },
   guqin:    { title: '斫琴甄选', subtitle: '管理古琴分类与商品', type: 'guqin' },
+  qindao:   { title: '琴道传习', subtitle: '管理活动招生海报', type: 'poster', section: 'qindao' },
+  yaji:     { title: '坐忘雅集', subtitle: '管理雅集活动海报', type: 'poster', section: 'yaji' },
 };
 
 // 登录
@@ -571,16 +585,26 @@ function setFilter(key) {
   loadProducts();
 }
 
-// 商品
+// 商品 / 海报 统一加载入口
 async function loadProducts() {
   document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
-  const type = tabConfig[currentTab].type;
-  const cats = getCategoriesForTab().map(c => c.key);
+  const cfg = tabConfig[currentTab];
 
+  if (cfg.type === 'poster') {
+    document.getElementById('btnAdd').style.display = 'none';
+    document.getElementById('btnAddPoster').style.display = '';
+    const { data } = await db.from('posters').select('*').eq('section', cfg.section).order('sort_order').order('created_at');
+    renderPosters(data || [], cfg.section);
+    document.getElementById('filterBar').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('btnAdd').style.display = '';
+  document.getElementById('btnAddPoster').style.display = 'none';
+  const cats = getCategoriesForTab().map(c => c.key);
   let query = db.from('products').select('*, categories(name)').in('category_key', cats.length ? cats : ['__none__']).order('is_visible', { ascending: false }).order('sort_order');
   if (currentFilter) query = query.eq('category_key', currentFilter);
-
-  const { data, error } = await query;
+  const { data } = await query;
   renderProducts(data || []);
   renderFilterBar();
 }
@@ -874,6 +898,91 @@ async function deleteProduct(id, name) {
   await db.from('products').delete().eq('id', id);
   showToast('已删除');
   loadProducts();
+}
+
+// ── 海报管理 ──────────────────────────────────────────
+
+function renderPosters(posters, section) {
+  const el = document.getElementById('productList');
+  if (!posters.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">🖼️</div><p>暂无海报，点击「上传海报」添加</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="poster-admin-grid">' + posters.map((p, i) => `
+    <div class="poster-admin-card" data-id="${p.id}" data-sort="${p.sort_order ?? i}">
+      <div class="poster-admin-img" style="background-image:url('${p.image_url}')"></div>
+      ${p.title ? `<div class="poster-admin-title">${p.title}</div>` : ''}
+      <div class="poster-admin-actions">
+        <button class="sort-btn" onclick="movePoster('${p.id}', -1)">↑</button>
+        <button class="sort-btn" onclick="movePoster('${p.id}', 1)">↓</button>
+        <button class="btn-delete" onclick="deletePoster('${p.id}')">删除</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
+
+function openPosterUpload() {
+  const section = tabConfig[currentTab].section;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    showToast('上传中…');
+    // 压缩到 3:4
+    const blob = await cropAndCompress(file, 3, 4);
+    const filename = `poster_${section}_${Date.now()}.jpg`;
+    const { error: upErr } = await db.storage.from('product-images').upload(filename, blob, { contentType: 'image/jpeg' });
+    if (upErr) { showToast('上传失败'); return; }
+    const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
+    await db.from('posters').insert({ section, image_url: publicUrl, sort_order: 999 });
+    showToast('海报已上传');
+    loadProducts();
+  };
+  input.click();
+}
+
+async function cropAndCompress(file, ratioW, ratioH) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const srcW = img.width, srcH = img.height;
+      let cropW = srcW, cropH = Math.round(srcW * ratioH / ratioW);
+      if (cropH > srcH) { cropH = srcH; cropW = Math.round(srcH * ratioW / ratioH); }
+      const offX = Math.round((srcW - cropW) / 2);
+      const offY = Math.round((srcH - cropH) / 2);
+      const maxH = 1440;
+      const scale = cropH > maxH ? maxH / cropH : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(cropW * scale);
+      canvas.height = Math.round(cropH * scale);
+      canvas.getContext('2d').drawImage(img, offX, offY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+    };
+    img.src = url;
+  });
+}
+
+async function deletePoster(id) {
+  if (!confirm('确定删除这张海报吗？')) return;
+  await db.from('posters').delete().eq('id', id);
+  showToast('已删除');
+  loadProducts();
+}
+
+async function movePoster(id, direction) {
+  const cards = [...document.querySelectorAll('.poster-admin-card')];
+  const idx = cards.findIndex(c => c.dataset.id === id);
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= cards.length) return;
+  const grid = cards[idx].parentNode;
+  if (direction === -1) grid.insertBefore(cards[idx], cards[targetIdx]);
+  else grid.insertBefore(cards[targetIdx], cards[idx]);
+  const allCards = [...grid.querySelectorAll('.poster-admin-card')];
+  await Promise.all(allCards.map((c, i) => db.from('posters').update({ sort_order: i }).eq('id', c.dataset.id)));
 }
 
 function switchTab(tab) {

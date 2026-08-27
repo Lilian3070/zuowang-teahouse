@@ -585,9 +585,18 @@ section {
   margin: 0 auto;
 }
 
+.poster-scroll {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: none;
+}
+.poster-scroll::-webkit-scrollbar { display: none; }
+
 .poster-card {
   flex: 0 0 auto;
-  width: clamp(240px, 30%, 320px);
+  width: clamp(200px, 28vw, 300px);
 }
 
 .poster-card img {
