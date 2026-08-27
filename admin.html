@@ -217,10 +217,19 @@
   }
   .btn-edit:hover { border-color: var(--gold); color: var(--gold); }
   .btn-delete:hover { border-color: var(--red); color: var(--red); }
-  .btn-toggle { color: var(--sage); border-color: var(--sage); }
-  .btn-toggle:hover { background: var(--sage); color: white; }
-  .btn-toggle-hidden { color: var(--ink-muted); border-color: var(--border); background: var(--surface); }
-  .btn-toggle-hidden:hover { border-color: var(--sage); color: var(--sage); background: white; }
+  .visibility-switch { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .vs-btn {
+    padding: 5px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border: none;
+    background: white;
+    color: var(--ink-muted);
+    transition: all 0.15s;
+  }
+  .vs-btn:hover { background: var(--surface); }
+  .vs-active-show { background: var(--sage) !important; color: white !important; }
+  .vs-active-hide { background: var(--red-soft) !important; color: var(--red) !important; font-weight: 600; }
   .badge-hidden {
     font-size: 11px;
     padding: 2px 8px;
@@ -552,7 +561,9 @@ function renderProducts(products) {
         ${p.description ? `<div class="product-meta" style="margin-top:2px">${p.description}</div>` : ''}
       </div>
       <div class="product-actions">
-        <button class="btn-toggle ${p.is_visible ? '' : 'btn-toggle-hidden'}" onclick="toggleVisible('${p.id}', ${p.is_visible})">${p.is_visible ? '显示中' : '已隐藏'}</button>
+        <div class="visibility-switch">
+          <button class="vs-btn ${p.is_visible ? 'vs-active-show' : ''}" onclick="setVisible('${p.id}', true)">显示</button><button class="vs-btn ${!p.is_visible ? 'vs-active-hide' : ''}" onclick="setVisible('${p.id}', false)">隐藏</button>
+        </div>
         <button class="btn-edit" onclick="openEditModal('${p.id}')">编辑</button>
         <button class="btn-delete" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">删除</button>
       </div>
@@ -683,9 +694,9 @@ async function saveProduct() {
   loadProducts();
 }
 
-async function toggleVisible(id, currentVisible) {
-  await db.from('products').update({ is_visible: !currentVisible }).eq('id', id);
-  showToast(currentVisible ? '已隐藏' : '已显示');
+async function setVisible(id, visible) {
+  await db.from('products').update({ is_visible: visible }).eq('id', id);
+  showToast(visible ? '已设为显示' : '已设为隐藏');
   loadProducts();
 }
 
