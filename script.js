@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     brandModal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
 
-    const { data: products } = await db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('created_at');
+    const { data: products } = await db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('sort_order').order('created_at');
     if (products && products.length) {
       modalProducts.innerHTML = '';
       products.forEach(p => modalProducts.appendChild(renderProductCard(p)));
