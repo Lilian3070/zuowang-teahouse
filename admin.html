@@ -217,6 +217,10 @@
   }
   .btn-edit:hover { border-color: var(--gold); color: var(--gold); }
   .btn-delete:hover { border-color: var(--red); color: var(--red); }
+  .btn-toggle { color: var(--sage); border-color: var(--sage); }
+  .btn-toggle:hover { background: var(--sage); color: white; }
+  .btn-toggle-hidden { color: var(--ink-muted); border-color: var(--border); background: var(--surface); }
+  .btn-toggle-hidden:hover { border-color: var(--sage); color: var(--sage); background: white; }
   .badge-hidden {
     font-size: 11px;
     padding: 2px 8px;
@@ -548,6 +552,7 @@ function renderProducts(products) {
         ${p.description ? `<div class="product-meta" style="margin-top:2px">${p.description}</div>` : ''}
       </div>
       <div class="product-actions">
+        <button class="btn-toggle ${p.is_visible ? '' : 'btn-toggle-hidden'}" onclick="toggleVisible('${p.id}', ${p.is_visible})">${p.is_visible ? '显示中' : '已隐藏'}</button>
         <button class="btn-edit" onclick="openEditModal('${p.id}')">编辑</button>
         <button class="btn-delete" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">删除</button>
       </div>
@@ -675,6 +680,12 @@ async function saveProduct() {
     showToast('商品已添加');
   }
   closeModal();
+  loadProducts();
+}
+
+async function toggleVisible(id, currentVisible) {
+  await db.from('products').update({ is_visible: !currentVisible }).eq('id', id);
+  showToast(currentVisible ? '已隐藏' : '已显示');
   loadProducts();
 }
 
