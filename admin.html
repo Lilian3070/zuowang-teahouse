@@ -230,6 +230,9 @@
   .vs-btn:hover { background: var(--surface); }
   .vs-active-show { background: var(--sage) !important; color: white !important; }
   .vs-active-hide { background: var(--red-soft) !important; color: var(--red) !important; font-weight: 600; }
+  .sort-btns { display: flex; flex-direction: column; gap: 2px; }
+  .sort-btn { padding: 2px 8px; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; line-height: 1.4; color: var(--ink-muted); }
+  .sort-btn:hover { background: #f5efe6; color: #8B6914; }
   .badge-hidden {
     font-size: 11px;
     padding: 2px 8px;
@@ -552,8 +555,8 @@ function renderProducts(products) {
     el.innerHTML = '<div class="empty-state"><div style="font-size:32px">📦</div><p>暂无商品，点击「添加商品」开始</p></div>';
     return;
   }
-  el.innerHTML = '<div class="product-list">' + products.map(p => `
-    <div class="product-row">
+  el.innerHTML = '<div class="product-list">' + products.map((p, i) => `
+    <div class="product-row" data-id="${p.id}" data-sort="${p.sort_order || i}">
       ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none'">` : '<div class="no-img">无图</div>'}
       <div class="product-info">
         <div class="product-name">${p.name} ${!p.is_visible ? '<span class="badge-hidden">已隐藏</span>' : ''}</div>
@@ -561,8 +564,12 @@ function renderProducts(products) {
         ${p.description ? `<div class="product-meta" style="margin-top:2px">${p.description}</div>` : ''}
       </div>
       <div class="product-actions">
+        <div class="sort-btns">
+          <button class="sort-btn" onclick="moveProduct('${p.id}', -1)" title="上移">↑</button>
+          <button class="sort-btn" onclick="moveProduct('${p.id}', 1)" title="下移">↓</button>
+        </div>
         <div class="visibility-switch">
-          <button class="vs-btn ${p.is_visible ? 'vs-active-show' : ''}" onclick="setVisible('${p.id}', true)">显示</button><button class="vs-btn ${!p.is_visible ? 'vs-active-hide' : ''}" onclick="setVisible('${p.id}', false)">隐藏</button>
+          <button class="vs-btn vs-btn-show ${p.is_visible ? 'vs-active-show' : ''}" onclick="setVisible('${p.id}', true)">显示</button><button class="vs-btn vs-btn-hide ${!p.is_visible ? 'vs-active-hide' : ''}" onclick="setVisible('${p.id}', false)">隐藏</button>
         </div>
         <button class="btn-edit" onclick="openEditModal('${p.id}')">编辑</button>
         <button class="btn-delete" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">删除</button>
@@ -697,6 +704,38 @@ async function saveProduct() {
 async function setVisible(id, visible) {
   await db.from('products').update({ is_visible: visible }).eq('id', id);
   showToast(visible ? '已设为显示' : '已设为隐藏');
+  // 只更新那一行，不刷新整个列表
+  const row = document.querySelector(`.product-row[data-id="${id}"]`);
+  if (!row) return;
+  const showBtn = row.querySelector('.vs-btn-show');
+  const hideBtn = row.querySelector('.vs-btn-hide');
+  const badge = row.querySelector('.badge-hidden');
+  if (visible) {
+    showBtn.classList.add('vs-active-show');
+    hideBtn.classList.remove('vs-active-hide');
+    if (badge) badge.remove();
+  } else {
+    showBtn.classList.remove('vs-active-show');
+    hideBtn.classList.add('vs-active-hide');
+    if (!badge) {
+      row.querySelector('.product-name').insertAdjacentHTML('beforeend', '<span class="badge-hidden">已隐藏</span>');
+    }
+  }
+}
+
+async function moveProduct(id, direction) {
+  const rows = [...document.querySelectorAll('.product-row')];
+  const idx = rows.findIndex(r => r.dataset.id === id);
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= rows.length) return;
+  const idA = rows[idx].dataset.id;
+  const idB = rows[targetIdx].dataset.id;
+  const sortA = parseInt(rows[idx].dataset.sort);
+  const sortB = parseInt(rows[targetIdx].dataset.sort);
+  await Promise.all([
+    db.from('products').update({ sort_order: sortB }).eq('id', idA),
+    db.from('products').update({ sort_order: sortA }).eq('id', idB),
+  ]);
   loadProducts();
 }
 
