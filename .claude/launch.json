@@ -5,7 +5,8 @@
       "name": "zuowang-teahouse",
       "runtimeExecutable": "powershell",
       "runtimeArgs": ["-ExecutionPolicy", "Bypass", "-File", "serve.ps1"],
-      "port": 8934
+      "port": 8080,
+      "autoPort": true
     }
   ]
 }

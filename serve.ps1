@@ -1,8 +1,9 @@
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$port = if ($env:PORT) { $env:PORT } else { "8934" }
 $listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:8934/")
+$listener.Prefixes.Add("http://localhost:$port/")
 $listener.Start()
-Write-Host "Serving $root on http://localhost:8934/"
+Write-Host "Serving $root on http://localhost:$port/"
 
 $mime = @{
   ".html" = "text/html; charset=utf-8"

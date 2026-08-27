@@ -9,7 +9,7 @@
 <body>
 
 <nav class="nav">
-  <div class="brand">坐忘茗舍</div>
+  <img class="nav-logo" src="assets/坐忘茗舍logo.png" alt="坐忘茗舍">
   <button class="nav-toggle" id="navToggle" aria-label="菜单">
     <span></span><span></span><span></span>
   </button>
@@ -19,6 +19,7 @@
     <li><a href="#qindao">琴道传习</a></li>
     <li><a href="#zhuoqin">斫琴甄选</a></li>
     <li><a href="#booking">茶席预约</a></li>
+    <li><a href="#yaji">坐忘雅集</a></li>
     <li><a href="#about">坐忘故事</a></li>
     <li><a href="#contact">寻访茗舍</a></li>
   </ul>
@@ -26,7 +27,7 @@
 
 <header class="hero">
   <div class="brand-title">
-    <h1>坐忘茗舍</h1>
+    <img class="hero-logo" src="assets/坐忘茗舍logo.png" alt="坐忘茗舍">
     <img class="brand-seal" src="assets/店铺印章.png" alt="坐忘茗舍 印章">
   </div>
   <p class="tagline">于一室茶烟古琴声中，坐忘外物。</p>
@@ -80,35 +81,35 @@
   <p class="demo-note">以下分类为结构占位，用于演示"分类 → 产品"两级浏览效果，正式上线前会替换为真实的茶具分类与产品信息。</p>
   <div class="grid-4" id="teawareGrid">
     <div class="card teaware-card">
-      <div class="card-media">【实拍图占位】</div>
+      <div class="card-media"><img class="cover-fit" src="assets/茶器-泡茶主器.png" alt="泡茶主器"></div>
       <div class="card-body">
         <h3>泡茶主器</h3>
         <p>手感顺畅，出水断水利落，兼具实用与观赏价值。</p>
-        <button class="explore-btn" type="button" data-category="zhuchaqi">查看茶具 →</button>
+        <button class="explore-btn" type="button" data-category="zhuchaqi">茗器清赏 →</button>
       </div>
     </div>
     <div class="card teaware-card">
-      <div class="card-media">【实拍图占位】</div>
+      <div class="card-media"><img class="cover-fit" src="assets/茶器-品茗杯盏.png" alt="品茗杯盏"></div>
       <div class="card-body">
         <h3>品茗杯盏</h3>
         <p>观茶汤之色，品茶香之韵，寻一只称手的专属主人杯。</p>
-        <button class="explore-btn" type="button" data-category="pinmingbei">查看茶具 →</button>
+        <button class="explore-btn" type="button" data-category="pinmingbei">茗器清赏 →</button>
       </div>
     </div>
     <div class="card teaware-card">
-      <div class="card-media">【实拍图占位】</div>
+      <div class="card-media"><img class="cover-fit" src="assets/茶器-茶席雅设.png" alt="茶席雅设"></div>
       <div class="card-body">
         <h3>茶席雅设</h3>
         <p>点缀案头茶席，营造静谧雅致的品茶氛围。</p>
-        <button class="explore-btn" type="button" data-category="chaxiyashe">查看茶具 →</button>
+        <button class="explore-btn" type="button" data-category="chaxiyashe">茗器清赏 →</button>
       </div>
     </div>
     <div class="card teaware-card">
-      <div class="card-media">【实拍图占位】</div>
+      <div class="card-media"><img class="cover-fit" src="assets/茶器-名窑匠作.png" alt="名窑匠作"></div>
       <div class="card-body">
         <h3>名窑匠作</h3>
         <p>严选名窑大工精制，独一无二的匠心器物。</p>
-        <button class="explore-btn" type="button" data-category="mingyao">查看茶具 →</button>
+        <button class="explore-btn" type="button" data-category="mingyao">茗器清赏 →</button>
       </div>
     </div>
   </div>
@@ -118,21 +119,32 @@
   <div class="section-head">
     <span class="eyebrow">GUQIN · 传习</span>
     <h2>琴道传习</h2>
-    <p>【占位文案】以琴修身，以道传习——介绍古琴课程的教学理念与授课形式。</p>
+    <p class="section-quote">「千载琴声不绝，弦外之响，皆为心声。」</p>
+    <p>减去尘世的杂音，古琴只留给懂得倾听的灵台。随缘传习，不疾不徐。从最初的松沉落指，到后来的指下生风，这是一场向内的修行。当跨越时空的音符在指尖流淌，方知千载风骨，不过是与自我的久别重逢。</p>
     <div class="divider"></div>
   </div>
-  <div class="split reverse">
-    <div>
-      <h3>【占位】课程与报名</h3>
-      <p>【占位文案】介绍课程形式（一对一 / 小班）、适合零基础还是有一定基础的学员、教学老师简介，以及报名方式。</p>
-      <ul class="tag-list">
-        <li>【零基础入门】</li>
-        <li>【进阶课程】</li>
-        <li>【线下授课】</li>
-        <li>【报名咨询】</li>
-      </ul>
+  <div class="grid-3" id="qindaoGrid">
+    <div class="card poster-card">
+      <div class="card-media poster"><img src="assets/招生海报-秋季入门小班.jpg" alt="秋季古琴入门小班"></div>
+      <div class="card-body">
+        <h3>秋季古琴入门小班</h3>
+        <a href="#contact" class="cta-btn">咨询报名 →</a>
+      </div>
     </div>
-    <div class="media">【授课场景实拍图占位】</div>
+    <div class="card poster-card">
+      <div class="card-media poster"><img src="assets/招生海报-一对一私享课.png" alt="一对一私享课"></div>
+      <div class="card-body">
+        <h3>一对一私享课</h3>
+        <a href="#contact" class="cta-btn">咨询报名 →</a>
+      </div>
+    </div>
+    <div class="card poster-card">
+      <div class="card-media poster"><img src="assets/招生海报-高阶大曲精修课.png" alt="高阶大曲精修课"></div>
+      <div class="card-body">
+        <h3>高阶大曲精修课</h3>
+        <a href="#contact" class="cta-btn">咨询报名 →</a>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -140,19 +152,42 @@
   <div class="section-head">
     <span class="eyebrow">GUQIN · 斫琴</span>
     <h2>斫琴甄选</h2>
-    <p>【占位文案】一器一物，皆经甄选而来——介绍店内古琴的选材、斫琴师渊源与制作理念。</p>
+    <p class="section-quote">「寻一弦清音，伴半日闲暇。」</p>
+    <p>七弦无桥，静水流深。从初学入门到各阶琴器，馆内皆有备存。分门别类，各擅其声。若路过或得闲，随时可以来馆里坐坐，亲自落指弹上一曲。顺心与否，心里自然就有了答案。</p>
     <div class="divider"></div>
   </div>
-  <div class="split">
-    <div class="media">【古琴实拍图占位】</div>
-    <div>
-      <h3>【占位】斫琴师 / 品牌来源</h3>
-      <p>【占位文案】介绍店内古琴的选材、斫琴师或品牌来源、价位区间，可附一段关于"斫琴如修心"的品牌理念。</p>
-      <ul class="tag-list">
-        <li>【琴材/款式】</li>
-        <li>【价位区间】</li>
-        <li>【可预约试音】</li>
-      </ul>
+  <div class="grid-4" id="guqinGrid">
+    <div class="card">
+      <div class="card-media square"><img src="assets/琴器-初弦.png" alt="初弦"></div>
+      <div class="card-body">
+        <h3>初弦</h3>
+        <p>初学者入门之选，手感松沉顺手，陪伴您迈出习琴的第一步。</p>
+        <button class="explore-btn" type="button" data-guqin="chuxian">知音寻琴 →</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-media square"><img src="assets/琴器-妙音.png" alt="妙音"></div>
+      <div class="card-body">
+        <h3>妙音</h3>
+        <p>演奏与进阶之选，音色饱满圆润、余韵深长，是日常操缦的知心伴侣。</p>
+        <button class="explore-btn" type="button" data-guqin="miaoyin">知音寻琴 →</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-media square"><img src="assets/琴器-藏锋.png" alt="藏锋"></div>
+      <div class="card-body">
+        <h3>藏锋</h3>
+        <p>经典良材与老漆珍品，兼具精湛工艺与深厚收藏之美。</p>
+        <button class="explore-btn" type="button" data-guqin="cangfeng">知音寻琴 →</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-media square"><img src="assets/琴器-携行.png" alt="携行"></div>
+      <div class="card-body">
+        <h3>携行</h3>
+        <p>形制小巧轻灵的膝琴，无论案头清修还是外出随身携带皆宜。</p>
+        <button class="explore-btn" type="button" data-guqin="xiexing">知音寻琴 →</button>
+      </div>
     </div>
   </div>
 </section>
@@ -160,46 +195,81 @@
 <section id="booking" class="booking">
   <div class="section-head">
     <span class="eyebrow">TEA ROOM</span>
-    <h2>茶室体验 · 包厢预约</h2>
-    <p>【占位文案】介绍包厢环境与氛围，说明可自主泡茶，也可由店内代为泡茶。</p>
+    <h2>坐忘茶境 · 席位预约</h2>
+    <p>隐于喧嚣之外，独立清幽茶境。店内设静谧独立包厢，可随心享受自主施茶之乐，亦可由专业茶艺师悉心代为冲泡，于满室茶香间，体味物我两忘的悠然。</p>
     <div class="divider"></div>
   </div>
-  <div class="booking-panel">
-    <div class="booking-info">
-      <h3>预约须知【占位】</h3>
-      <ul>
-        <li>包厢数量与容纳人数【占位】</li>
-        <li>自主泡茶 / 代泡茶两种模式说明【占位】</li>
-        <li>营业时间【占位】</li>
-        <li>费用说明【占位】</li>
+  <div class="booking-tracks">
+    <div class="track track-new">
+      <span class="track-label">初次到访</span>
+      <h3>新客初见</h3>
+      <p class="track-lead">本馆实行预约制，初次到访请先与掌柜微信或电话联络，确认在地身份与空闲雅室。</p>
+      <ul class="plain-list">
+        <li>雅室数量有限，敬请提前联系</li>
+        <li>可自主泡茶怡情，亦可请茶艺师代为冲泡</li>
+        <li>具体到访时间与费用，由掌柜与您详细确认</li>
       </ul>
-      <p style="font-size:0.85rem; color:#d9cdae; margin-top:24px;">
-        此表单目前仅为前端展示，暂未连接后台，正式上线前需要接入真实的提交方式（如邮件、微信通知等）。
-      </p>
+      <a href="#contact" class="cta-btn">添加掌柜微信 →</a>
     </div>
-    <form class="booking-form" id="bookingForm">
-      <label for="name">姓名</label>
-      <input type="text" id="name" name="name" placeholder="请输入姓名" required>
 
-      <label for="phone">联系电话</label>
-      <input type="tel" id="phone" name="phone" placeholder="请输入手机号" required>
+    <div class="track track-verified">
+      <span class="track-label">知音通道</span>
+      <h3>已联络知音</h3>
+      <p class="track-lead">已与掌柜联络确认的知音，请在此验证预留手机号，即可直接填写席位预约。</p>
 
-      <label for="mode">泡茶方式</label>
-      <select id="mode" name="mode">
-        <option>自主泡茶</option>
-        <option>店内代泡</option>
-        <option>还没想好，先咨询</option>
-      </select>
+      <form class="verify-form" id="verifyForm">
+        <label for="verifyPhone">预留手机号</label>
+        <input type="tel" id="verifyPhone" name="verifyPhone" placeholder="请输入手机号" required>
+        <button type="submit" class="submit-btn">验证身份</button>
+      </form>
+      <p class="verify-message" id="verifyMessage"></p>
 
-      <label for="datetime">期望到访时间</label>
-      <input type="text" id="datetime" name="datetime" placeholder="例如：8月30日下午2点左右">
+      <form class="booking-form real-booking-form" id="realBookingForm">
+        <label for="name">姓名</label>
+        <input type="text" id="name" name="name" placeholder="请输入姓名" required>
 
-      <label for="note">备注</label>
-      <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
+        <label for="mode">泡茶方式</label>
+        <select id="mode" name="mode">
+          <option>自主泡茶</option>
+          <option>店内代泡</option>
+          <option>还没想好，先咨询</option>
+        </select>
 
-      <button type="submit" class="submit-btn">提交预约意向</button>
-      <div class="form-status" id="formStatus">已收到您的预约意向，我们会尽快通过电话或微信与您确认。</div>
-    </form>
+        <label for="datetime">期望到访时间</label>
+        <input type="text" id="datetime" name="datetime" placeholder="例如：8月30日下午2点左右">
+
+        <label for="note">备注</label>
+        <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
+
+        <button type="submit" class="submit-btn">提交预约</button>
+        <div class="form-status" id="formStatus">已收到您的预约，我们会尽快与您确认。</div>
+      </form>
+
+      <p class="proto-note">当前为原型演示，手机号验证暂由前端模拟，正式上线后将接入真实的知音名单数据。</p>
+    </div>
+  </div>
+</section>
+
+<section id="yaji" class="yaji">
+  <div class="section-head">
+    <span class="eyebrow">GATHERING</span>
+    <h2>坐忘雅集</h2>
+    <div class="divider"></div>
+  </div>
+  <div class="yaji-story">
+    <p class="story-title">「 风来疏竹，水过溪山。」</p>
+    <p>在这里的日子向来不拘一格——或抚琴弹唱、或洞箫低回，或着一袭汉服、或展纸挥毫，甚至只是兴之所至的闲谈长啸。</p>
+    <p>没有固定的排期，全凭四时节气与当下的心境。茶烟轻扬处，若恰好撞见彼此的兴致，便是一场不期而遇的知音聚落。</p>
+    <p>随时欢迎联络掌柜，看最近空间里又有什么新鲜趣事正要发生。</p>
+  </div>
+  <div class="grid-3" id="yajiGrid">
+    <div class="card poster-card">
+      <div class="card-media poster"><img src="assets/雅集海报.png" alt="坐忘雅集"></div>
+      <div class="card-body">
+        <a href="#contact" class="cta-btn">联络掌柜 →</a>
+      </div>
+    </div>
+    <!-- 每次新活动复制上方 card 结构，替换 src 图片路径即可 -->
   </div>
 </section>
 
@@ -222,24 +292,24 @@
 <section id="contact" class="contact">
   <div class="section-head">
     <span class="eyebrow">CONTACT</span>
-    <h2>联系我们</h2>
-    <p>欢迎通过以下方式咨询茶叶、茶具、古琴课程或包厢预约</p>
+    <h2>静候君来</h2>
+    <p>琴茶相伴，静候知音。欢迎垂询茶叶茶具、古琴研习与包厢预约。</p>
     <div class="divider"></div>
   </div>
   <div class="contact-grid">
     <div class="contact-item">
-      <div class="qr"><img src="assets/微信二维码.jpg" alt="坐忘茗舍 微信二维码"></div>
-      <h3>微信咨询</h3>
+      <div class="qr"><img src="assets/微信专线.png" alt="坐忘茗舍 微信二维码"></div>
+      <h3>微信专线</h3>
       <p>扫码添加微信</p>
     </div>
     <div class="contact-item">
-      <div class="qr icon">☎</div>
-      <h3>电话</h3>
+      <div class="qr"><img src="assets/咨询热线.png" alt="咨询热线"></div>
+      <h3>咨询热线</h3>
       <p>18668788289</p>
     </div>
     <a class="contact-item map-link" href="https://www.amap.com/search?query=温州市鹿城区松台街道蛟翔巷111号" target="_blank" rel="noopener">
-      <div class="qr icon">📍</div>
-      <h3>地址</h3>
+      <div class="qr"><img src="assets/茗舍地址.png" alt="茗舍地址"></div>
+      <h3>茗舍地址</h3>
       <p>温州市鹿城区松台街道蛟翔巷111号</p>
       <p class="map-cta">点击在高德地图中查看 →</p>
     </a>
