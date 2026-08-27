@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return card;
   }
 
-  async function openEntryModal(entry, eyebrowText) {
+  async function openEntryModal(entry, eyebrowText, categoryKey) {
     if (!entry) return;
     modalEyebrow.textContent = eyebrowText;
     modalBrandName.textContent = entry.name;
@@ -367,16 +367,13 @@ document.addEventListener('DOMContentLoaded', () => {
     brandModal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
 
-    const { data: cat } = await db.from('categories').select('id').eq('name', entry.name).maybeSingle();
-    if (cat) {
-      const { data: products } = await db.from('products').select('*').eq('category_id', cat.id).eq('is_visible', true).order('created_at');
-      if (products && products.length) {
-        modalProducts.innerHTML = '';
-        products.forEach(p => modalProducts.appendChild(renderProductCard(p)));
-        return;
-      }
+    const { data: products } = await db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('created_at');
+    if (products && products.length) {
+      modalProducts.innerHTML = '';
+      products.forEach(p => modalProducts.appendChild(renderProductCard(p)));
+    } else {
+      modalProducts.innerHTML = '<p style="color:#888;padding:20px 0">暂无商品</p>';
     }
-    modalProducts.innerHTML = '<p style="color:#888;padding:20px 0">暂无商品</p>';
   }
 
   function closeEntryModal() {
@@ -390,11 +387,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = e.target.closest('.explore-btn');
     if (!btn) return;
     if (btn.dataset.brand) {
-      openEntryModal(teaBrands[btn.dataset.brand], 'BRAND');
+      openEntryModal(teaBrands[btn.dataset.brand], 'BRAND', btn.dataset.brand);
     } else if (btn.dataset.category) {
-      openEntryModal(teawareCategories[btn.dataset.category], 'TEAWARE');
+      openEntryModal(teawareCategories[btn.dataset.category], 'TEAWARE', btn.dataset.category);
     } else if (btn.dataset.guqin) {
-      openEntryModal(guqinCategories[btn.dataset.guqin], 'GUQIN');
+      openEntryModal(guqinCategories[btn.dataset.guqin], 'GUQIN', btn.dataset.guqin);
     }
   });
 
