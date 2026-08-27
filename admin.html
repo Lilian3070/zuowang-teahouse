@@ -233,7 +233,6 @@
   .sort-btns { display: flex; flex-direction: column; gap: 2px; }
   .sort-btn { padding: 2px 8px; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; line-height: 1.4; color: var(--ink-muted); }
   .sort-btn:hover { background: #f5efe6; color: #8B6914; }
-.drag-placeholder { background: #f5efe6; border: 2px dashed #c9a96e; border-radius: 10px; margin-bottom: 10px; }
   .product-row[draggable="true"] { transition: box-shadow 0.15s; }
   .product-row.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
   .badge-hidden {
@@ -778,26 +777,16 @@ function initDragSort() {
   const list = document.getElementById('sortableList');
   if (!list) return;
   let dragging = null;
-  let placeholder = null;
 
   list.addEventListener('dragstart', e => {
     dragging = e.target.closest('.product-row');
     if (!dragging) return;
     setTimeout(() => { dragging.style.opacity = '0.4'; }, 0);
-    placeholder = document.createElement('div');
-    placeholder.className = 'drag-placeholder';
-    placeholder.style.height = dragging.offsetHeight + 'px';
   });
 
   list.addEventListener('dragend', async e => {
     if (!dragging) return;
     dragging.style.opacity = '';
-    if (placeholder && placeholder.parentNode) {
-      placeholder.parentNode.replaceChild(dragging, placeholder);
-    }
-    placeholder = null;
-
-    // 重新计算所有行的 sort_order 并保存
     const rows = [...list.querySelectorAll('.product-row')];
     await Promise.all(rows.map((r, i) => {
       r.dataset.sort = i;
@@ -808,17 +797,16 @@ function initDragSort() {
 
   list.addEventListener('dragover', e => {
     e.preventDefault();
-    if (!dragging || !placeholder) return;
+    if (!dragging) return;
     const target = e.target.closest('.product-row');
     if (!target || target === dragging) return;
     const rect = target.getBoundingClientRect();
     const mid = rect.top + rect.height / 2;
     if (e.clientY < mid) {
-      target.parentNode.insertBefore(placeholder, target);
+      list.insertBefore(dragging, target);
     } else {
-      target.parentNode.insertBefore(placeholder, target.nextSibling);
+      list.insertBefore(dragging, target.nextSibling);
     }
-    placeholder.parentNode.insertBefore(dragging, placeholder);
   });
 }
 
