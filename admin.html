@@ -785,14 +785,21 @@ function initDragSort() {
   });
 
   list.addEventListener('dragend', async e => {
-    if (!dragging) return;
-    dragging.style.opacity = '';
+    const el = dragging;
+    dragging = null;
+    if (!el) return;
+    el.style.opacity = '';
+    el.style.transition = '';
     const rows = [...list.querySelectorAll('.product-row')];
     await Promise.all(rows.map((r, i) => {
       r.dataset.sort = i;
       return db.from('products').update({ sort_order: i }).eq('id', r.dataset.id);
     }));
-    dragging = null;
+  });
+
+  // 兜底：任何情况松手都还原透明度
+  document.addEventListener('mouseup', () => {
+    document.querySelectorAll('.product-row').forEach(r => r.style.opacity = '');
   });
 
   list.addEventListener('dragover', e => {
