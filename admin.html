@@ -723,11 +723,13 @@ function setVisible(id, visible) {
       }
     }
   }
-  // 后台保存，失败时回滚 UI 并提示
-  db.from('products').update({ is_visible: visible }).eq('id', id).then(({ error }) => {
+  // 后台保存，明确提示成功或失败
+  db.from('products').update({ is_visible: visible }).eq('id', id).then(({ error, data, count, status }) => {
     if (error) {
-      showToast('保存失败，请重试');
-      setVisible(id, !visible); // 回滚
+      showToast('❌ 保存失败：' + error.message);
+      setVisible(id, !visible); // 回滚 UI
+    } else {
+      showToast(visible ? '✓ 已设为显示' : '✓ 已设为隐藏');
     }
   });
 }
