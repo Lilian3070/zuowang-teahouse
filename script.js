@@ -50,25 +50,45 @@ document.addEventListener('DOMContentLoaded', () => {
       pauseTimeout = setTimeout(() => { paused = false; }, 4000);
     }
 
-    // 惯性：vel > 0 → tx 增 → 内容右移（上一张）；vel < 0 → tx 减 → 内容左移（下一张）
+    // 吸附到最近一张卡片
+    function snapTo(fromTX) {
+      const sw = slotW();
+      if (!sw) { animating = false; return; }
+      const nearest = Math.round(-fromTX / sw) * sw;
+      const target = -nearest;
+      const startTX = fromTX, dur = 280, t0 = performance.now();
+      cancelAnimationFrame(rafId);
+      animating = true;
+      function tick(now) {
+        const p = Math.min((now - t0) / dur, 1);
+        setTX(startTX + (target - startTX) * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) rafId = requestAnimationFrame(tick);
+        else animating = false;
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    // 惯性 → 减速 → 自动吸附
     function glide(vel) {
       let v = vel;
       cancelAnimationFrame(rafId);
       animating = true;
       function tick() {
-        if (Math.abs(v) < 0.3) { animating = false; return; }
+        if (Math.abs(v) < 0.5) { snapTo(tx); return; }
         setTX(tx + v);
-        v *= 0.95;
+        v *= 0.92;
         rafId = requestAnimationFrame(tick);
       }
       rafId = requestAnimationFrame(tick);
     }
 
-    // 自动：向左滚一张（下一张）
+    // 自动：向左滚一张，从当前吸附位置出发
     function autoStep() {
       if (paused || animating) return;
       animating = true;
-      const startTX = tx, target = tx - slotW(), dur = 500, t0 = performance.now();
+      const sw = slotW();
+      const snappedTX = -Math.round(-tx / sw) * sw;
+      const startTX = snappedTX, target = snappedTX - sw, dur = 500, t0 = performance.now();
       cancelAnimationFrame(rafId);
       function tick(now) {
         const p = Math.min((now - t0) / dur, 1);
