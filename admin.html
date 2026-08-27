@@ -735,9 +735,12 @@ function setVisible(id, visible) {
     }
   }
 
-  // 后台保存
-  db.from('products').update({ is_visible: visible }).eq('id', id).then(({ error }) => {
-    if (error) setVisible(id, !visible);
+  // 后台保存：可见性 + 重新计算所有行的 sort_order
+  const rows = list ? [...list.querySelectorAll('.product-row')] : [];
+  const saves = [db.from('products').update({ is_visible: visible }).eq('id', id)];
+  rows.forEach((r, i) => { r.dataset.sort = i; saves.push(db.from('products').update({ sort_order: i }).eq('id', r.dataset.id)); });
+  Promise.all(saves).then(results => {
+    if (results[0].error) setVisible(id, !visible);
   });
 }
 
