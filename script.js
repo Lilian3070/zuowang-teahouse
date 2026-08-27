@@ -24,7 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function slotW() {
       const c = track.querySelector('.card');
-      return c ? (c.offsetWidth + 16) : 0;
+      if (!c) return 0;
+      const gap = parseFloat(getComputedStyle(track).gap) || 16;
+      return c.offsetWidth + gap;
     }
     function origW() { return slotW() * N; }
 
@@ -401,21 +403,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') closeEntryModal();
   });
 
-  // 海报加载
+  // 海报加载（每次调用都重建轮播）
   async function loadPosters(section, gridId, btnText, btnHref) {
     const grid = document.getElementById(gridId);
     if (!grid) return;
+    // 销毁旧轮播
+    if (destroyers.has(grid)) { destroyers.get(grid)(); destroyers.delete(grid); }
     const { data } = await db.from('posters').select('*').eq('section', section).eq('is_visible', true).order('sort_order').order('created_at');
-    if (!data || !data.length) { grid.innerHTML = ''; return; }
-    grid.innerHTML = data.map(p => `
-      <div class="card poster-card">
+    grid.innerHTML = '';
+    if (!data || !data.length) return;
+    data.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'card poster-card';
+      card.innerHTML = `
         <div class="card-media poster"><img src="${p.image_url}" alt="${p.title || '活动海报'}" loading="lazy"></div>
         <div class="card-body">
           ${p.title ? `<h3>${p.title}</h3>` : ''}
           <a href="${btnHref}" class="cta-btn">${btnText}</a>
-        </div>
-      </div>
-    `).join('');
+        </div>`;
+      grid.appendChild(card);
+    });
+    if (data.length >= 2) {
+      const destroy = initCarousel(grid);
+      if (destroy) destroyers.set(grid, destroy);
+    }
   }
 
   loadPosters('qindao', 'qindaoGrid', '咨询报名 →', '#contact');

@@ -586,13 +586,21 @@ section {
 }
 
 .poster-scroll {
-  display: flex;
-  gap: 24px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  scrollbar-width: none;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
 }
 .poster-scroll::-webkit-scrollbar { display: none; }
+
+/* 海报 carousel track（复用商品轮播逻辑） */
+.poster-scroll .carousel-track {
+  display: flex;
+  gap: 24px;
+  will-change: transform;
+  touch-action: pan-y;
+  user-select: none;
+}
+.poster-scroll .carousel-track.grabbing { cursor: grabbing; }
 
 .poster-card {
   flex: 0 0 auto;
@@ -603,6 +611,7 @@ section {
   width: 100%;
   border-radius: 4px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  pointer-events: none;
 }
 
 .about {
