@@ -233,6 +233,11 @@
   .sort-btns { display: flex; flex-direction: column; gap: 2px; }
   .sort-btn { padding: 2px 8px; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; line-height: 1.4; color: var(--ink-muted); }
   .sort-btn:hover { background: #f5efe6; color: #8B6914; }
+  .drag-handle { font-size: 18px; color: var(--ink-muted); cursor: grab; padding: 0 6px; user-select: none; flex-shrink: 0; }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-placeholder { background: #f5efe6; border: 2px dashed #c9a96e; border-radius: 10px; margin-bottom: 10px; }
+  .product-row[draggable="true"] { transition: box-shadow 0.15s; }
+  .product-row.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
   .badge-hidden {
     font-size: 11px;
     padding: 2px 8px;
@@ -555,8 +560,9 @@ function renderProducts(products) {
     el.innerHTML = '<div class="empty-state"><div style="font-size:32px">📦</div><p>暂无商品，点击「添加商品」开始</p></div>';
     return;
   }
-  el.innerHTML = '<div class="product-list">' + products.map((p, i) => `
-    <div class="product-row" data-id="${p.id}" data-sort="${p.sort_order || i}">
+  el.innerHTML = '<div class="product-list" id="sortableList">' + products.map((p, i) => `
+    <div class="product-row" data-id="${p.id}" data-sort="${p.sort_order || i}" draggable="true">
+      <div class="drag-handle" title="拖拽排序">⠿</div>
       ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none'">` : '<div class="no-img">无图</div>'}
       <div class="product-info">
         <div class="product-name">${p.name} ${!p.is_visible ? '<span class="badge-hidden">已隐藏</span>' : ''}</div>
@@ -576,6 +582,7 @@ function renderProducts(products) {
       </div>
     </div>
   `).join('') + '</div>';
+  initDragSort();
 }
 
 // 模态框
@@ -724,19 +731,98 @@ async function setVisible(id, visible) {
 }
 
 async function moveProduct(id, direction) {
-  const rows = [...document.querySelectorAll('.product-row')];
+  const list = document.getElementById('sortableList');
+  const rows = [...list.querySelectorAll('.product-row')];
   const idx = rows.findIndex(r => r.dataset.id === id);
   const targetIdx = idx + direction;
   if (targetIdx < 0 || targetIdx >= rows.length) return;
-  const idA = rows[idx].dataset.id;
-  const idB = rows[targetIdx].dataset.id;
-  const sortA = parseInt(rows[idx].dataset.sort);
-  const sortB = parseInt(rows[targetIdx].dataset.sort);
+
+  const rowA = rows[idx];
+  const rowB = rows[targetIdx];
+
+  // 动画：先记录各自位置
+  const rectA = rowA.getBoundingClientRect();
+  const rectB = rowB.getBoundingClientRect();
+  const diffA = rectB.top - rectA.top;
+  const diffB = rectA.top - rectB.top;
+
+  // DOM 交换
+  if (direction === -1) {
+    list.insertBefore(rowA, rowB);
+  } else {
+    list.insertBefore(rowB, rowA);
+  }
+
+  // 交换 data-sort
+  const sortA = rowA.dataset.sort;
+  const sortB = rowB.dataset.sort;
+  rowA.dataset.sort = sortB;
+  rowB.dataset.sort = sortA;
+
+  // FLIP 动画
+  rowA.style.transition = 'none';
+  rowB.style.transition = 'none';
+  rowA.style.transform = `translateY(${-diffA}px)`;
+  rowB.style.transform = `translateY(${-diffB}px)`;
+  rowA.offsetHeight; // force reflow
+  rowA.style.transition = 'transform 0.25s ease';
+  rowB.style.transition = 'transform 0.25s ease';
+  rowA.style.transform = '';
+  rowB.style.transform = '';
+
+  // 后台保存
   await Promise.all([
-    db.from('products').update({ sort_order: sortB }).eq('id', idA),
-    db.from('products').update({ sort_order: sortA }).eq('id', idB),
+    db.from('products').update({ sort_order: parseInt(sortB) }).eq('id', rowA.dataset.id),
+    db.from('products').update({ sort_order: parseInt(sortA) }).eq('id', rowB.dataset.id),
   ]);
-  loadProducts();
+}
+
+function initDragSort() {
+  const list = document.getElementById('sortableList');
+  if (!list) return;
+  let dragging = null;
+  let placeholder = null;
+
+  list.addEventListener('dragstart', e => {
+    dragging = e.target.closest('.product-row');
+    if (!dragging) return;
+    setTimeout(() => { dragging.style.opacity = '0.4'; }, 0);
+    placeholder = document.createElement('div');
+    placeholder.className = 'drag-placeholder';
+    placeholder.style.height = dragging.offsetHeight + 'px';
+  });
+
+  list.addEventListener('dragend', async e => {
+    if (!dragging) return;
+    dragging.style.opacity = '';
+    if (placeholder && placeholder.parentNode) {
+      placeholder.parentNode.replaceChild(dragging, placeholder);
+    }
+    placeholder = null;
+
+    // 重新计算所有行的 sort_order 并保存
+    const rows = [...list.querySelectorAll('.product-row')];
+    await Promise.all(rows.map((r, i) => {
+      r.dataset.sort = i;
+      return db.from('products').update({ sort_order: i }).eq('id', r.dataset.id);
+    }));
+    dragging = null;
+  });
+
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!dragging || !placeholder) return;
+    const target = e.target.closest('.product-row');
+    if (!target || target === dragging) return;
+    const rect = target.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    if (e.clientY < mid) {
+      target.parentNode.insertBefore(placeholder, target);
+    } else {
+      target.parentNode.insertBefore(placeholder, target.nextSibling);
+    }
+    placeholder.parentNode.insertBefore(dragging, placeholder);
+  });
 }
 
 async function deleteProduct(id, name) {
