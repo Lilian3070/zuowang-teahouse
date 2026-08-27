@@ -723,8 +723,13 @@ function setVisible(id, visible) {
       }
     }
   }
-  // 后台静默保存
-  db.from('products').update({ is_visible: visible }).eq('id', id);
+  // 后台保存，失败时回滚 UI 并提示
+  db.from('products').update({ is_visible: visible }).eq('id', id).then(({ error }) => {
+    if (error) {
+      showToast('保存失败，请重试');
+      setVisible(id, !visible); // 回滚
+    }
+  });
 }
 
 async function moveProduct(id, direction) {
