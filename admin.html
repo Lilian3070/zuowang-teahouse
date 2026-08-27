@@ -1052,8 +1052,7 @@ function openPosterEdit(id, title, imageUrl) {
   _posterOrigUrl = imageUrl;
   _posterNewBlob = null;
   document.getElementById('posterEditTitle').value = title;
-  document.getElementById('posterEditOverlay').style.display = 'block';
-  document.getElementById('posterEditModal').style.display = 'block';
+  document.getElementById('posterEditOverlay').style.display = 'flex';
   loadCropImage(imageUrl);
 }
 
@@ -1139,7 +1138,6 @@ document.getElementById('posterReplaceInput').addEventListener('change', functio
 
 function closePosterEdit() {
   document.getElementById('posterEditOverlay').style.display = 'none';
-  document.getElementById('posterEditModal').style.display = 'none';
   _posterEditId = null;
   _posterNewBlob = null;
 }
@@ -1182,35 +1180,36 @@ async function savePosterEdit() {
 }
 </script>
 <!-- 海报编辑弹窗 -->
-<div id="posterEditOverlay" class="modal-overlay" style="display:none" onclick="closePosterEdit()"></div>
-<div id="posterEditModal" class="modal-box" style="display:none;max-width:520px">
-  <div class="modal-header">
-    <h2 class="modal-title">编辑海报</h2>
-    <button class="modal-close" onclick="closePosterEdit()">×</button>
-  </div>
-
-  <div style="margin-bottom:16px">
-    <label style="font-size:13px;color:var(--ink-muted);display:block;margin-bottom:6px">海报图片 <span style="font-size:11px">（拖拽调整位置，滑块调整大小）</span></label>
-    <div id="posterCropFrame" style="width:100%;aspect-ratio:3/4;background:#f0ece6;border-radius:8px;overflow:hidden;position:relative;cursor:grab;user-select:none;max-height:360px">
-      <img id="posterCropImg" src="" draggable="false" style="position:absolute;transform-origin:top left;max-width:none">
+<div id="posterEditOverlay" class="modal-overlay" style="display:none;z-index:1001" onclick="if(event.target===this)closePosterEdit()">
+  <div class="modal" style="width:420px;max-width:92vw;max-height:90vh;overflow-y:auto" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">编辑海报</h2>
+      <button class="modal-close" onclick="closePosterEdit()">×</button>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
-      <span style="font-size:12px;color:var(--ink-muted)">缩小</span>
-      <input type="range" id="posterZoom" min="0.5" max="3" step="0.01" value="1" style="flex:1">
-      <span style="font-size:12px;color:var(--ink-muted)">放大</span>
+
+    <div style="margin-bottom:14px">
+      <label style="font-size:13px;color:var(--ink-muted);display:block;margin-bottom:6px">图片预览 <span style="font-size:11px">（拖拽位置 · 滑块缩放）</span></label>
+      <div id="posterCropFrame" style="width:100%;max-height:280px;aspect-ratio:3/4;background:#f0ece6;border-radius:8px;overflow:hidden;position:relative;cursor:grab;user-select:none">
+        <img id="posterCropImg" src="" draggable="false" style="position:absolute;transform-origin:0 0;max-width:none">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <span style="font-size:11px;color:var(--ink-muted)">缩小</span>
+        <input type="range" id="posterZoom" min="0.5" max="3" step="0.01" value="1" style="flex:1">
+        <span style="font-size:11px;color:var(--ink-muted)">放大</span>
+      </div>
+      <button onclick="triggerPosterReplace()" style="margin-top:8px;font-size:12px;padding:5px 12px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--ink-muted)">换一张图片</button>
+      <input type="file" id="posterReplaceInput" accept="image/*" style="display:none">
     </div>
-    <button onclick="triggerPosterReplace()" style="margin-top:8px;font-size:12px;padding:5px 12px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--ink-muted)">换一张图片</button>
-    <input type="file" id="posterReplaceInput" accept="image/*" style="display:none">
-  </div>
 
-  <div style="margin-bottom:20px">
-    <label style="font-size:13px;color:var(--ink-muted);display:block;margin-bottom:6px">显示文字（标题，可留空）</label>
-    <input type="text" id="posterEditTitle" placeholder="例：秋季古琴入门小班" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box">
-  </div>
+    <div style="margin-bottom:18px">
+      <label style="font-size:13px;color:var(--ink-muted);display:block;margin-bottom:6px">显示文字（可留空）</label>
+      <input type="text" id="posterEditTitle" placeholder="例：秋季古琴入门小班" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box">
+    </div>
 
-  <div style="display:flex;gap:10px;justify-content:flex-end">
-    <button onclick="closePosterEdit()" style="padding:10px 20px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer">取消</button>
-    <button onclick="savePosterEdit()" style="padding:10px 24px;background:var(--gold);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">保存</button>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closePosterEdit()" style="padding:9px 18px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer;font-size:14px">取消</button>
+      <button onclick="savePosterEdit()" style="padding:9px 22px;background:var(--gold);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px">保存</button>
+    </div>
   </div>
 </div>
 </body>
