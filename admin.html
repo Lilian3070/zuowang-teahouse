@@ -358,6 +358,7 @@
     <div class="top-bar-title">坐忘茗舍 · 管理后台</div>
     <div class="top-bar-right">
       <span id="userEmail" style="font-size:13px;color:var(--ink-muted)"></span>
+      <button class="btn-logout" onclick="openPasswordModal()">修改密码</button>
       <button class="btn-logout" onclick="doLogout()">退出登录</button>
     </div>
   </div>
@@ -424,6 +425,26 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">取消</button>
       <button class="btn-save" onclick="saveProduct()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 修改密码模态框 -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-title">修改密码</div>
+    <div class="form-group">
+      <label>新密码</label>
+      <input type="password" id="newPassword" placeholder="至少 6 位">
+    </div>
+    <div class="form-group">
+      <label>确认新密码</label>
+      <input type="password" id="confirmPassword" placeholder="再输入一次">
+    </div>
+    <div class="error-msg" id="passwordError"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closePasswordModal()">取消</button>
+      <button class="btn-save" onclick="savePassword()">保存</button>
     </div>
   </div>
 </div>
@@ -687,9 +708,35 @@ function showToast(msg) {
   if (session) { showAdmin(); }
 })();
 
+function openPasswordModal() {
+  document.getElementById('newPassword').value = '';
+  document.getElementById('confirmPassword').value = '';
+  document.getElementById('passwordError').textContent = '';
+  document.getElementById('passwordModal').classList.add('open');
+}
+
+function closePasswordModal() {
+  document.getElementById('passwordModal').classList.remove('open');
+}
+
+async function savePassword() {
+  const np = document.getElementById('newPassword').value;
+  const cp = document.getElementById('confirmPassword').value;
+  document.getElementById('passwordError').textContent = '';
+  if (np.length < 6) { document.getElementById('passwordError').textContent = '密码至少 6 位'; return; }
+  if (np !== cp) { document.getElementById('passwordError').textContent = '两次密码不一致'; return; }
+  const { error } = await db.auth.updateUser({ password: np });
+  if (error) { document.getElementById('passwordError').textContent = '修改失败，请重试'; return; }
+  closePasswordModal();
+  showToast('密码已修改');
+}
+
 // 点遮罩关闭模态框
 document.getElementById('productModal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeModal();
+});
+document.getElementById('passwordModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closePasswordModal();
 });
 </script>
 </body>
