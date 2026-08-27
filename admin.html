@@ -352,7 +352,7 @@
   /* 海报管理网格 */
   .poster-admin-grid { display: flex; flex-wrap: wrap; gap: 16px; }
   .poster-admin-card { width: 160px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
-  .poster-admin-img { width: 160px; aspect-ratio: 3/4; background-size: cover; background-position: center; background-color: var(--surface); }
+  .poster-admin-img { width: 160px; aspect-ratio: 2/3; background-size: cover; background-position: center; background-color: var(--surface); }
   .poster-admin-title { font-size: 12px; padding: 6px 10px; color: var(--ink); font-weight: 600; }
   .poster-admin-actions { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
   .poster-admin-actions .sort-btn { flex: 1; }
@@ -1100,7 +1100,7 @@ async function savePosterEdit() {
     const frame = document.getElementById('posterCropFrame');
     const img = document.getElementById('posterCropImg');
     const fw = frame.clientWidth, fh = frame.clientHeight;
-    const outW = 810, outH = 1080;
+    const outW = 1080, outH = 1620;
     const canvas = document.createElement('canvas');
     canvas.width = outW; canvas.height = outH;
     const ctx = canvas.getContext('2d');
@@ -1182,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     <div style="margin-bottom:14px">
       <div style="font-size:12px;color:var(--ink-muted);margin-bottom:6px">图片预览 · 拖拽调整位置 · 滑块调整大小</div>
-      <div id="posterCropFrame" style="width:100%;height:260px;background:#f0ece6;border-radius:8px;overflow:hidden;position:relative;cursor:grab;user-select:none">
+      <div id="posterCropFrame" style="width:100%;aspect-ratio:2/3;max-height:320px;background:#f0ece6;border-radius:8px;overflow:hidden;position:relative;cursor:grab;user-select:none">
         <img id="posterCropImg" src="" draggable="false" style="position:absolute;transform-origin:0 0;max-width:none;max-height:none">
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
