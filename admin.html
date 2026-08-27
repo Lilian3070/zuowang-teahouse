@@ -908,8 +908,8 @@ function renderPosters(posters, section) {
     el.innerHTML = '<div class="empty-state"><div style="font-size:32px">🖼️</div><p>暂无海报，点击「上传海报」添加</p></div>';
     return;
   }
-  el.innerHTML = '<div class="poster-admin-grid">' + posters.map((p, i) => `
-    <div class="poster-admin-card" data-id="${p.id}" data-sort="${p.sort_order ?? i}">
+  el.innerHTML = '<div class="poster-admin-grid" id="posterSortGrid">' + posters.map((p, i) => `
+    <div class="poster-admin-card" data-id="${p.id}" data-sort="${p.sort_order ?? i}" draggable="true">
       <div class="poster-admin-img" style="background-image:url('${p.image_url}')"></div>
       ${p.title ? `<div class="poster-admin-title">${p.title}</div>` : ''}
       <div class="poster-admin-actions">
@@ -920,6 +920,40 @@ function renderPosters(posters, section) {
       </div>
     </div>
   `).join('') + '</div>';
+  initPosterDragSort();
+}
+
+function initPosterDragSort() {
+  const grid = document.getElementById('posterSortGrid');
+  if (!grid) return;
+  let dragging = null;
+  grid.addEventListener('dragstart', e => {
+    dragging = e.target.closest('.poster-admin-card');
+    if (!dragging) return;
+    setTimeout(() => { dragging.style.opacity = '0.4'; }, 0);
+  });
+  grid.addEventListener('dragend', async () => {
+    const el = dragging; dragging = null;
+    if (!el) return;
+    el.style.opacity = '';
+    const cards = [...grid.querySelectorAll('.poster-admin-card')];
+    await Promise.all(cards.map((c, i) => {
+      c.dataset.sort = i;
+      return db.from('posters').update({ sort_order: i }).eq('id', c.dataset.id);
+    }));
+  });
+  document.addEventListener('mouseup', () => {
+    grid.querySelectorAll('.poster-admin-card').forEach(c => c.style.opacity = '');
+  });
+  grid.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!dragging) return;
+    const target = e.target.closest('.poster-admin-card');
+    if (!target || target === dragging) return;
+    const rect = target.getBoundingClientRect();
+    if (e.clientX < rect.left + rect.width / 2) grid.insertBefore(dragging, target);
+    else grid.insertBefore(dragging, target.nextSibling);
+  });
 }
 
 function openPosterUpload() {
