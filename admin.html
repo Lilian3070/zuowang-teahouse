@@ -233,9 +233,7 @@
   .sort-btns { display: flex; flex-direction: column; gap: 2px; }
   .sort-btn { padding: 2px 8px; font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; line-height: 1.4; color: var(--ink-muted); }
   .sort-btn:hover { background: #f5efe6; color: #8B6914; }
-  .drag-handle { font-size: 18px; color: var(--ink-muted); cursor: grab; padding: 0 6px; user-select: none; flex-shrink: 0; }
-  .drag-handle:active { cursor: grabbing; }
-  .drag-placeholder { background: #f5efe6; border: 2px dashed #c9a96e; border-radius: 10px; margin-bottom: 10px; }
+.drag-placeholder { background: #f5efe6; border: 2px dashed #c9a96e; border-radius: 10px; margin-bottom: 10px; }
   .product-row[draggable="true"] { transition: box-shadow 0.15s; }
   .product-row.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
   .badge-hidden {
@@ -562,7 +560,6 @@ function renderProducts(products) {
   }
   el.innerHTML = '<div class="product-list" id="sortableList">' + products.map((p, i) => `
     <div class="product-row" data-id="${p.id}" data-sort="${p.sort_order || i}" draggable="true">
-      <div class="drag-handle" title="拖拽排序">⠿</div>
       ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none'">` : '<div class="no-img">无图</div>'}
       <div class="product-info">
         <div class="product-name">${p.name} ${!p.is_visible ? '<span class="badge-hidden">已隐藏</span>' : ''}</div>
