@@ -1,3 +1,8 @@
+const db = supabase.createClient(
+  'https://wmatsdnpbpcltuoynyrh.supabase.co',
+  'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl'
+);
+
 document.addEventListener('DOMContentLoaded', () => {
   // 无缝循环轮播 —— transform 控制，彻底消除 scrollLeft 跳帧
   function initCarousel(grid) {
@@ -332,31 +337,46 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalBrandDesc = document.getElementById('modalBrandDesc');
   const modalProducts = document.getElementById('modalProducts');
 
-  function renderProductCard(product) {
+  function renderProductCard(p) {
     const card = document.createElement('div');
     card.className = 'product-card';
+    const media = p.image_url
+      ? `<img src="${p.image_url}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover">`
+      : '【产品实拍图占位】';
+    const spec = p.price || p.spec || '';
+    const desc = p.description || p.category || '';
     card.innerHTML = `
-      <div class="product-media">【产品实拍图占位】</div>
+      <div class="product-media">${media}</div>
       <div class="product-body">
-        <span class="product-category">${product.category}</span>
-        <h4>${product.name}</h4>
-        <p class="product-spec">${product.spec}</p>
+        ${desc ? `<span class="product-category">${desc}</span>` : ''}
+        <h4>${p.name}</h4>
+        ${spec ? `<p class="product-spec">${spec}</p>` : ''}
         <button class="detail-btn" type="button">查看详情</button>
       </div>
     `;
     return card;
   }
 
-  function openEntryModal(entry, eyebrowText) {
+  async function openEntryModal(entry, eyebrowText) {
     if (!entry) return;
     modalEyebrow.textContent = eyebrowText;
     modalBrandName.textContent = entry.name;
     modalBrandDesc.textContent = entry.desc;
-    modalProducts.innerHTML = '';
-    entry.products.forEach(p => modalProducts.appendChild(renderProductCard(p)));
+    modalProducts.innerHTML = '<p style="color:#888;padding:20px 0">加载中…</p>';
     brandModal.classList.add('open');
     brandModal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
+
+    const { data: cat } = await db.from('categories').select('id').eq('name', entry.name).maybeSingle();
+    if (cat) {
+      const { data: products } = await db.from('products').select('*').eq('category_id', cat.id).eq('is_visible', true).order('created_at');
+      if (products && products.length) {
+        modalProducts.innerHTML = '';
+        products.forEach(p => modalProducts.appendChild(renderProductCard(p)));
+        return;
+      }
+    }
+    modalProducts.innerHTML = '<p style="color:#888;padding:20px 0">暂无商品</p>';
   }
 
   function closeEntryModal() {
