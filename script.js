@@ -176,7 +176,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(checkCarousel, 150);
+    resizeTimer = setTimeout(() => {
+      checkCarousel();
+      ['qindaoGrid', 'yajiGrid'].forEach(id => {
+        const g = document.getElementById(id);
+        if (g) checkPosterCarousel(g);
+      });
+    }, 150);
   });
 
 
@@ -403,12 +409,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') closeEntryModal();
   });
 
-  // 海报加载（每次调用都重建轮播）
+  // 海报加载
   async function loadPosters(section, gridId, btnText, btnHref) {
     const grid = document.getElementById(gridId);
     if (!grid) return;
-    // 销毁旧轮播
-    if (destroyers.has(grid)) { destroyers.get(grid)(); destroyers.delete(grid); }
     const { data } = await db.from('posters').select('*').eq('section', section).eq('is_visible', true).order('sort_order').order('created_at');
     grid.innerHTML = '';
     if (!data || !data.length) return;
@@ -423,9 +427,22 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`;
       grid.appendChild(card);
     });
-    if (data.length >= 2) {
-      const destroy = initCarousel(grid);
-      if (destroy) destroyers.set(grid, destroy);
+    checkPosterCarousel(grid);
+  }
+
+  // 海报轮播：手机端启用，桌面端普通横排
+  function checkPosterCarousel(grid) {
+    const isMobile = window.innerWidth <= 860;
+    const hasCarousel = destroyers.has(grid);
+    if (isMobile && !hasCarousel) {
+      const cards = grid.querySelectorAll('.card');
+      if (cards.length >= 2) {
+        const destroy = initCarousel(grid);
+        if (destroy) destroyers.set(grid, destroy);
+      }
+    } else if (!isMobile && hasCarousel) {
+      destroyers.get(grid)();
+      destroyers.delete(grid);
     }
   }
 

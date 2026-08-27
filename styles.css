@@ -586,21 +586,30 @@ section {
 }
 
 .poster-scroll {
-  overflow: hidden;
-  position: relative;
-  cursor: grab;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 .poster-scroll::-webkit-scrollbar { display: none; }
 
-/* 海报 carousel track（复用商品轮播逻辑） */
-.poster-scroll .carousel-track {
-  display: flex;
-  gap: 24px;
-  will-change: transform;
-  touch-action: pan-y;
-  user-select: none;
+/* 手机端：转为轮播容器 */
+@media (max-width: 860px) {
+  .poster-scroll {
+    overflow: hidden;
+    position: relative;
+    cursor: grab;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  .poster-scroll .carousel-track {
+    display: flex;
+    gap: 24px;
+    will-change: transform;
+    touch-action: pan-y;
+    user-select: none;
+  }
+  .poster-scroll .carousel-track.grabbing { cursor: grabbing; }
 }
-.poster-scroll .carousel-track.grabbing { cursor: grabbing; }
 
 .poster-card {
   flex: 0 0 auto;
