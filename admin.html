@@ -358,6 +358,10 @@
   .poster-admin-actions .poster-sort-col { display: flex; flex-direction: column; gap: 2px; }
   .poster-admin-actions .poster-sort-col .sort-btn { padding: 2px 8px; font-size: 11px; }
   .poster-admin-actions .btn-edit, .poster-admin-actions .btn-delete { flex: 1; }
+  .poster-admin-vis { display: flex; border-top: 1px solid var(--border); }
+  .poster-admin-vis .vs-btn { flex: 1; border-radius: 0; border: none; border-right: 1px solid var(--border); }
+  .poster-admin-vis .vs-btn:last-child { border-right: none; }
+  .poster-admin-img.is-hidden { opacity: 0.4; }
 
   @media (max-width: 680px) {
     /* 顶栏 */
@@ -913,6 +917,9 @@ function renderPosters(posters, section) {
     <div class="poster-admin-card" data-id="${p.id}" data-sort="${p.sort_order ?? i}" draggable="true">
       <div class="poster-admin-img" style="background-image:url('${p.image_url}')"></div>
       ${p.title ? `<div class="poster-admin-title">${p.title}</div>` : ''}
+      <div class="poster-admin-vis" data-id="${p.id}">
+        <button class="vs-btn vs-btn-show ${p.is_visible !== false ? 'vs-active-show' : ''}" onmousedown="event.preventDefault();setVisiblePoster('${p.id}',true)">显示</button><button class="vs-btn vs-btn-hide ${p.is_visible === false ? 'vs-active-hide' : ''}" onmousedown="event.preventDefault();setVisiblePoster('${p.id}',false)">隐藏</button>
+      </div>
       <div class="poster-admin-actions">
         <div class="poster-sort-col">
           <button class="sort-btn" onclick="movePoster('${p.id}', -1)">↑</button>
@@ -1001,6 +1008,26 @@ async function cropAndCompress(file, ratioW, ratioH) {
       canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
     };
     img.src = url;
+  });
+}
+
+function setVisiblePoster(id, visible) {
+  const card = document.querySelector(`.poster-admin-card[data-id="${id}"]`);
+  if (!card) return;
+  const showBtn = card.querySelector('.vs-btn-show');
+  const hideBtn = card.querySelector('.vs-btn-hide');
+  const img = card.querySelector('.poster-admin-img');
+  if (visible) {
+    showBtn.classList.add('vs-active-show');
+    hideBtn.classList.remove('vs-active-hide');
+    img.classList.remove('is-hidden');
+  } else {
+    showBtn.classList.remove('vs-active-show');
+    hideBtn.classList.add('vs-active-hide');
+    img.classList.add('is-hidden');
+  }
+  db.from('posters').update({ is_visible: visible }).eq('id', id).then(({ error }) => {
+    if (error) setVisiblePoster(id, !visible);
   });
 }
 
