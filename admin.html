@@ -1061,7 +1061,7 @@ function loadCropImage(url) {
   const img = document.getElementById('posterCropImg');
   const frame = document.getElementById('posterCropFrame');
   const zoom = document.getElementById('posterZoom');
-  _cropScale = 1; _cropX = 0; _cropY = 0;
+  _cropScale = 1;
   img.onload = () => {
     const fw = frame.clientWidth, fh = frame.clientHeight;
     const fitScale = Math.max(fw / img.naturalWidth, fh / img.naturalHeight);
@@ -1070,8 +1070,6 @@ function loadCropImage(url) {
     zoom.max = fitScale * 4;
     zoom.step = fitScale * 0.01;
     zoom.value = fitScale;
-    _cropX = (fw - img.naturalWidth * fitScale) / 2;
-    _cropY = (fh - img.naturalHeight * fitScale) / 2;
     applyTransform();
   };
   img.src = url;
@@ -1079,7 +1077,14 @@ function loadCropImage(url) {
 
 function applyTransform() {
   const img = document.getElementById('posterCropImg');
-  img.style.transform = `translate(${_cropX}px,${_cropY}px) scale(${_cropScale})`;
+  const frame = document.getElementById('posterCropFrame');
+  const fw = frame.clientWidth, fh = frame.clientHeight;
+  const iw = img.naturalWidth * _cropScale, ih = img.naturalHeight * _cropScale;
+  img.style.left = ((fw - iw) / 2) + 'px';
+  img.style.top = ((fh - ih) / 2) + 'px';
+  img.style.width = iw + 'px';
+  img.style.height = ih + 'px';
+  img.style.transform = '';
 }
 
 function closePosterEdit() {
@@ -1104,10 +1109,12 @@ async function savePosterEdit() {
     const canvas = document.createElement('canvas');
     canvas.width = outW; canvas.height = outH;
     const ctx = canvas.getContext('2d');
+    const iw = img.naturalWidth * _cropScale, ih = img.naturalHeight * _cropScale;
+    const offsetX = (fw - iw) / 2, offsetY = (fh - ih) / 2;
     const sx = outW / fw, sy = outH / fh;
     ctx.save();
     ctx.scale(sx, sy);
-    ctx.translate(_cropX, _cropY);
+    ctx.translate(offsetX, offsetY);
     ctx.scale(_cropScale, _cropScale);
     ctx.drawImage(img, 0, 0);
     ctx.restore();
@@ -1129,39 +1136,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const frame = document.getElementById('posterCropFrame');
 
   zoom.addEventListener('input', function() {
-    const fw = frame.clientWidth, fh = frame.clientHeight;
-    const oldScale = _cropScale;
     _cropScale = parseFloat(this.value);
-    _cropX = fw/2 - (_cropScale/oldScale) * (fw/2 - _cropX);
-    _cropY = fh/2 - (_cropScale/oldScale) * (fh/2 - _cropY);
     applyTransform();
   });
 
-  frame.addEventListener('mousedown', e => {
+  frame.addEventListener('wheel', e => {
     e.preventDefault();
-    _posterDragStart = { x: e.clientX - _cropX, y: e.clientY - _cropY };
-    frame.style.cursor = 'grabbing';
-  });
-  document.addEventListener('mousemove', e => {
-    if (!_posterDragStart) return;
-    _cropX = e.clientX - _posterDragStart.x;
-    _cropY = e.clientY - _posterDragStart.y;
-    applyTransform();
-  });
-  document.addEventListener('mouseup', () => { _posterDragStart = null; frame.style.cursor = 'grab'; });
-
-  frame.addEventListener('touchstart', e => {
-    if (e.touches.length === 1)
-      _posterDragStart = { x: e.touches[0].clientX - _cropX, y: e.touches[0].clientY - _cropY };
-  }, { passive: true });
-  frame.addEventListener('touchmove', e => {
-    if (!_posterDragStart || e.touches.length !== 1) return;
-    e.preventDefault();
-    _cropX = e.touches[0].clientX - _posterDragStart.x;
-    _cropY = e.touches[0].clientY - _posterDragStart.y;
+    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+    _cropScale = Math.max(parseFloat(zoom.min), Math.min(parseFloat(zoom.max), _cropScale + delta * _cropScale));
+    zoom.value = _cropScale;
     applyTransform();
   }, { passive: false });
-  frame.addEventListener('touchend', () => { _posterDragStart = null; });
 
   document.getElementById('posterReplaceInput').addEventListener('change', function() {
     const file = this.files[0];
@@ -1174,34 +1159,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- 海报编辑弹窗 -->
 <div id="posterEditOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1100;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closePosterEdit()">
-  <div style="background:white;border-radius:14px;width:400px;max-width:94vw;max-height:88vh;overflow-y:auto;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.18)" onclick="event.stopPropagation()">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="margin:0;font-size:17px;font-weight:700">编辑海报</h3>
+  <div style="background:white;border-radius:14px;width:280px;max-width:94vw;max-height:92vh;overflow-y:auto;padding:18px;box-shadow:0 8px 40px rgba(0,0,0,0.18)" onclick="event.stopPropagation()">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;font-size:15px;font-weight:700">编辑海报</h3>
       <button onclick="closePosterEdit()" style="font-size:20px;background:none;border:none;cursor:pointer;color:var(--ink-muted);line-height:1">×</button>
     </div>
 
-    <div style="margin-bottom:14px">
-      <div style="font-size:12px;color:var(--ink-muted);margin-bottom:6px">图片预览 · 拖拽调整位置 · 滑块调整大小</div>
-      <div id="posterCropFrame" style="width:200px;aspect-ratio:2/3;background:#f0ece6;border-radius:8px;overflow:hidden;position:relative;cursor:grab;user-select:none;margin:0 auto">
-        <img id="posterCropImg" src="" draggable="false" style="position:absolute;transform-origin:0 0;max-width:none;max-height:none">
+    <div style="margin-bottom:12px">
+      <div id="posterCropFrame" style="width:100%;aspect-ratio:2/3;background:#f0ece6;border-radius:8px;overflow:hidden;position:relative;user-select:none">
+        <img id="posterCropImg" src="" draggable="false" style="position:absolute;transform-origin:center center;max-width:none;max-height:none">
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <span style="font-size:11px;color:var(--ink-muted);white-space:nowrap">缩小</span>
         <input type="range" id="posterZoom" min="0.1" max="3" step="0.01" value="1" style="flex:1">
         <span style="font-size:11px;color:var(--ink-muted);white-space:nowrap">放大</span>
       </div>
-      <button onclick="triggerPosterReplace()" style="margin-top:8px;font-size:12px;padding:5px 12px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--ink-muted)">换一张图片</button>
+      <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;text-align:center">滑块或滚轮调整大小 · 图片自动居中</div>
+      <button onclick="triggerPosterReplace()" style="margin-top:8px;font-size:12px;padding:5px 12px;border:1px solid var(--border);background:var(--surface);border-radius:6px;cursor:pointer;color:var(--ink-muted);width:100%">换一张图片</button>
       <input type="file" id="posterReplaceInput" accept="image/*" style="display:none">
     </div>
 
-    <div style="margin-bottom:18px">
+    <div style="margin-bottom:14px">
       <div style="font-size:12px;color:var(--ink-muted);margin-bottom:6px">显示文字（可留空）</div>
-      <input type="text" id="posterEditTitle" placeholder="例：秋季古琴入门小班" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box">
+      <input type="text" id="posterEditTitle" placeholder="例：秋季古琴入门小班" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box">
     </div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button onclick="closePosterEdit()" style="padding:9px 18px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer;font-size:14px">取消</button>
-      <button onclick="savePosterEdit()" style="padding:9px 22px;background:var(--gold);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px">保存</button>
+      <button onclick="closePosterEdit()" style="padding:8px 16px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer;font-size:13px">取消</button>
+      <button onclick="savePosterEdit()" style="padding:8px 20px;background:var(--gold);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">保存</button>
     </div>
   </div>
 </div>
