@@ -350,6 +350,7 @@
     background: var(--bg);
   }
   .upload-area:hover { border-color: var(--gold); color: var(--gold); }
+  .upload-area.drag-over { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
 
   .detail-img-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
   .detail-img-thumb { position: relative; width: 64px; height: 64px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); flex-shrink: 0; }
@@ -1928,6 +1929,37 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
+
+// 图片上传区：支持从文件夹拖拽图片进来
+function enableDropUpload(areaEl, inputEl, multiple) {
+  if (!areaEl || !inputEl) return;
+  ['dragenter', 'dragover'].forEach(evt => areaEl.addEventListener(evt, e => {
+    e.preventDefault();
+    areaEl.classList.add('drag-over');
+  }));
+  ['dragleave', 'drop'].forEach(evt => areaEl.addEventListener(evt, () => {
+    areaEl.classList.remove('drag-over');
+  }));
+  areaEl.addEventListener('drop', e => {
+    e.preventDefault();
+    const dropped = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
+    if (!dropped.length) return;
+    const files = multiple ? dropped : [dropped[0]];
+    const dt = new DataTransfer();
+    files.forEach(f => dt.items.add(f));
+    inputEl.files = dt.files;
+    inputEl.dispatchEvent(new Event('change'));
+  });
+}
+// 防止拖拽脱靶时浏览器直接打开图片文件
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+document.addEventListener('DOMContentLoaded', () => {
+  enableDropUpload(document.getElementById('uploadArea'), document.getElementById('imageFileInput'), false);
+  enableDropUpload(document.getElementById('detailUploadArea'), document.getElementById('detailImageFileInput'), true);
+  enableDropUpload(document.getElementById('catUploadArea'), document.getElementById('catImageInput'), false);
+});
 
 // 初始化
 (async () => {
