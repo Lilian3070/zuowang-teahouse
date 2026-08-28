@@ -588,7 +588,10 @@ section {
 .poster-scroll {
   display: flex;
   gap: 24px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: none;
 }
 .poster-scroll::-webkit-scrollbar { display: none; }
 
