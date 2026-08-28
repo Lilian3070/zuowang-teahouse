@@ -1401,39 +1401,45 @@ async function movePoster(id, direction) {
 let currentMemberId = null;
 
 // 会员列表：琴人档案只显示有课时套餐的人，茗客档案只显示有消费记录的人
-async function loadMembers() {
+async function loadMembers(forceRefresh = false) {
   const cfg = tabConfig[currentTab];
   const memberType = cfg.memberType;
   const search = document.getElementById('memberSearch');
   const keyword = (search ? search.value.trim() : '').toLowerCase();
 
+  let rawData = tabProductsCache[currentTab];
+  if (!rawData || forceRefresh) {
+    if (memberType === 'class') {
+      const { data } = await db.from('class_packages').select('member_id, total_hours, used_hours, members(id, name, phone)').order('created_at');
+      rawData = data || [];
+    } else {
+      const { data } = await db.from('purchases').select('member_id, amount, members(id, name, phone)').order('purchased_at', { ascending: false });
+      rawData = data || [];
+    }
+    tabProductsCache[currentTab] = rawData;
+  }
+
+  const map = new Map();
   if (memberType === 'class') {
-    const { data } = await db.from('class_packages').select('member_id, total_hours, used_hours, members(id, name, phone)').order('created_at');
-    const map = new Map();
-    (data || []).forEach(r => {
+    rawData.forEach(r => {
       if (!r.members) return;
       if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, phone: r.members.phone, remaining: 0, packages: 0 });
       const entry = map.get(r.member_id);
       entry.remaining += (r.total_hours - r.used_hours);
       entry.packages += 1;
     });
-    let list = [...map.values()];
-    if (keyword) list = list.filter(m => m.name.toLowerCase().includes(keyword));
-    renderMemberList(list, 'class');
   } else {
-    const { data } = await db.from('purchases').select('member_id, amount, members(id, name, phone)').order('purchased_at', { ascending: false });
-    const map = new Map();
-    (data || []).forEach(r => {
+    rawData.forEach(r => {
       if (!r.members) return;
       if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, phone: r.members.phone, total: 0, count: 0 });
       const entry = map.get(r.member_id);
       entry.total += Number(r.amount) || 0;
       entry.count += 1;
     });
-    let list = [...map.values()];
-    if (keyword) list = list.filter(m => m.name.toLowerCase().includes(keyword));
-    renderMemberList(list, 'purchase');
   }
+  let list = [...map.values()];
+  if (keyword) list = list.filter(m => m.name.toLowerCase().includes(keyword));
+  renderMemberList(list, memberType);
 }
 
 function renderMemberList(list, type) {
@@ -1524,6 +1530,7 @@ async function saveNewRecord() {
 
   showToast('已添加');
   closeAddRecordModal();
+  delete tabProductsCache[currentTab];
   loadMembers();
 }
 
@@ -1556,6 +1563,7 @@ async function openMemberDetail(id) {
 function closeMemberDetail() {
   document.getElementById('memberDetailModal').classList.remove('open');
   currentMemberId = null;
+  delete tabProductsCache[currentTab];
   loadMembers();
 }
 
@@ -1678,14 +1686,18 @@ function formatSlotLabel(date) {
   return m === 0 ? `${period}${h12}点` : `${period}${h12}点${m}分`;
 }
 
-async function renderCalendar() {
-  const { data } = await db.from('schedule_events').select('*, members(name)').order('start_at');
-  const events = (data || []).map(e => ({
-    id: e.id,
-    title: e.members?.name ? `${e.members.name} · ${e.title}` : e.title,
-    start: e.start_at,
-    end: e.end_at,
-  }));
+async function renderCalendar(forceRefresh = false) {
+  let events = tabProductsCache['schedule'];
+  if (!events || forceRefresh) {
+    const { data } = await db.from('schedule_events').select('*, members(name)').order('start_at');
+    events = (data || []).map(e => ({
+      id: e.id,
+      title: e.members?.name ? `${e.members.name} · ${e.title}` : e.title,
+      start: e.start_at,
+      end: e.end_at,
+    }));
+    tabProductsCache['schedule'] = events;
+  }
 
   const el = document.getElementById('calendarEl');
   if (!el) return;
@@ -1767,6 +1779,7 @@ async function saveEvent() {
   else await db.from('schedule_events').insert(payload);
   showToast('已保存');
   closeEventModal();
+  delete tabProductsCache['schedule'];
   renderCalendar();
   if (currentMemberId) await refreshUpcoming();
 }
@@ -1777,6 +1790,7 @@ async function deleteEvent() {
   await db.from('schedule_events').delete().eq('id', id);
   showToast('已删除');
   closeEventModal();
+  delete tabProductsCache['schedule'];
   renderCalendar();
   if (currentMemberId) await refreshUpcoming();
 }
