@@ -644,6 +644,10 @@ section {
   margin-bottom: 24px;
 }
 
+.about .story .story-title:not(:first-child) {
+  margin-top: 44px;
+}
+
 /* contact */
 .contact {
   background: var(--tea-deep);
