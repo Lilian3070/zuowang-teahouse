@@ -1837,6 +1837,7 @@ function switchTab(tab) {
   event.target.classList.add('active');
   document.getElementById('pageTitle').textContent = tabConfig[tab].title;
   document.getElementById('pageSubtitle').textContent = tabConfig[tab].subtitle;
+  resetCatPanel();
   loadProducts();
 }
 
