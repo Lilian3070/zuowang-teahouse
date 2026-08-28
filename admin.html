@@ -363,6 +363,73 @@
   .poster-admin-vis .vs-btn:last-child { border-right: none; }
   .poster-admin-img.is-hidden { opacity: 0.4; }
 
+  /* 会员管理 */
+  .member-row {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+  .member-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--gold-soft); color: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; flex-shrink: 0;
+  }
+  .member-info { flex: 1; min-width: 0; }
+  .member-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .member-meta { font-size: 12px; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .member-search {
+    width: 260px; max-width: 100%; padding: 9px 14px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; background: white; color: var(--ink); outline: none;
+  }
+  .member-search:focus { border-color: var(--gold); }
+
+  .member-detail-modal .modal { width: 640px; }
+  .member-detail-section { margin-top: 24px; }
+  .member-detail-section h4 {
+    font-size: 14px; font-weight: 700; color: var(--ink);
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .package-row, .purchase-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 8px; font-size: 13px; background: var(--bg);
+  }
+  .package-row .pkg-info, .purchase-row .pur-info { flex: 1; min-width: 0; }
+  .package-row .pkg-name { font-weight: 600; margin-bottom: 2px; }
+  .package-row .pkg-hours { color: var(--ink-muted); font-size: 12px; }
+  .purchase-row .pur-item { font-weight: 600; margin-bottom: 2px; }
+  .purchase-row .pur-meta { color: var(--ink-muted); font-size: 12px; }
+  .btn-deduct {
+    padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    border: 1px solid var(--sage); background: white; color: var(--sage); font-weight: 600;
+  }
+  .btn-deduct:hover { background: var(--sage); color: white; }
+  .btn-deduct:disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--border); color: var(--ink-muted); background: white; }
+  .btn-mini-delete {
+    padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    border: 1px solid var(--border); background: white; color: var(--ink-muted);
+  }
+  .btn-mini-delete:hover { border-color: var(--red); color: var(--red); }
+  .add-inline-form {
+    display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+  }
+  .add-inline-form input {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; background: white; color: var(--ink); outline: none;
+  }
+  .add-inline-form input:focus { border-color: var(--gold); }
+  .add-inline-form .btn-add-inline {
+    padding: 8px 14px; background: var(--gold); color: white; border: none;
+    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+
   @media (max-width: 680px) {
     /* 顶栏 */
     .admin-header { padding: 0 16px; }
@@ -395,6 +462,13 @@
     .btn-edit, .btn-delete { padding: 6px 12px; font-size: 12px; }
     .vs-btn { padding: 6px 10px; font-size: 12px; }
     .sort-btn { padding: 4px 10px; }
+
+    /* 会员行 */
+    .member-row { flex-wrap: wrap; gap: 10px; padding: 12px; }
+    .member-search { width: 100%; }
+    .member-detail-modal .modal { width: 95vw; padding: 20px; }
+    .add-inline-form { flex-direction: column; }
+    .add-inline-form input, .add-inline-form .btn-add-inline { width: 100%; }
   }
 </style>
 </head>
@@ -439,6 +513,10 @@
         <button class="sidebar-item" onclick="switchTab('qindao')">琴道传习</button>
         <button class="sidebar-item" onclick="switchTab('yaji')">坐忘雅集</button>
       </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">会员管理</div>
+        <button class="sidebar-item" onclick="switchTab('members')">会员档案</button>
+      </div>
     </div>
 
     <div class="main-content">
@@ -449,6 +527,7 @@
         </div>
         <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
         <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
+        <button class="btn-add" id="btnAddMember" onclick="openAddMemberModal()" style="display:none">+ 添加会员</button>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
@@ -518,6 +597,78 @@
   </div>
 </div>
 
+<!-- 添加会员模态框 -->
+<div class="modal-overlay" id="addMemberModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-title">添加会员</div>
+    <div class="form-group">
+      <label>姓名</label>
+      <input type="text" id="newMemberName" placeholder="会员姓名">
+    </div>
+    <div class="form-group">
+      <label>联系方式（选填）</label>
+      <input type="text" id="newMemberPhone" placeholder="手机号 / 微信">
+    </div>
+    <div class="form-group">
+      <label>备注（选填）</label>
+      <textarea id="newMemberNote" placeholder="其他备注信息..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAddMemberModal()">取消</button>
+      <button class="btn-save" onclick="saveMember()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 会员详情模态框 -->
+<div class="modal-overlay member-detail-modal" id="memberDetailModal">
+  <div class="modal">
+    <div class="modal-title">会员详情</div>
+
+    <div class="form-group">
+      <label>姓名</label>
+      <input type="text" id="memberDetailName">
+    </div>
+    <div class="form-group">
+      <label>联系方式</label>
+      <input type="text" id="memberDetailPhone" placeholder="手机号 / 微信">
+    </div>
+    <div class="form-group">
+      <label>备注</label>
+      <textarea id="memberDetailNote" placeholder="其他备注信息..."></textarea>
+    </div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-save" onclick="saveMemberBasic()">保存基本信息</button>
+    </div>
+
+    <div class="member-detail-section">
+      <h4>课时记录</h4>
+      <div id="packageList"></div>
+      <div class="add-inline-form">
+        <input type="text" id="newPkgName" placeholder="套餐名，例：12课时入门小班" style="flex:2">
+        <input type="number" id="newPkgHours" placeholder="总课时" style="width:90px">
+        <input type="text" id="newPkgPrice" placeholder="价格（选填）" style="width:110px">
+        <button class="btn-add-inline" onclick="addClassPackage()">+ 添加套餐</button>
+      </div>
+    </div>
+
+    <div class="member-detail-section">
+      <h4>消费记录</h4>
+      <div id="purchaseList"></div>
+      <div class="add-inline-form">
+        <input type="text" id="newPurItem" placeholder="购买项目，例：正山堂骏眉红茶" style="flex:2">
+        <input type="text" id="newPurAmount" placeholder="金额（选填）" style="width:110px">
+        <input type="date" id="newPurDate" style="width:150px">
+        <button class="btn-add-inline" onclick="addPurchase()">+ 添加消费</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeMemberDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -537,6 +688,7 @@ const tabConfig = {
   guqin:    { title: '斫琴甄选', subtitle: '管理古琴分类与商品', type: 'guqin' },
   qindao:   { title: '琴道传习', subtitle: '管理活动招生海报', type: 'poster', section: 'qindao' },
   yaji:     { title: '坐忘雅集', subtitle: '管理雅集活动海报', type: 'poster', section: 'yaji' },
+  members:  { title: '会员档案', subtitle: '管理学员课时与客人消费记录', type: 'member' },
 };
 
 // 登录
@@ -590,14 +742,24 @@ function setFilter(key) {
   loadProducts();
 }
 
-// 商品 / 海报 统一加载入口
+// 商品 / 海报 / 会员 统一加载入口
 async function loadProducts() {
   document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
   const cfg = tabConfig[currentTab];
 
+  if (cfg.type === 'member') {
+    document.getElementById('btnAdd').style.display = 'none';
+    document.getElementById('btnAddPoster').style.display = 'none';
+    document.getElementById('btnAddMember').style.display = '';
+    document.getElementById('filterBar').innerHTML = '<input type="text" class="member-search" id="memberSearch" placeholder="搜索会员姓名..." oninput="loadMembers()">';
+    await loadMembers();
+    return;
+  }
+
   if (cfg.type === 'poster') {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = '';
+    document.getElementById('btnAddMember').style.display = 'none';
     const { data } = await db.from('posters').select('*').eq('section', cfg.section).order('sort_order').order('created_at');
     renderPosters(data || [], cfg.section);
     document.getElementById('filterBar').innerHTML = '';
@@ -606,6 +768,7 @@ async function loadProducts() {
 
   document.getElementById('btnAdd').style.display = '';
   document.getElementById('btnAddPoster').style.display = 'none';
+  document.getElementById('btnAddMember').style.display = 'none';
   const cats = getCategoriesForTab().map(c => c.key);
   let query = db.from('products').select('*, categories(name)').in('category_key', cats.length ? cats : ['__none__']).order('is_visible', { ascending: false }).order('sort_order');
   if (currentFilter) query = query.eq('category_key', currentFilter);
@@ -1075,6 +1238,197 @@ async function movePoster(id, direction) {
   else grid.insertBefore(cards[targetIdx], cards[idx]);
   const allCards = [...grid.querySelectorAll('.poster-admin-card')];
   await Promise.all(allCards.map((c, i) => db.from('posters').update({ sort_order: i }).eq('id', c.dataset.id)));
+}
+
+// ── 会员管理 ──────────────────────────────────────────
+
+let currentMemberId = null;
+
+async function loadMembers() {
+  const search = document.getElementById('memberSearch');
+  const keyword = search ? search.value.trim() : '';
+  let query = db.from('members').select('*').order('created_at', { ascending: false });
+  if (keyword) query = query.ilike('name', `%${keyword}%`);
+  const { data } = await query;
+  renderMembers(data || []);
+}
+
+function renderMembers(members) {
+  const el = document.getElementById('productList');
+  if (!members.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">👤</div><p>暂无会员，点击「添加会员」开始</p></div>';
+    return;
+  }
+  el.innerHTML = members.map(m => `
+    <div class="member-row" data-id="${m.id}">
+      <div class="member-avatar">${(m.name || '?').slice(0, 1)}</div>
+      <div class="member-info">
+        <div class="member-name">${m.name}</div>
+        <div class="member-meta">${m.phone || '未填写联系方式'}${m.note ? ' · ' + m.note : ''}</div>
+      </div>
+      <div class="product-actions">
+        <button class="btn-edit" onclick="openMemberDetail('${m.id}')">查看详情</button>
+        <button class="btn-delete" onclick="deleteMember('${m.id}','${(m.name || '').replace(/'/g, "\\'")}')">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openAddMemberModal() {
+  document.getElementById('newMemberName').value = '';
+  document.getElementById('newMemberPhone').value = '';
+  document.getElementById('newMemberNote').value = '';
+  document.getElementById('addMemberModal').classList.add('open');
+}
+
+function closeAddMemberModal() {
+  document.getElementById('addMemberModal').classList.remove('open');
+}
+
+async function saveMember() {
+  const name = document.getElementById('newMemberName').value.trim();
+  if (!name) { showToast('请填写姓名'); return; }
+  const phone = document.getElementById('newMemberPhone').value.trim() || null;
+  const note = document.getElementById('newMemberNote').value.trim() || null;
+  await db.from('members').insert({ name, phone, note });
+  showToast('已添加');
+  closeAddMemberModal();
+  loadMembers();
+}
+
+async function deleteMember(id, name) {
+  if (!confirm(`确定要删除会员「${name}」吗？她名下的课时和消费记录也会一并删除。`)) return;
+  await db.from('members').delete().eq('id', id);
+  showToast('已删除');
+  loadMembers();
+}
+
+async function openMemberDetail(id) {
+  currentMemberId = id;
+  const [{ data: member }, { data: packages }, { data: purchases }] = await Promise.all([
+    db.from('members').select('*').eq('id', id).single(),
+    db.from('class_packages').select('*').eq('member_id', id).order('created_at'),
+    db.from('purchases').select('*').eq('member_id', id).order('purchased_at', { ascending: false }),
+  ]);
+  if (!member) return;
+  document.getElementById('memberDetailName').value = member.name;
+  document.getElementById('memberDetailPhone').value = member.phone || '';
+  document.getElementById('memberDetailNote').value = member.note || '';
+  renderPackages(packages || []);
+  renderPurchases(purchases || []);
+  document.getElementById('memberDetailModal').classList.add('open');
+}
+
+function closeMemberDetail() {
+  document.getElementById('memberDetailModal').classList.remove('open');
+  currentMemberId = null;
+  loadMembers();
+}
+
+async function saveMemberBasic() {
+  if (!currentMemberId) return;
+  const name = document.getElementById('memberDetailName').value.trim();
+  if (!name) { showToast('请填写姓名'); return; }
+  const phone = document.getElementById('memberDetailPhone').value.trim() || null;
+  const note = document.getElementById('memberDetailNote').value.trim() || null;
+  await db.from('members').update({ name, phone, note }).eq('id', currentMemberId);
+  showToast('已保存');
+}
+
+// 课时套餐
+function renderPackages(packages) {
+  const el = document.getElementById('packageList');
+  if (!packages.length) {
+    el.innerHTML = '<div style="color:var(--ink-muted);font-size:13px">暂无课时套餐</div>';
+    return;
+  }
+  el.innerHTML = packages.map(p => {
+    const remaining = p.total_hours - p.used_hours;
+    return `
+    <div class="package-row" data-id="${p.id}">
+      <div class="pkg-info">
+        <div class="pkg-name">${p.package_name}</div>
+        <div class="pkg-hours">已用 ${p.used_hours} / 共 ${p.total_hours} 节 · 剩余 ${remaining} 节${p.price ? ' · ¥' + p.price : ''}</div>
+      </div>
+      <button class="btn-deduct" ${remaining <= 0 ? 'disabled' : ''} onclick="deductHour('${p.id}')">扣一节</button>
+      <button class="btn-mini-delete" onclick="deletePackage('${p.id}')">删除</button>
+    </div>`;
+  }).join('');
+}
+
+async function refreshPackages() {
+  const { data } = await db.from('class_packages').select('*').eq('member_id', currentMemberId).order('created_at');
+  renderPackages(data || []);
+}
+
+async function addClassPackage() {
+  if (!currentMemberId) return;
+  const name = document.getElementById('newPkgName').value.trim();
+  const hours = parseFloat(document.getElementById('newPkgHours').value);
+  const price = document.getElementById('newPkgPrice').value.trim();
+  if (!name || !hours) { showToast('请填写套餐名和总课时'); return; }
+  await db.from('class_packages').insert({ member_id: currentMemberId, package_name: name, total_hours: hours, price: price || null });
+  document.getElementById('newPkgName').value = '';
+  document.getElementById('newPkgHours').value = '';
+  document.getElementById('newPkgPrice').value = '';
+  await refreshPackages();
+  showToast('已添加');
+}
+
+async function deductHour(id) {
+  const { data } = await db.from('class_packages').select('*').eq('id', id).single();
+  if (!data || data.used_hours >= data.total_hours) return;
+  await db.from('class_packages').update({ used_hours: data.used_hours + 1 }).eq('id', id);
+  await refreshPackages();
+}
+
+async function deletePackage(id) {
+  if (!confirm('确定删除这个课时套餐吗？')) return;
+  await db.from('class_packages').delete().eq('id', id);
+  await refreshPackages();
+}
+
+// 消费记录
+function renderPurchases(purchases) {
+  const el = document.getElementById('purchaseList');
+  if (!purchases.length) {
+    el.innerHTML = '<div style="color:var(--ink-muted);font-size:13px">暂无消费记录</div>';
+    return;
+  }
+  el.innerHTML = purchases.map(p => `
+    <div class="purchase-row" data-id="${p.id}">
+      <div class="pur-info">
+        <div class="pur-item">${p.item}</div>
+        <div class="pur-meta">${p.purchased_at || ''}${p.amount ? ' · ¥' + p.amount : ''}${p.note ? ' · ' + p.note : ''}</div>
+      </div>
+      <button class="btn-mini-delete" onclick="deletePurchase('${p.id}')">删除</button>
+    </div>
+  `).join('');
+}
+
+async function refreshPurchases() {
+  const { data } = await db.from('purchases').select('*').eq('member_id', currentMemberId).order('purchased_at', { ascending: false });
+  renderPurchases(data || []);
+}
+
+async function addPurchase() {
+  if (!currentMemberId) return;
+  const item = document.getElementById('newPurItem').value.trim();
+  const amount = document.getElementById('newPurAmount').value.trim();
+  const date = document.getElementById('newPurDate').value || null;
+  if (!item) { showToast('请填写购买项目'); return; }
+  await db.from('purchases').insert({ member_id: currentMemberId, item, amount: amount || null, purchased_at: date });
+  document.getElementById('newPurItem').value = '';
+  document.getElementById('newPurAmount').value = '';
+  document.getElementById('newPurDate').value = '';
+  await refreshPurchases();
+  showToast('已添加');
+}
+
+async function deletePurchase(id) {
+  if (!confirm('确定删除这条消费记录吗？')) return;
+  await db.from('purchases').delete().eq('id', id);
+  await refreshPurchases();
 }
 
 function switchTab(tab) {
