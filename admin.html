@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 管理后台</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <style>
   :root {
     --bg: #F7F3EC;
@@ -430,6 +431,11 @@
     border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
 
+  /* 行程日历 */
+  #calendarEl {
+    background: white; border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  }
+
   @media (max-width: 680px) {
     /* 顶栏 */
     .admin-header { padding: 0 16px; }
@@ -469,6 +475,12 @@
     .member-detail-modal .modal { width: 95vw; padding: 20px; }
     .add-inline-form { flex-direction: column; }
     .add-inline-form input, .add-inline-form .btn-add-inline { width: 100%; }
+
+    /* 行程日历 */
+    #calendarEl { padding: 8px; }
+    #calendarEl .fc-toolbar { flex-direction: column; gap: 8px; }
+    #calendarEl .fc-toolbar-title { font-size: 16px; }
+    #calendarEl .fc-button { padding: 4px 8px; font-size: 12px; }
   }
 </style>
 </head>
@@ -517,6 +529,10 @@
         <div class="sidebar-label">会员管理</div>
         <button class="sidebar-item" onclick="switchTab('qinren')">琴人档案</button>
         <button class="sidebar-item" onclick="switchTab('guests')">茗客档案</button>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">行程安排</div>
+        <button class="sidebar-item" onclick="switchTab('schedule')">日程日历</button>
       </div>
     </div>
 
@@ -674,6 +690,14 @@
     </div>
 
     <div class="member-detail-section">
+      <h4>预约上课</h4>
+      <div id="upcomingList"></div>
+      <div class="add-inline-form">
+        <button class="btn-add-inline" onclick="quickAddEventForMember()">+ 预约上课</button>
+      </div>
+    </div>
+
+    <div class="member-detail-section">
       <h4>课时记录</h4>
       <div id="packageList"></div>
       <div class="add-inline-form">
@@ -701,6 +725,39 @@
   </div>
 </div>
 
+<!-- 添加/编辑行程模态框 -->
+<div class="modal-overlay" id="eventModal">
+  <div class="modal" style="width:420px">
+    <div class="modal-title" id="eventModalTitle">添加行程</div>
+    <input type="hidden" id="eventEditId">
+    <div class="form-group">
+      <label>标题</label>
+      <input type="text" id="eventTitle" placeholder="例：古琴课 / 外出采购">
+    </div>
+    <div class="form-group">
+      <label>关联会员（选填）</label>
+      <select id="eventMemberSelect"></select>
+    </div>
+    <div class="form-group">
+      <label>开始时间</label>
+      <input type="datetime-local" id="eventStart">
+    </div>
+    <div class="form-group">
+      <label>结束时间</label>
+      <input type="datetime-local" id="eventEnd">
+    </div>
+    <div class="form-group">
+      <label>备注（选填）</label>
+      <textarea id="eventNote"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-delete" id="eventDeleteBtn" onclick="deleteEvent()" style="display:none">删除</button>
+      <button class="btn-cancel" onclick="closeEventModal()">取消</button>
+      <button class="btn-save" onclick="saveEvent()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -722,6 +779,7 @@ const tabConfig = {
   yaji:     { title: '坐忘雅集', subtitle: '管理雅集活动海报', type: 'poster', section: 'yaji' },
   qinren:   { title: '琴人档案', subtitle: '管理学员课时套餐', type: 'member', memberType: 'class' },
   guests:   { title: '茗客档案', subtitle: '管理客人消费记录', type: 'member', memberType: 'purchase' },
+  schedule: { title: '行程安排', subtitle: '管理主理人行程与学员约课时间', type: 'schedule' },
 };
 
 // 登录
@@ -775,10 +833,20 @@ function setFilter(key) {
   loadProducts();
 }
 
-// 商品 / 海报 / 会员 统一加载入口
+// 商品 / 海报 / 会员 / 行程 统一加载入口
 async function loadProducts() {
   document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
   const cfg = tabConfig[currentTab];
+
+  if (cfg.type === 'schedule') {
+    document.getElementById('btnAdd').style.display = 'none';
+    document.getElementById('btnAddPoster').style.display = 'none';
+    document.getElementById('btnAddMember').style.display = 'none';
+    document.getElementById('filterBar').innerHTML = '';
+    document.getElementById('productList').innerHTML = '<div id="calendarEl"></div>';
+    renderCalendar();
+    return;
+  }
 
   if (cfg.type === 'member') {
     document.getElementById('btnAdd').style.display = 'none';
@@ -1417,10 +1485,11 @@ async function deleteMember() {
 
 async function openMemberDetail(id) {
   currentMemberId = id;
-  const [{ data: member }, { data: packages }, { data: purchases }] = await Promise.all([
+  const [{ data: member }, { data: packages }, { data: purchases }, { data: upcoming }] = await Promise.all([
     db.from('members').select('*').eq('id', id).single(),
     db.from('class_packages').select('*').eq('member_id', id).order('created_at'),
     db.from('purchases').select('*').eq('member_id', id).order('purchased_at', { ascending: false }),
+    db.from('schedule_events').select('*').eq('member_id', id).gte('start_at', new Date().toISOString()).order('start_at'),
   ]);
   if (!member) return;
   document.getElementById('memberDetailName').value = member.name;
@@ -1428,6 +1497,7 @@ async function openMemberDetail(id) {
   document.getElementById('memberDetailNote').value = member.note || '';
   renderPackages(packages || []);
   renderPurchases(purchases || []);
+  renderUpcoming(upcoming || []);
   document.getElementById('memberDetailModal').classList.add('open');
 }
 
@@ -1541,6 +1611,145 @@ async function deletePurchase(id) {
   if (!confirm('确定删除这条消费记录吗？')) return;
   await db.from('purchases').delete().eq('id', id);
   await refreshPurchases();
+}
+
+// ── 行程安排 ──────────────────────────────────────────
+
+let calendarInstance = null;
+
+async function renderCalendar() {
+  const { data } = await db.from('schedule_events').select('*, members(name)').order('start_at');
+  const events = (data || []).map(e => ({
+    id: e.id,
+    title: e.members?.name ? `${e.members.name} · ${e.title}` : e.title,
+    start: e.start_at,
+    end: e.end_at,
+  }));
+
+  const el = document.getElementById('calendarEl');
+  if (!el) return;
+  if (calendarInstance) { calendarInstance.destroy(); calendarInstance = null; }
+  calendarInstance = new FullCalendar.Calendar(el, {
+    locale: 'zh-cn',
+    height: 'auto',
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay' },
+    initialView: 'dayGridMonth',
+    events,
+    selectable: true,
+    select: (info) => { openAddEventModal(null, info.start, info.end); calendarInstance.unselect(); },
+    eventClick: (info) => openEditEventModal(info.event.id),
+  });
+  calendarInstance.render();
+}
+
+function toDatetimeLocal(dateOrStr) {
+  const d = dateOrStr instanceof Date ? dateOrStr : new Date(dateOrStr);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function openAddEventModal(memberId, startDate, endDate) {
+  document.getElementById('eventModalTitle').textContent = '添加行程';
+  document.getElementById('eventEditId').value = '';
+  document.getElementById('eventDeleteBtn').style.display = 'none';
+  document.getElementById('eventTitle').value = '';
+  document.getElementById('eventNote').value = '';
+  document.getElementById('eventStart').value = startDate ? toDatetimeLocal(startDate) : '';
+  document.getElementById('eventEnd').value = endDate ? toDatetimeLocal(endDate) : '';
+  await populateEventMemberSelect(memberId);
+  document.getElementById('eventModal').classList.add('open');
+}
+
+async function openEditEventModal(id) {
+  const { data } = await db.from('schedule_events').select('*').eq('id', id).single();
+  if (!data) return;
+  document.getElementById('eventModalTitle').textContent = '编辑行程';
+  document.getElementById('eventEditId').value = data.id;
+  document.getElementById('eventDeleteBtn').style.display = '';
+  document.getElementById('eventTitle').value = data.title;
+  document.getElementById('eventNote').value = data.note || '';
+  document.getElementById('eventStart').value = toDatetimeLocal(data.start_at);
+  document.getElementById('eventEnd').value = toDatetimeLocal(data.end_at);
+  await populateEventMemberSelect(data.member_id);
+  document.getElementById('eventModal').classList.add('open');
+}
+
+async function populateEventMemberSelect(selectedId) {
+  const { data: members } = await db.from('members').select('id, name').order('name');
+  const select = document.getElementById('eventMemberSelect');
+  select.innerHTML = '<option value="">不关联会员（个人行程）</option>' + (members || []).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+  select.value = selectedId || '';
+}
+
+function closeEventModal() {
+  document.getElementById('eventModal').classList.remove('open');
+}
+
+async function saveEvent() {
+  const id = document.getElementById('eventEditId').value;
+  const title = document.getElementById('eventTitle').value.trim();
+  const memberId = document.getElementById('eventMemberSelect').value || null;
+  const startVal = document.getElementById('eventStart').value;
+  const endVal = document.getElementById('eventEnd').value;
+  if (!title || !startVal || !endVal) { showToast('请填写标题和起止时间'); return; }
+  const payload = {
+    title,
+    member_id: memberId,
+    start_at: new Date(startVal).toISOString(),
+    end_at: new Date(endVal).toISOString(),
+    note: document.getElementById('eventNote').value.trim() || null,
+  };
+  if (id) await db.from('schedule_events').update(payload).eq('id', id);
+  else await db.from('schedule_events').insert(payload);
+  showToast('已保存');
+  closeEventModal();
+  renderCalendar();
+  if (currentMemberId) await refreshUpcoming();
+}
+
+async function deleteEvent() {
+  const id = document.getElementById('eventEditId').value;
+  if (!id || !confirm('确定删除这条行程吗？')) return;
+  await db.from('schedule_events').delete().eq('id', id);
+  showToast('已删除');
+  closeEventModal();
+  renderCalendar();
+  if (currentMemberId) await refreshUpcoming();
+}
+
+// 会员详情里的"预约上课"
+function formatEventTime(startIso, endIso) {
+  const s = new Date(startIso), e = new Date(endIso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${s.getMonth() + 1}月${s.getDate()}日 ${pad(s.getHours())}:${pad(s.getMinutes())}-${pad(e.getHours())}:${pad(e.getMinutes())}`;
+}
+
+function renderUpcoming(events) {
+  const el = document.getElementById('upcomingList');
+  if (!el) return;
+  if (!events.length) {
+    el.innerHTML = '<div style="color:var(--ink-muted);font-size:13px">暂无预约</div>';
+    return;
+  }
+  el.innerHTML = events.map(e => `
+    <div class="purchase-row" data-id="${e.id}">
+      <div class="pur-info">
+        <div class="pur-item">${e.title}</div>
+        <div class="pur-meta">${formatEventTime(e.start_at, e.end_at)}</div>
+      </div>
+      <button class="btn-mini-delete" onclick="openEditEventModal('${e.id}')">编辑</button>
+    </div>
+  `).join('');
+}
+
+async function refreshUpcoming() {
+  if (!currentMemberId) return;
+  const { data } = await db.from('schedule_events').select('*').eq('member_id', currentMemberId).gte('start_at', new Date().toISOString()).order('start_at');
+  renderUpcoming(data || []);
+}
+
+function quickAddEventForMember() {
+  openAddEventModal(currentMemberId);
 }
 
 function switchTab(tab) {
