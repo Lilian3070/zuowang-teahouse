@@ -795,6 +795,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentTab = 'tea';
 let currentFilter = null;
 let editingId = null;
+const tabProductsCache = {}; // { tabKey: allProductsArray }
 let categoriesCache = [];
 
 const tabConfig = {
@@ -860,7 +861,7 @@ function setFilter(key) {
 }
 
 // 商品 / 海报 / 会员 / 行程 统一加载入口
-async function loadProducts() {
+async function loadProducts(forceRefresh = false) {
   document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
   const cfg = tabConfig[currentTab];
 
@@ -906,12 +907,19 @@ async function loadProducts() {
   document.getElementById('btnAdd').style.display = '';
   document.getElementById('btnAddPoster').style.display = 'none';
   document.getElementById('btnAddMember').style.display = 'none';
-  const cats = getCategoriesForTab().map(c => c.key);
-  let query = db.from('products').select('*, categories(name)').in('category_key', cats.length ? cats : ['__none__']).order('is_visible', { ascending: false }).order('sort_order');
-  if (currentFilter) query = query.eq('category_key', currentFilter);
-  const { data } = await query;
-  renderProducts(data || []);
   renderFilterBar();
+
+  const cats = getCategoriesForTab().map(c => c.key);
+  let allProducts = tabProductsCache[currentTab];
+  if (!allProducts || forceRefresh) {
+    const { data } = await db.from('products').select('*, categories(name)').in('category_key', cats.length ? cats : ['__none__']).order('is_visible', { ascending: false }).order('sort_order');
+    allProducts = data || [];
+    tabProductsCache[currentTab] = allProducts;
+  } else {
+    document.getElementById('productList').innerHTML = '';
+  }
+  const filtered = currentFilter ? allProducts.filter(p => p.category_key === currentFilter) : allProducts;
+  renderProducts(filtered);
 }
 
 function renderProducts(products) {
@@ -1064,6 +1072,7 @@ async function saveProduct() {
     showToast('商品已添加');
   }
   closeModal();
+  delete tabProductsCache[currentTab];
   loadProducts();
 }
 
@@ -1104,6 +1113,7 @@ function setVisible(id, visible) {
   rows.forEach((r, i) => { r.dataset.sort = i; saves.push(db.from('products').update({ sort_order: i }).eq('id', r.dataset.id)); });
   Promise.all(saves).then(results => {
     if (results[0].error) setVisible(id, !visible);
+    else delete tabProductsCache[currentTab];
   });
 }
 
@@ -1213,6 +1223,7 @@ async function deleteProduct(id, name) {
   const path = storagePathFromUrl(data?.image_url);
   if (path) await db.storage.from('product-images').remove([path]);
   showToast('已删除');
+  delete tabProductsCache[currentTab];
   loadProducts();
 }
 
