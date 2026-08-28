@@ -862,8 +862,9 @@ function setFilter(key) {
 
 // 商品 / 海报 / 会员 / 行程 统一加载入口
 async function loadProducts(forceRefresh = false) {
-  document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
   const cfg = tabConfig[currentTab];
+  const hasCached = !!tabProductsCache[currentTab];
+  if (!hasCached) document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
 
   if (cfg.type === 'schedule') {
     document.getElementById('btnAdd').style.display = 'none';
@@ -897,9 +898,14 @@ async function loadProducts(forceRefresh = false) {
     document.getElementById('btnAddMember').style.display = 'none';
     document.getElementById('catPanel').style.display = 'none';
     resetCatPanel();
-    const { data } = await db.from('posters').select('*').eq('section', cfg.section).order('sort_order').order('created_at');
-    renderPosters(data || [], cfg.section);
     document.getElementById('filterBar').innerHTML = '';
+    let posters = tabProductsCache[currentTab];
+    if (!posters || forceRefresh) {
+      const { data } = await db.from('posters').select('*').eq('section', cfg.section).order('sort_order').order('created_at');
+      posters = data || [];
+      tabProductsCache[currentTab] = posters;
+    }
+    renderPosters(posters, cfg.section);
     return;
   }
 
@@ -1305,6 +1311,7 @@ function openPosterUpload() {
     const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
     await db.from('posters').insert({ section, image_url: publicUrl, sort_order: 999 });
     showToast('海报已上传');
+    delete tabProductsCache[currentTab];
     loadProducts();
   };
   input.click();
@@ -1373,6 +1380,7 @@ async function deletePoster(id) {
   const path = storagePathFromUrl(data?.image_url);
   if (path) await db.storage.from('product-images').remove([path]);
   showToast('已删除');
+  delete tabProductsCache[currentTab];
   loadProducts();
 }
 
@@ -1957,6 +1965,7 @@ async function savePosterEdit() {
   await db.from('posters').update({ title: title || null, image_url: imageUrl }).eq('id', _posterEditId);
   showToast('已保存');
   closePosterEdit();
+  delete tabProductsCache[currentTab];
   loadProducts();
 }
 
