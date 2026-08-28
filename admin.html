@@ -2257,18 +2257,46 @@ async function moveCat(id, dir) {
   renderFilterBar();
 }
 
-async function setCatVisible(id, visible) {
-  await db.from('categories').update({ is_visible: visible }).eq('id', id);
-  await loadCategories();
-  // 重新按显示在上、隐藏在下排序 sort_order
-  const type = tabConfig[currentTab].type;
-  const all = categoriesCache.filter(c => c.type === type).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
-  const reordered = [...all.filter(c => c.is_visible !== false), ...all.filter(c => c.is_visible === false)];
-  await Promise.all(reordered.map((c, i) => db.from('categories').update({ sort_order: i * 10 }).eq('id', c.id)));
-  await loadCategories();
-  renderCatPanel();
-  renderFilterBar();
-  delete tabProductsCache[currentTab];
+function setCatVisible(id, visible) {
+  // 立即更新本地缓存
+  const cat = categoriesCache.find(c => c.id === id);
+  if (cat) cat.is_visible = visible;
+
+  // 立即更新 DOM
+  const list = document.getElementById('catCardList');
+  const row = list?.querySelector(`.cat-card[data-id="${id}"]`);
+  if (row) {
+    row.dataset.visible = visible;
+    const showBtn = row.querySelector('.vs-btn-show');
+    const hideBtn = row.querySelector('.vs-btn-hide');
+    const badge = row.querySelector('.badge-hidden');
+    const nameEl = row.querySelector('.cat-card-name');
+    const img = row.querySelector('.cat-card-img');
+    const info = row.querySelector('.cat-card-info');
+    if (visible) {
+      showBtn?.classList.add('vs-active-show');
+      hideBtn?.classList.remove('vs-active-hide');
+      badge?.remove();
+      if (img) img.style.opacity = '';
+      if (info) info.style.opacity = '';
+      // 移到第一个隐藏行之前
+      const firstHidden = [...list.querySelectorAll('.cat-card')].find(r => r.dataset.visible === 'false');
+      if (firstHidden) list.insertBefore(row, firstHidden);
+    } else {
+      showBtn?.classList.remove('vs-active-show');
+      hideBtn?.classList.add('vs-active-hide');
+      if (!badge && nameEl) nameEl.insertAdjacentHTML('beforeend', '<span class="badge-hidden">已隐藏</span>');
+      if (img) img.style.opacity = '0.4';
+      if (info) info.style.opacity = '0.5';
+      // 沉到底部
+      list.appendChild(row);
+    }
+    // 后台保存：可见性 + 重新计算 sort_order
+    const rows = [...list.querySelectorAll('.cat-card')];
+    const saves = [db.from('categories').update({ is_visible: visible }).eq('id', id)];
+    rows.forEach((r, i) => { r.dataset.sort = i * 10; saves.push(db.from('categories').update({ sort_order: i * 10 }).eq('id', r.dataset.id)); });
+    Promise.all(saves).then(() => { loadCategories(); renderFilterBar(); delete tabProductsCache[currentTab]; });
+  }
 }
 </script>
 
