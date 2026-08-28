@@ -2052,10 +2052,6 @@ document.addEventListener('DOMContentLoaded', () => {
       <div id="catUploadStatus" style="font-size:12px;color:var(--ink-muted);margin-top:6px;"></div>
       <input type="hidden" id="catImage">
     </div>
-    <div class="form-group">
-      <label>排序（数字越小越靠前）</label>
-      <input type="number" id="catSort" value="0" min="0" style="width:120px">
-    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeCatModal()">取消</button>
       <button class="btn-save" onclick="saveCat()">保存</button>
@@ -2093,13 +2089,17 @@ function renderCatPanel() {
     return;
   }
   list.innerHTML = cats.map(c => `
-    <div class="cat-card">
+    <div class="cat-card" data-id="${c.id}" data-sort="${c.sort_order ?? 0}">
       ${c.cover_url
         ? `<img class="cat-card-img" src="${c.cover_url}" alt="${c.name}">`
         : `<div class="cat-card-no-img">🖼</div>`}
       <div class="cat-card-info">
         <div class="cat-card-name">${c.name}</div>
         ${c.description ? `<div class="cat-card-desc">${c.description}</div>` : ''}
+      </div>
+      <div class="sort-btns">
+        <button class="sort-btn" onclick="moveCat('${c.id}', -1)">↑</button>
+        <button class="sort-btn" onclick="moveCat('${c.id}', 1)">↓</button>
       </div>
       <button class="btn-edit" onclick="openCatModal('${c.id}')">编辑</button>
       <button class="btn-delete" onclick="deleteCat('${c.id}', '${c.name.replace(/'/g,"\\'")}')">删除</button>
@@ -2120,7 +2120,6 @@ function openCatModal(id) {
     if (!c) return;
     document.getElementById('catName').value = c.name || '';
     document.getElementById('catDesc').value = c.description || '';
-    document.getElementById('catSort').value = c.sort_order ?? 0;
     if (c.cover_url) {
       document.getElementById('catImage').value = c.cover_url;
       document.getElementById('catUploadPreview').src = c.cover_url;
@@ -2130,8 +2129,6 @@ function openCatModal(id) {
   } else {
     document.getElementById('catName').value = '';
     document.getElementById('catDesc').value = '';
-    const sameType = categoriesCache.filter(c => c.type === tabConfig[currentTab].type);
-    document.getElementById('catSort').value = sameType.length * 10;
   }
   document.getElementById('catModal').classList.add('open');
 }
@@ -2176,7 +2173,6 @@ async function saveCat() {
     name,
     description: document.getElementById('catDesc').value.trim() || null,
     cover_url: coverUrl || null,
-    sort_order: parseInt(document.getElementById('catSort').value) || 0,
     type,
   };
 
@@ -2185,6 +2181,8 @@ async function saveCat() {
     ({ error } = await db.from('categories').update(payload).eq('id', editingCatId));
   } else {
     payload.key = 'cat_' + Date.now().toString(36);
+    const sameType = categoriesCache.filter(c => c.type === tabConfig[currentTab].type);
+    payload.sort_order = sameType.length * 10;
     ({ error } = await db.from('categories').insert(payload));
   }
   if (error) { alert('保存失败：' + error.message); return; }
@@ -2207,6 +2205,27 @@ async function deleteCat(id, name) {
   delete tabProductsCache[currentTab];
   loadProducts();
   showToast('分类已删除');
+}
+
+async function moveCat(id, dir) {
+  const list = document.getElementById('catCardList');
+  const rows = [...list.querySelectorAll('.cat-card')];
+  const idx = rows.findIndex(r => r.dataset.id === id);
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= rows.length) return;
+  const rowA = rows[idx], rowB = rows[swapIdx];
+  const sortA = rowA.dataset.sort, sortB = rowB.dataset.sort;
+  // 交换 DOM
+  if (dir === -1) list.insertBefore(rowA, rowB);
+  else list.insertBefore(rowB, rowA);
+  rowA.dataset.sort = sortB; rowB.dataset.sort = sortA;
+  // 保存到 DB
+  await Promise.all([
+    db.from('categories').update({ sort_order: parseInt(sortB) }).eq('id', rowA.dataset.id),
+    db.from('categories').update({ sort_order: parseInt(sortA) }).eq('id', rowB.dataset.id),
+  ]);
+  await loadCategories();
+  renderFilterBar();
 }
 </script>
 
