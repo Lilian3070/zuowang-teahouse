@@ -898,9 +898,20 @@ function initDragSort() {
   });
 }
 
+function storagePathFromUrl(url) {
+  if (!url) return null;
+  const marker = '/product-images/';
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(url.slice(idx + marker.length));
+}
+
 async function deleteProduct(id, name) {
   if (!confirm(`确定要删除「${name}」吗？`)) return;
+  const { data } = await db.from('products').select('image_url').eq('id', id).single();
   await db.from('products').delete().eq('id', id);
+  const path = storagePathFromUrl(data?.image_url);
+  if (path) await db.storage.from('product-images').remove([path]);
   showToast('已删除');
   loadProducts();
 }
@@ -1046,7 +1057,10 @@ function setVisiblePoster(id, visible) {
 
 async function deletePoster(id) {
   if (!confirm('确定删除这张海报吗？')) return;
+  const { data } = await db.from('posters').select('image_url').eq('id', id).single();
   await db.from('posters').delete().eq('id', id);
+  const path = storagePathFromUrl(data?.image_url);
+  if (path) await db.storage.from('product-images').remove([path]);
   showToast('已删除');
   loadProducts();
 }
