@@ -450,19 +450,18 @@
 
   @media (max-width: 680px) {
     /* 顶栏 */
-    .admin-header { padding: 0 16px; }
-    .header-brand { font-size: 15px; }
-    .header-right { gap: 6px; }
-    .btn-logout, .btn-change-pw { padding: 6px 10px; font-size: 12px; }
-    .user-email { display: none; }
+    .top-bar { padding: 0 16px; }
+    .top-bar-title { font-size: 15px; }
+    .top-bar-right { gap: 6px; }
+    .btn-logout { padding: 6px 10px; font-size: 12px; }
+    #userEmail { display: none; }
 
     /* 布局：侧边栏变顶部横条 */
     .admin-layout { flex-direction: column; }
     .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); padding: 12px 0 4px; }
-    .sidebar-section { padding: 0 12px; }
+    .sidebar-section { padding: 0 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
     .sidebar-label { display: none; }
-    .sidebar-section > div { display: flex; gap: 6px; flex-wrap: wrap; }
-    .sidebar-item { width: auto; padding: 7px 14px; font-size: 13px; border-radius: 20px; border: 1px solid var(--border); }
+    .sidebar-item { display: inline-block; width: auto; padding: 7px 14px; font-size: 13px; border-radius: 20px; border: 1px solid var(--border); }
     .sidebar-item.active { border-color: var(--gold); }
 
     /* 主内容 */
