@@ -814,7 +814,7 @@ let currentTab = 'tea';
 let currentFilter = null;
 let editingId = null;
 let detailImages = []; // [{ url } for saved images | { file, previewUrl } for pending uploads]
-let removedDetailImageUrls = [];
+let pendingImageRemovals = [];
 const tabProductsCache = {}; // { tabKey: allProductsArray }
 let categoriesCache = [];
 
@@ -1014,7 +1014,7 @@ async function openEditModal(id) {
     placeholder.style.display = 'block';
   }
   detailImages = (data.detail_images || []).map(url => ({ url, previewUrl: url }));
-  removedDetailImageUrls = [];
+  pendingImageRemovals = [];
   renderDetailImgGrid();
   populateCategorySelect(data.category_key);
   document.getElementById('productModal').classList.add('open');
@@ -1039,7 +1039,7 @@ function closeModal() {
 function resetDetailImages() {
   detailImages.forEach(item => { if (item.file) URL.revokeObjectURL(item.previewUrl); });
   detailImages = [];
-  removedDetailImageUrls = [];
+  pendingImageRemovals = [];
   document.getElementById('detailImageFileInput').value = '';
   renderDetailImgGrid();
 }
@@ -1066,7 +1066,7 @@ function handleDetailImagesSelect(event) {
 function removeDetailImage(index) {
   const item = detailImages[index];
   if (!item) return;
-  if (item.url) removedDetailImageUrls.push(item.url);
+  if (item.url) pendingImageRemovals.push(item.url);
   if (item.file) URL.revokeObjectURL(item.previewUrl);
   detailImages.splice(index, 1);
   renderDetailImgGrid();
@@ -1107,15 +1107,16 @@ function handleImageSelect(event) {
 
 async function uploadImageIfNeeded() {
   const file = document.getElementById('imageFileInput').files[0];
-  if (!file) return document.getElementById('modalImage').value || null;
+  const oldUrl = document.getElementById('modalImage').value || null;
+  if (!file) return oldUrl;
   document.getElementById('uploadStatus').textContent = '上传中...';
   const compressed = await compressImage(file);
-  const ext = 'jpg';
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { data, error } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
-  if (error) { showToast('图片上传失败'); return null; }
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+  const { error } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
+  if (error) { showToast('图片上传失败'); return oldUrl; }
   const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
   document.getElementById('uploadStatus').textContent = '上传成功';
+  if (oldUrl) pendingImageRemovals.push(oldUrl);
   return publicUrl;
 }
 
@@ -1147,14 +1148,15 @@ async function saveProduct() {
     detail_images: detailImageUrls,
     is_visible: document.getElementById('modalVisible').checked,
   };
+  let error;
   if (editingId) {
-    await db.from('products').update(payload).eq('id', editingId);
-    showToast('商品已更新');
+    ({ error } = await db.from('products').update(payload).eq('id', editingId));
   } else {
-    await db.from('products').insert(payload);
-    showToast('商品已添加');
+    ({ error } = await db.from('products').insert(payload));
   }
-  const toRemove = removedDetailImageUrls.map(storagePathFromUrl).filter(Boolean);
+  if (error) { showToast('保存失败：' + error.message); return; }
+  showToast(editingId ? '商品已更新' : '商品已添加');
+  const toRemove = pendingImageRemovals.map(storagePathFromUrl).filter(Boolean);
   if (toRemove.length) db.storage.from('product-images').remove(toRemove);
   closeModal();
   delete tabProductsCache[currentTab];
@@ -2033,6 +2035,8 @@ async function savePosterEdit() {
   const title = document.getElementById('posterEditTitle').value.trim();
   showToast('保存中…');
   let imageUrl = _posterOrigUrl;
+  const oldUrl = _posterOrigUrl;
+  let replaced = false;
   if (_posterNewBlob) {
     const frame = document.getElementById('posterCropFrame');
     const img = document.getElementById('posterCropImg');
@@ -2055,8 +2059,14 @@ async function savePosterEdit() {
     const { error } = await db.storage.from('product-images').upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
     if (error) { showToast('图片上传失败'); return; }
     imageUrl = db.storage.from('product-images').getPublicUrl(filename).data.publicUrl;
+    replaced = true;
   }
-  await db.from('posters').update({ title: title || null, image_url: imageUrl }).eq('id', _posterEditId);
+  const { error: saveErr } = await db.from('posters').update({ title: title || null, image_url: imageUrl }).eq('id', _posterEditId);
+  if (saveErr) { showToast('保存失败'); return; }
+  if (replaced && oldUrl) {
+    const path = storagePathFromUrl(oldUrl);
+    if (path) db.storage.from('product-images').remove([path]);
+  }
   showToast('已保存');
   closePosterEdit();
   delete tabProductsCache[currentTab];
@@ -2281,6 +2291,7 @@ async function saveCat() {
   if (!name) { alert('请填写分类名称'); return; }
   const type = tabConfig[currentTab].type;
   let coverUrl = document.getElementById('catImage').value;
+  const oldCoverUrl = coverUrl || null;
 
   if (catImageFile) {
     document.getElementById('catUploadStatus').textContent = '上传中...';
@@ -2310,6 +2321,11 @@ async function saveCat() {
   }
   if (error) { alert('保存失败：' + error.message); return; }
 
+  if (catImageFile && oldCoverUrl) {
+    const path = storagePathFromUrl(oldCoverUrl);
+    if (path) db.storage.from('product-images').remove([path]);
+  }
+
   closeCatModal();
   await loadCategories();
   renderCatPanel();
@@ -2320,8 +2336,11 @@ async function saveCat() {
 
 async function deleteCat(id, name) {
   if (!confirm('确认删除分类「' + name + '」？\n\n注意：只删除分类本身，该分类下的商品数据不会被删除。')) return;
+  const cat = categoriesCache.find(c => c.id === id);
   const { error } = await db.from('categories').delete().eq('id', id);
   if (error) { alert('删除失败：' + error.message); return; }
+  const coverPath = storagePathFromUrl(cat?.cover_url);
+  if (coverPath) db.storage.from('product-images').remove([coverPath]);
   await loadCategories();
   renderCatPanel();
   renderFilterBar();
