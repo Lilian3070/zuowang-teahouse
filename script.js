@@ -291,6 +291,17 @@ document.addEventListener('DOMContentLoaded', () => {
   loadFrontCategories('teaware', 'teawareGrid', 'teaware-card', 'cover-fit', 'data-category',  '茗器清赏 →');
   loadFrontCategories('guqin',   'guqinGrid',   '',             '',          'data-guqin',     '知音寻琴 →');
 
+  // 预加载所有商品到内存，点击时秒开
+  const productsCache = {};
+  db.from('products').select('*').eq('is_visible', true).order('sort_order').order('created_at')
+    .then(({ data }) => {
+      if (!data) return;
+      data.forEach(p => {
+        if (!productsCache[p.category_key]) productsCache[p.category_key] = [];
+        productsCache[p.category_key].push(p);
+      });
+    });
+
   const brandModal = document.getElementById('brandModal');
   const brandModalOverlay = document.getElementById('brandModalOverlay');
   const modalClose = document.getElementById('modalClose');
@@ -329,7 +340,9 @@ document.addEventListener('DOMContentLoaded', () => {
     brandModal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
 
-    const { data: products } = await db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('sort_order').order('created_at');
+    const cached = productsCache[categoryKey];
+    const products = cached !== undefined ? cached
+      : (await db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('sort_order').order('created_at')).data;
     if (products && products.length) {
       modalProducts.innerHTML = '';
       products.forEach(p => modalProducts.appendChild(renderProductCard(p)));
