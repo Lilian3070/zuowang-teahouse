@@ -351,6 +351,16 @@
   }
   .upload-area:hover { border-color: var(--gold); color: var(--gold); }
 
+  .detail-img-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .detail-img-thumb { position: relative; width: 64px; height: 64px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); flex-shrink: 0; }
+  .detail-img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .detail-img-remove {
+    position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(0,0,0,0.6); color: white; border: none; font-size: 12px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .detail-img-remove:hover { background: var(--red); }
+
   /* 海报管理网格 */
   .poster-admin-grid { display: flex; flex-wrap: wrap; gap: 16px; }
   .poster-admin-card { width: 160px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
@@ -609,6 +619,14 @@
       <div id="uploadStatus" style="font-size:12px;color:var(--ink-muted);margin-top:6px;"></div>
       <input type="hidden" id="modalImage">
     </div>
+    <div class="form-group">
+      <label>详情图片（选填，可添加多张）</label>
+      <div class="detail-img-grid" id="detailImgGrid" style="display:none"></div>
+      <div class="upload-area" id="detailUploadArea" onclick="document.getElementById('detailImageFileInput').click()" style="padding:14px">
+        点击添加详情图片，可一次选择多张
+      </div>
+      <input type="file" id="detailImageFileInput" accept="image/*" multiple style="display:none" onchange="handleDetailImagesSelect(event)">
+    </div>
     <div class="checkbox-row">
       <input type="checkbox" id="modalVisible" checked>
       <label for="modalVisible">在网站上显示此商品</label>
@@ -795,6 +813,8 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentTab = 'tea';
 let currentFilter = null;
 let editingId = null;
+let detailImages = []; // [{ url } for saved images | { file, previewUrl } for pending uploads]
+let removedDetailImageUrls = [];
 const tabProductsCache = {}; // { tabKey: allProductsArray }
 let categoriesCache = [];
 
@@ -967,6 +987,7 @@ function openAddModal() {
   document.getElementById('modalPrice').value = '';
   document.getElementById('modalImage').value = '';
   document.getElementById('modalVisible').checked = true;
+  resetDetailImages();
   populateCategorySelect();
   document.getElementById('productModal').classList.add('open');
 }
@@ -992,6 +1013,9 @@ async function openEditModal(id) {
     preview.style.display = 'none';
     placeholder.style.display = 'block';
   }
+  detailImages = (data.detail_images || []).map(url => ({ url, previewUrl: url }));
+  removedDetailImageUrls = [];
+  renderDetailImgGrid();
   populateCategorySelect(data.category_key);
   document.getElementById('productModal').classList.add('open');
 }
@@ -1008,7 +1032,44 @@ function closeModal() {
   document.getElementById('uploadPlaceholder').style.display = 'block';
   document.getElementById('uploadStatus').textContent = '';
   document.getElementById('imageFileInput').value = '';
+  resetDetailImages();
   editingId = null;
+}
+
+function resetDetailImages() {
+  detailImages.forEach(item => { if (item.file) URL.revokeObjectURL(item.previewUrl); });
+  detailImages = [];
+  removedDetailImageUrls = [];
+  document.getElementById('detailImageFileInput').value = '';
+  renderDetailImgGrid();
+}
+
+function renderDetailImgGrid() {
+  const grid = document.getElementById('detailImgGrid');
+  if (!detailImages.length) { grid.innerHTML = ''; grid.style.display = 'none'; return; }
+  grid.style.display = 'flex';
+  grid.innerHTML = detailImages.map((item, i) => `
+    <div class="detail-img-thumb">
+      <img src="${item.previewUrl}" alt="详情图">
+      <button type="button" class="detail-img-remove" onclick="removeDetailImage(${i})" title="删除">×</button>
+    </div>
+  `).join('');
+}
+
+function handleDetailImagesSelect(event) {
+  const files = Array.from(event.target.files || []);
+  files.forEach(file => detailImages.push({ file, previewUrl: URL.createObjectURL(file) }));
+  event.target.value = '';
+  renderDetailImgGrid();
+}
+
+function removeDetailImage(index) {
+  const item = detailImages[index];
+  if (!item) return;
+  if (item.url) removedDetailImageUrls.push(item.url);
+  if (item.file) URL.revokeObjectURL(item.previewUrl);
+  detailImages.splice(index, 1);
+  renderDetailImgGrid();
 }
 
 // 图片压缩
@@ -1058,16 +1119,32 @@ async function uploadImageIfNeeded() {
   return publicUrl;
 }
 
+async function uploadDetailImagesIfNeeded() {
+  const urls = [];
+  for (const item of detailImages) {
+    if (item.url) { urls.push(item.url); continue; }
+    const compressed = await compressImage(item.file);
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const { error } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
+    if (error) { showToast('详情图片上传失败'); continue; }
+    const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
+    urls.push(publicUrl);
+  }
+  return urls;
+}
+
 async function saveProduct() {
   const name = document.getElementById('modalName').value.trim();
   if (!name) { showToast('请填写商品名称'); return; }
   const imageUrl = await uploadImageIfNeeded();
+  const detailImageUrls = await uploadDetailImagesIfNeeded();
   const payload = {
     category_key: document.getElementById('modalCategory').value,
     name,
     description: document.getElementById('modalDesc').value.trim() || null,
     price: document.getElementById('modalPrice').value.trim() || null,
     image_url: imageUrl,
+    detail_images: detailImageUrls,
     is_visible: document.getElementById('modalVisible').checked,
   };
   if (editingId) {
@@ -1077,6 +1154,8 @@ async function saveProduct() {
     await db.from('products').insert(payload);
     showToast('商品已添加');
   }
+  const toRemove = removedDetailImageUrls.map(storagePathFromUrl).filter(Boolean);
+  if (toRemove.length) db.storage.from('product-images').remove(toRemove);
   closeModal();
   delete tabProductsCache[currentTab];
   loadProducts();
@@ -1224,10 +1303,10 @@ function storagePathFromUrl(url) {
 
 async function deleteProduct(id, name) {
   if (!confirm(`确定要删除「${name}」吗？`)) return;
-  const { data } = await db.from('products').select('image_url').eq('id', id).single();
+  const { data } = await db.from('products').select('image_url, detail_images').eq('id', id).single();
   await db.from('products').delete().eq('id', id);
-  const path = storagePathFromUrl(data?.image_url);
-  if (path) await db.storage.from('product-images').remove([path]);
+  const paths = [data?.image_url, ...(data?.detail_images || [])].map(storagePathFromUrl).filter(Boolean);
+  if (paths.length) await db.storage.from('product-images').remove(paths);
   showToast('已删除');
   delete tabProductsCache[currentTab];
   loadProducts();

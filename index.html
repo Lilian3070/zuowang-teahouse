@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 茶 · 器 · 琴</title>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -209,7 +209,25 @@
   </div>
 </div>
 
+<div class="product-gallery-modal" id="productGalleryModal" aria-hidden="true">
+  <div class="product-gallery-overlay" id="productGalleryOverlay"></div>
+  <div class="product-gallery-panel" role="dialog" aria-modal="true" aria-labelledby="galleryProductName">
+    <button class="modal-close" id="galleryClose" type="button" aria-label="关闭">✕</button>
+    <div class="gallery-main">
+      <button class="gallery-nav gallery-prev" id="galleryPrev" type="button" aria-label="上一张">‹</button>
+      <img id="galleryMainImg" src="" alt="">
+      <button class="gallery-nav gallery-next" id="galleryNext" type="button" aria-label="下一张">›</button>
+    </div>
+    <div class="gallery-thumbs" id="galleryThumbs"></div>
+    <div class="gallery-info">
+      <h4 id="galleryProductName"></h4>
+      <p id="galleryProductSpec"></p>
+      <p id="galleryProductDesc"></p>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="script.js?v=4"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>

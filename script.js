@@ -293,6 +293,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 预加载所有商品到内存，点击时秒开
   const productsCache = {};
+  const productsById = {};
+  function indexProducts(list) {
+    (list || []).forEach(p => { productsById[p.id] = p; });
+  }
   db.from('products').select('*').eq('is_visible', true).order('sort_order').order('created_at')
     .then(({ data }) => {
       if (!data) return;
@@ -300,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!productsCache[p.category_key]) productsCache[p.category_key] = [];
         productsCache[p.category_key].push(p);
       });
+      indexProducts(data);
     });
 
   const brandModal = document.getElementById('brandModal');
@@ -324,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <h4>${p.name}</h4>
         ${spec ? `<p class="product-spec">${spec}</p>` : ''}
         ${desc ? `<span class="product-category">${desc}</span>` : ''}
-        <button class="detail-btn" type="button">查看详情</button>
+        <button class="detail-btn" type="button" data-id="${p.id}">查看详情</button>
       </div>
     `;
     return card;
@@ -343,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cached = productsCache[categoryKey];
     const products = cached !== undefined ? cached
       : (await db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('sort_order').order('created_at')).data;
+    if (cached === undefined) indexProducts(products);
     if (products && products.length) {
       modalProducts.innerHTML = '';
       products.forEach(p => modalProducts.appendChild(renderProductCard(p)));
@@ -357,8 +363,75 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('modal-open');
   }
 
+  // 商品详情图片弹窗
+  const galleryModal = document.getElementById('productGalleryModal');
+  const galleryOverlay = document.getElementById('productGalleryOverlay');
+  const galleryClose = document.getElementById('galleryClose');
+  const galleryMainImg = document.getElementById('galleryMainImg');
+  const galleryThumbs = document.getElementById('galleryThumbs');
+  const galleryPrev = document.getElementById('galleryPrev');
+  const galleryNext = document.getElementById('galleryNext');
+  const galleryProductName = document.getElementById('galleryProductName');
+  const galleryProductSpec = document.getElementById('galleryProductSpec');
+  const galleryProductDesc = document.getElementById('galleryProductDesc');
+
+  let galleryImages = [];
+  let galleryIndex = 0;
+
+  function showGalleryImage(i) {
+    galleryIndex = (i + galleryImages.length) % galleryImages.length;
+    galleryMainImg.src = galleryImages[galleryIndex];
+    [...galleryThumbs.children].forEach((el, idx) => el.classList.toggle('active', idx === galleryIndex));
+  }
+
+  function openProductGallery(p) {
+    const images = [p.image_url, ...(p.detail_images || [])].filter(Boolean);
+    galleryImages = images;
+    galleryProductName.textContent = p.name;
+    galleryProductSpec.textContent = p.price ? `¥${p.price}` : (p.spec || '');
+    galleryProductDesc.textContent = p.description || '';
+    if (images.length) {
+      galleryMainImg.style.display = '';
+      galleryThumbs.innerHTML = images.length > 1
+        ? images.map((url, i) => `<img class="gallery-thumb" src="${url}" data-i="${i}" alt="">`).join('')
+        : '';
+      galleryThumbs.style.display = images.length > 1 ? 'flex' : 'none';
+      galleryPrev.style.display = galleryNext.style.display = images.length > 1 ? '' : 'none';
+      showGalleryImage(0);
+    } else {
+      galleryMainImg.style.display = 'none';
+      galleryThumbs.innerHTML = '';
+      galleryThumbs.style.display = 'none';
+      galleryPrev.style.display = galleryNext.style.display = 'none';
+    }
+    galleryModal.classList.add('open');
+    galleryModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeProductGallery() {
+    galleryModal.classList.remove('open');
+    galleryModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  }
+
+  galleryThumbs.addEventListener('click', e => {
+    const t = e.target.closest('.gallery-thumb');
+    if (t) showGalleryImage(parseInt(t.dataset.i, 10));
+  });
+  galleryPrev.addEventListener('click', () => showGalleryImage(galleryIndex - 1));
+  galleryNext.addEventListener('click', () => showGalleryImage(galleryIndex + 1));
+  galleryClose.addEventListener('click', closeProductGallery);
+  galleryOverlay.addEventListener('click', closeProductGallery);
+
   // 事件委托：绑定到 document，克隆卡片的按钮也能触发
   document.addEventListener('click', e => {
+    const detailBtn = e.target.closest('.detail-btn');
+    if (detailBtn) {
+      const p = productsById[detailBtn.dataset.id];
+      if (p) openProductGallery(p);
+      return;
+    }
     const btn = e.target.closest('.explore-btn');
     if (!btn) return;
     if (btn.dataset.brand) {
@@ -373,7 +446,13 @@ document.addEventListener('DOMContentLoaded', () => {
   modalClose.addEventListener('click', closeEntryModal);
   brandModalOverlay.addEventListener('click', closeEntryModal);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeEntryModal();
+    if (e.key === 'Escape') {
+      if (galleryModal.classList.contains('open')) closeProductGallery();
+      else closeEntryModal();
+    } else if (galleryModal.classList.contains('open')) {
+      if (e.key === 'ArrowLeft') showGalleryImage(galleryIndex - 1);
+      else if (e.key === 'ArrowRight') showGalleryImage(galleryIndex + 1);
+    }
   });
 
   // 海报加载
