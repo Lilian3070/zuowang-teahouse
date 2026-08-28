@@ -2082,7 +2082,8 @@ function resetCatPanel() {
 
 function renderCatPanel() {
   const type = tabConfig[currentTab].type;
-  const cats = categoriesCache.filter(c => c.type === type).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  const all = categoriesCache.filter(c => c.type === type).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  const cats = [...all.filter(c => c.is_visible !== false), ...all.filter(c => c.is_visible === false)];
   const list = document.getElementById('catCardList');
   if (!cats.length) {
     list.innerHTML = '<div class="cat-empty">暂无分类，点击「添加分类」创建第一个</div>';
@@ -2109,6 +2110,30 @@ function renderCatPanel() {
       <button class="btn-delete" onclick="deleteCat('${c.id}', '${c.name.replace(/'/g,"\\'")}')">删除</button>
     </div>
   `).join('');
+
+  // 拖拽排序
+  let dragSrc = null;
+  list.querySelectorAll('.cat-card').forEach(card => {
+    card.setAttribute('draggable', true);
+    card.addEventListener('dragstart', () => { dragSrc = card; card.style.opacity = '0.4'; });
+    card.addEventListener('dragend', () => { card.style.opacity = ''; });
+    card.addEventListener('dragover', e => { e.preventDefault(); });
+    card.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === card) return;
+      const rows = [...list.querySelectorAll('.cat-card')];
+      const idxA = rows.indexOf(dragSrc), idxB = rows.indexOf(card);
+      if (idxA < idxB) list.insertBefore(dragSrc, card.nextSibling);
+      else list.insertBefore(dragSrc, card);
+      const newRows = [...list.querySelectorAll('.cat-card')];
+      await Promise.all(newRows.map((r, i) => {
+        r.dataset.sort = i * 10;
+        return db.from('categories').update({ sort_order: i * 10 }).eq('id', r.dataset.id);
+      }));
+      await loadCategories();
+      renderFilterBar();
+    });
+  });
 }
 
 function openCatModal(id) {
@@ -2233,9 +2258,13 @@ async function moveCat(id, dir) {
 }
 
 async function setCatVisible(id, visible) {
-  const row = document.querySelector(`.cat-card[data-id="${id}"]`);
-  if (!row) return;
   await db.from('categories').update({ is_visible: visible }).eq('id', id);
+  await loadCategories();
+  // 重新按显示在上、隐藏在下排序 sort_order
+  const type = tabConfig[currentTab].type;
+  const all = categoriesCache.filter(c => c.type === type).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  const reordered = [...all.filter(c => c.is_visible !== false), ...all.filter(c => c.is_visible === false)];
+  await Promise.all(reordered.map((c, i) => db.from('categories').update({ sort_order: i * 10 }).eq('id', c.id)));
   await loadCategories();
   renderCatPanel();
   renderFilterBar();
