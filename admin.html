@@ -628,10 +628,6 @@
       </div>
       <input type="file" id="detailImageFileInput" accept="image/*" multiple style="display:none" onchange="handleDetailImagesSelect(event)">
     </div>
-    <div class="checkbox-row">
-      <input type="checkbox" id="modalVisible" checked>
-      <label for="modalVisible">在网站上显示此商品</label>
-    </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">取消</button>
       <button class="btn-save" onclick="saveProduct()">保存</button>
@@ -987,7 +983,6 @@ function openAddModal() {
   document.getElementById('modalDesc').value = '';
   document.getElementById('modalPrice').value = '';
   document.getElementById('modalImage').value = '';
-  document.getElementById('modalVisible').checked = true;
   resetDetailImages();
   populateCategorySelect();
   document.getElementById('productModal').classList.add('open');
@@ -1001,8 +996,6 @@ async function openEditModal(id) {
   document.getElementById('modalName').value = data.name;
   document.getElementById('modalDesc').value = data.description || '';
   document.getElementById('modalPrice').value = data.price || '';
-  document.getElementById('modalImage').value = data.image_url || '';
-  document.getElementById('modalVisible').checked = data.is_visible;
   document.getElementById('modalImage').value = data.image_url || '';
   const preview = document.getElementById('uploadPreview');
   const placeholder = document.getElementById('uploadPlaceholder');
@@ -1147,8 +1140,8 @@ async function saveProduct() {
     price: document.getElementById('modalPrice').value.trim() || null,
     image_url: imageUrl,
     detail_images: detailImageUrls,
-    is_visible: document.getElementById('modalVisible').checked,
   };
+  if (!editingId) payload.is_visible = true;
   let error;
   if (editingId) {
     ({ error } = await db.from('products').update(payload).eq('id', editingId));
