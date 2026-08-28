@@ -515,7 +515,8 @@
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">会员管理</div>
-        <button class="sidebar-item" onclick="switchTab('members')">会员档案</button>
+        <button class="sidebar-item" onclick="switchTab('qinren')">琴人档案</button>
+        <button class="sidebar-item" onclick="switchTab('guests')">客人消费</button>
       </div>
     </div>
 
@@ -527,7 +528,7 @@
         </div>
         <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
         <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
-        <button class="btn-add" id="btnAddMember" onclick="openAddMemberModal()" style="display:none">+ 添加会员</button>
+        <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
@@ -597,25 +598,55 @@
   </div>
 </div>
 
-<!-- 添加会员模态框 -->
-<div class="modal-overlay" id="addMemberModal">
-  <div class="modal" style="width:400px">
-    <div class="modal-title">添加会员</div>
+<!-- 添加课时套餐 / 消费记录模态框 -->
+<div class="modal-overlay" id="addRecordModal">
+  <div class="modal" style="width:420px">
+    <div class="modal-title" id="addRecordTitle">添加课时套餐</div>
     <div class="form-group">
-      <label>姓名</label>
-      <input type="text" id="newMemberName" placeholder="会员姓名">
+      <label>会员</label>
+      <select id="recordMemberSelect" onchange="toggleNewMemberFields()"></select>
     </div>
-    <div class="form-group">
-      <label>联系方式（选填）</label>
-      <input type="text" id="newMemberPhone" placeholder="手机号 / 微信">
+    <div id="newMemberFields" style="display:none">
+      <div class="form-group">
+        <label>姓名</label>
+        <input type="text" id="recordNewName" placeholder="新会员姓名">
+      </div>
+      <div class="form-group">
+        <label>联系方式（选填）</label>
+        <input type="text" id="recordNewPhone" placeholder="手机号 / 微信">
+      </div>
     </div>
-    <div class="form-group">
-      <label>备注（选填）</label>
-      <textarea id="newMemberNote" placeholder="其他备注信息..."></textarea>
+    <div id="recordClassFields">
+      <div class="form-group">
+        <label>套餐名</label>
+        <input type="text" id="recordPkgName" placeholder="例：12课时入门小班">
+      </div>
+      <div class="form-group">
+        <label>总课时</label>
+        <input type="number" id="recordPkgHours" placeholder="例：12">
+      </div>
+      <div class="form-group">
+        <label>价格（选填）</label>
+        <input type="text" id="recordPkgPrice" placeholder="例：1680">
+      </div>
+    </div>
+    <div id="recordPurchaseFields" style="display:none">
+      <div class="form-group">
+        <label>购买项目</label>
+        <input type="text" id="recordPurItem" placeholder="例：正山堂骏眉红茶 2盒">
+      </div>
+      <div class="form-group">
+        <label>金额（选填）</label>
+        <input type="text" id="recordPurAmount" placeholder="例：580">
+      </div>
+      <div class="form-group">
+        <label>日期（选填，默认今天）</label>
+        <input type="date" id="recordPurDate">
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeAddMemberModal()">取消</button>
-      <button class="btn-save" onclick="saveMember()">保存</button>
+      <button class="btn-cancel" onclick="closeAddRecordModal()">取消</button>
+      <button class="btn-save" onclick="saveNewRecord()">保存</button>
     </div>
   </div>
 </div>
@@ -638,6 +669,7 @@
       <textarea id="memberDetailNote" placeholder="其他备注信息..."></textarea>
     </div>
     <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-delete" onclick="deleteMember()">删除该会员</button>
       <button class="btn-save" onclick="saveMemberBasic()">保存基本信息</button>
     </div>
 
@@ -688,7 +720,8 @@ const tabConfig = {
   guqin:    { title: '斫琴甄选', subtitle: '管理古琴分类与商品', type: 'guqin' },
   qindao:   { title: '琴道传习', subtitle: '管理活动招生海报', type: 'poster', section: 'qindao' },
   yaji:     { title: '坐忘雅集', subtitle: '管理雅集活动海报', type: 'poster', section: 'yaji' },
-  members:  { title: '会员档案', subtitle: '管理学员课时与客人消费记录', type: 'member' },
+  qinren:   { title: '琴人档案', subtitle: '管理学员课时套餐', type: 'member', memberType: 'class' },
+  guests:   { title: '客人消费', subtitle: '管理客人消费记录', type: 'member', memberType: 'purchase' },
 };
 
 // 登录
@@ -750,8 +783,11 @@ async function loadProducts() {
   if (cfg.type === 'member') {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = 'none';
-    document.getElementById('btnAddMember').style.display = '';
-    document.getElementById('filterBar').innerHTML = '<input type="text" class="member-search" id="memberSearch" placeholder="搜索会员姓名..." oninput="loadMembers()">';
+    const btnMember = document.getElementById('btnAddMember');
+    btnMember.style.display = '';
+    btnMember.textContent = cfg.memberType === 'class' ? '+ 添加课时套餐' : '+ 添加消费记录';
+    btnMember.onclick = () => openAddRecordModal(cfg.memberType);
+    document.getElementById('filterBar').innerHTML = '<input type="text" class="member-search" id="memberSearch" placeholder="搜索姓名..." oninput="loadMembers()">';
     await loadMembers();
     return;
   }
@@ -1244,63 +1280,139 @@ async function movePoster(id, direction) {
 
 let currentMemberId = null;
 
+// 会员列表：琴人档案只显示有课时套餐的人，客人消费只显示有消费记录的人
 async function loadMembers() {
+  const cfg = tabConfig[currentTab];
+  const memberType = cfg.memberType;
   const search = document.getElementById('memberSearch');
-  const keyword = search ? search.value.trim() : '';
-  let query = db.from('members').select('*').order('created_at', { ascending: false });
-  if (keyword) query = query.ilike('name', `%${keyword}%`);
-  const { data } = await query;
-  renderMembers(data || []);
+  const keyword = (search ? search.value.trim() : '').toLowerCase();
+
+  if (memberType === 'class') {
+    const { data } = await db.from('class_packages').select('member_id, total_hours, used_hours, members(id, name, phone)').order('created_at');
+    const map = new Map();
+    (data || []).forEach(r => {
+      if (!r.members) return;
+      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, phone: r.members.phone, remaining: 0, packages: 0 });
+      const entry = map.get(r.member_id);
+      entry.remaining += (r.total_hours - r.used_hours);
+      entry.packages += 1;
+    });
+    let list = [...map.values()];
+    if (keyword) list = list.filter(m => m.name.toLowerCase().includes(keyword));
+    renderMemberList(list, 'class');
+  } else {
+    const { data } = await db.from('purchases').select('member_id, amount, members(id, name, phone)').order('purchased_at', { ascending: false });
+    const map = new Map();
+    (data || []).forEach(r => {
+      if (!r.members) return;
+      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, phone: r.members.phone, total: 0, count: 0 });
+      const entry = map.get(r.member_id);
+      entry.total += Number(r.amount) || 0;
+      entry.count += 1;
+    });
+    let list = [...map.values()];
+    if (keyword) list = list.filter(m => m.name.toLowerCase().includes(keyword));
+    renderMemberList(list, 'purchase');
+  }
 }
 
-function renderMembers(members) {
+function renderMemberList(list, type) {
   const el = document.getElementById('productList');
-  if (!members.length) {
-    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">👤</div><p>暂无会员，点击「添加会员」开始</p></div>';
+  if (!list.length) {
+    const emptyMsg = type === 'class' ? '暂无课时套餐记录，点击「添加课时套餐」开始' : '暂无消费记录，点击「添加消费记录」开始';
+    el.innerHTML = `<div class="empty-state"><div style="font-size:32px">👤</div><p>${emptyMsg}</p></div>`;
     return;
   }
-  el.innerHTML = members.map(m => `
+  el.innerHTML = list.map(m => {
+    const summary = type === 'class'
+      ? `剩余课时 ${m.remaining} 节 · ${m.packages} 个套餐`
+      : `累计消费 ¥${m.total} · ${m.count} 笔`;
+    return `
     <div class="member-row" data-id="${m.id}">
       <div class="member-avatar">${(m.name || '?').slice(0, 1)}</div>
       <div class="member-info">
         <div class="member-name">${m.name}</div>
-        <div class="member-meta">${m.phone || '未填写联系方式'}${m.note ? ' · ' + m.note : ''}</div>
+        <div class="member-meta">${m.phone || '未填写联系方式'} · ${summary}</div>
       </div>
       <div class="product-actions">
         <button class="btn-edit" onclick="openMemberDetail('${m.id}')">查看详情</button>
-        <button class="btn-delete" onclick="deleteMember('${m.id}','${(m.name || '').replace(/'/g, "\\'")}')">删除</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-function openAddMemberModal() {
-  document.getElementById('newMemberName').value = '';
-  document.getElementById('newMemberPhone').value = '';
-  document.getElementById('newMemberNote').value = '';
-  document.getElementById('addMemberModal').classList.add('open');
+// 添加课时套餐 / 消费记录（可选已有会员，也可新建会员）
+let addRecordType = 'class';
+
+async function openAddRecordModal(memberType) {
+  addRecordType = memberType;
+  document.getElementById('addRecordTitle').textContent = memberType === 'class' ? '添加课时套餐' : '添加消费记录';
+  document.getElementById('recordClassFields').style.display = memberType === 'class' ? '' : 'none';
+  document.getElementById('recordPurchaseFields').style.display = memberType === 'purchase' ? '' : 'none';
+  document.getElementById('recordPkgName').value = '';
+  document.getElementById('recordPkgHours').value = '';
+  document.getElementById('recordPkgPrice').value = '';
+  document.getElementById('recordPurItem').value = '';
+  document.getElementById('recordPurAmount').value = '';
+  document.getElementById('recordPurDate').value = '';
+  document.getElementById('recordNewName').value = '';
+  document.getElementById('recordNewPhone').value = '';
+
+  const { data: members } = await db.from('members').select('id, name').order('name');
+  const select = document.getElementById('recordMemberSelect');
+  select.innerHTML = '<option value="__new__">+ 新建会员</option>' + (members || []).map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+  select.value = '__new__';
+  toggleNewMemberFields();
+
+  document.getElementById('addRecordModal').classList.add('open');
 }
 
-function closeAddMemberModal() {
-  document.getElementById('addMemberModal').classList.remove('open');
+function toggleNewMemberFields() {
+  const isNew = document.getElementById('recordMemberSelect').value === '__new__';
+  document.getElementById('newMemberFields').style.display = isNew ? '' : 'none';
 }
 
-async function saveMember() {
-  const name = document.getElementById('newMemberName').value.trim();
-  if (!name) { showToast('请填写姓名'); return; }
-  const phone = document.getElementById('newMemberPhone').value.trim() || null;
-  const note = document.getElementById('newMemberNote').value.trim() || null;
-  await db.from('members').insert({ name, phone, note });
+function closeAddRecordModal() {
+  document.getElementById('addRecordModal').classList.remove('open');
+}
+
+async function saveNewRecord() {
+  const select = document.getElementById('recordMemberSelect');
+  let memberId = select.value;
+  if (memberId === '__new__') {
+    const name = document.getElementById('recordNewName').value.trim();
+    if (!name) { showToast('请填写会员姓名'); return; }
+    const phone = document.getElementById('recordNewPhone').value.trim() || null;
+    const { data, error } = await db.from('members').insert({ name, phone }).select().single();
+    if (error || !data) { showToast('创建会员失败'); return; }
+    memberId = data.id;
+  }
+
+  if (addRecordType === 'class') {
+    const name = document.getElementById('recordPkgName').value.trim();
+    const hours = parseFloat(document.getElementById('recordPkgHours').value);
+    const price = document.getElementById('recordPkgPrice').value.trim();
+    if (!name || !hours) { showToast('请填写套餐名和总课时'); return; }
+    await db.from('class_packages').insert({ member_id: memberId, package_name: name, total_hours: hours, price: price || null });
+  } else {
+    const item = document.getElementById('recordPurItem').value.trim();
+    const amount = document.getElementById('recordPurAmount').value.trim();
+    const date = document.getElementById('recordPurDate').value || null;
+    if (!item) { showToast('请填写购买项目'); return; }
+    await db.from('purchases').insert({ member_id: memberId, item, amount: amount || null, purchased_at: date });
+  }
+
   showToast('已添加');
-  closeAddMemberModal();
+  closeAddRecordModal();
   loadMembers();
 }
 
-async function deleteMember(id, name) {
-  if (!confirm(`确定要删除会员「${name}」吗？她名下的课时和消费记录也会一并删除。`)) return;
-  await db.from('members').delete().eq('id', id);
+async function deleteMember() {
+  if (!currentMemberId) return;
+  if (!confirm('确定要删除这位会员吗？她名下的课时和消费记录也会一并删除。')) return;
+  await db.from('members').delete().eq('id', currentMemberId);
   showToast('已删除');
-  loadMembers();
+  closeMemberDetail();
 }
 
 async function openMemberDetail(id) {
