@@ -2089,17 +2089,21 @@ function renderCatPanel() {
     return;
   }
   list.innerHTML = cats.map(c => `
-    <div class="cat-card" data-id="${c.id}" data-sort="${c.sort_order ?? 0}">
+    <div class="cat-card" data-id="${c.id}" data-sort="${c.sort_order ?? 0}" data-visible="${c.is_visible !== false}">
       ${c.cover_url
-        ? `<img class="cat-card-img" src="${c.cover_url}" alt="${c.name}">`
+        ? `<img class="cat-card-img" src="${c.cover_url}" alt="${c.name}" style="${c.is_visible === false ? 'opacity:0.4' : ''}">`
         : `<div class="cat-card-no-img">🖼</div>`}
-      <div class="cat-card-info">
-        <div class="cat-card-name">${c.name}</div>
+      <div class="cat-card-info" style="${c.is_visible === false ? 'opacity:0.5' : ''}">
+        <div class="cat-card-name">${c.name} ${c.is_visible === false ? '<span class="badge-hidden">已隐藏</span>' : ''}</div>
         ${c.description ? `<div class="cat-card-desc">${c.description}</div>` : ''}
       </div>
       <div class="sort-btns">
         <button class="sort-btn" onclick="moveCat('${c.id}', -1)">↑</button>
         <button class="sort-btn" onclick="moveCat('${c.id}', 1)">↓</button>
+      </div>
+      <div class="vs-selector">
+        <button class="vs-btn vs-btn-show ${c.is_visible !== false ? 'vs-active-show' : ''}" onclick="setCatVisible('${c.id}', true)">显示</button>
+        <button class="vs-btn vs-btn-hide ${c.is_visible === false ? 'vs-active-hide' : ''}" onclick="setCatVisible('${c.id}', false)">隐藏</button>
       </div>
       <button class="btn-edit" onclick="openCatModal('${c.id}')">编辑</button>
       <button class="btn-delete" onclick="deleteCat('${c.id}', '${c.name.replace(/'/g,"\\'")}')">删除</button>
@@ -2226,6 +2230,16 @@ async function moveCat(id, dir) {
   ]);
   await loadCategories();
   renderFilterBar();
+}
+
+async function setCatVisible(id, visible) {
+  const row = document.querySelector(`.cat-card[data-id="${id}"]`);
+  if (!row) return;
+  await db.from('categories').update({ is_visible: visible }).eq('id', id);
+  await loadCategories();
+  renderCatPanel();
+  renderFilterBar();
+  delete tabProductsCache[currentTab];
 }
 </script>
 

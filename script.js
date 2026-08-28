@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.getElementById(gridId);
     if (!grid) return;
     const { data } = await db.from('categories')
-      .select('*').eq('type', type).order('sort_order').order('created_at');
+      .select('*').eq('type', type).eq('is_visible', true).order('sort_order').order('created_at');
     frontCatCache[type] = {};
     grid.innerHTML = '';
     if (!data || !data.length) return;
