@@ -483,6 +483,21 @@
     #calendarEl .fc-toolbar-title { font-size: 16px; }
     #calendarEl .fc-button { padding: 4px 8px; font-size: 12px; }
   }
+
+  /* 分类管理面板 */
+  .btn-manage-cat { background: var(--surface); border: 1px solid var(--border); color: var(--ink-muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: border-color .15s, color .15s; }
+  .btn-manage-cat:hover, .btn-manage-cat.active { border-color: var(--gold); color: var(--gold); }
+  .cat-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .cat-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .cat-panel-header span { font-weight: 600; color: var(--ink); font-size: 14px; }
+  .cat-card-list { display: flex; flex-direction: column; gap: 8px; }
+  .cat-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: white; border: 1px solid var(--border); border-radius: 8px; }
+  .cat-card-img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+  .cat-card-no-img { width: 48px; height: 48px; border-radius: 6px; background: var(--bg); border: 1px dashed var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--ink-muted); font-size: 18px; }
+  .cat-card-info { flex: 1; min-width: 0; }
+  .cat-card-name { font-size: 14px; font-weight: 500; color: var(--ink); }
+  .cat-card-desc { font-size: 12px; color: var(--ink-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cat-empty { color: var(--ink-muted); font-size: 13px; padding: 8px 0; }
 </style>
 </head>
 <body>
@@ -543,12 +558,20 @@
           <div class="page-title" id="pageTitle">精选茗茶</div>
           <div class="page-subtitle" id="pageSubtitle">管理茶叶品牌与产品</div>
         </div>
+        <button class="btn-manage-cat" id="btnManageCat" onclick="toggleCatPanel()" style="display:none">管理分类</button>
         <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
         <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
         <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
+      <div class="cat-panel" id="catPanel" style="display:none">
+        <div class="cat-panel-header">
+          <span>分类管理</span>
+          <button class="btn-add" style="padding:6px 14px;font-size:13px" onclick="openCatModal(null)">+ 添加分类</button>
+        </div>
+        <div class="cat-card-list" id="catCardList"></div>
+      </div>
       <div id="productList"><div class="loading">加载中...</div></div>
     </div>
   </div>
@@ -843,6 +866,8 @@ async function loadProducts() {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = 'none';
     document.getElementById('btnAddMember').style.display = 'none';
+    document.getElementById('btnManageCat').style.display = 'none';
+    resetCatPanel();
     document.getElementById('filterBar').innerHTML = '';
     document.getElementById('productList').innerHTML = '<div id="calendarEl"></div>';
     renderCalendar();
@@ -852,6 +877,8 @@ async function loadProducts() {
   if (cfg.type === 'member') {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = 'none';
+    document.getElementById('btnManageCat').style.display = 'none';
+    resetCatPanel();
     const btnMember = document.getElementById('btnAddMember');
     btnMember.style.display = '';
     btnMember.textContent = cfg.memberType === 'class' ? '+ 添加课时套餐' : '+ 添加消费记录';
@@ -865,12 +892,15 @@ async function loadProducts() {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = '';
     document.getElementById('btnAddMember').style.display = 'none';
+    document.getElementById('btnManageCat').style.display = 'none';
+    resetCatPanel();
     const { data } = await db.from('posters').select('*').eq('section', cfg.section).order('sort_order').order('created_at');
     renderPosters(data || [], cfg.section);
     document.getElementById('filterBar').innerHTML = '';
     return;
   }
 
+  document.getElementById('btnManageCat').style.display = '';
   document.getElementById('btnAdd').style.display = '';
   document.getElementById('btnAddPoster').style.display = 'none';
   document.getElementById('btnAddMember').style.display = 'none';
@@ -1977,5 +2007,186 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </div>
 </div>
+
+<!-- 添加/编辑分类模态框 -->
+<div class="modal-overlay" id="catModal">
+  <div class="modal" style="width:420px">
+    <div class="modal-title" id="catModalTitle">添加分类</div>
+    <div class="form-group">
+      <label>分类名称 <span style="color:#e74c3c">*</span></label>
+      <input type="text" id="catName" placeholder="例：正山堂 · 骏眉中国">
+    </div>
+    <div class="form-group">
+      <label>分类描述（选填）</label>
+      <textarea id="catDesc" placeholder="简短介绍这个分类..." style="height:72px;resize:vertical"></textarea>
+    </div>
+    <div class="form-group">
+      <label>封面图片（选填）</label>
+      <div class="upload-area" id="catUploadArea" onclick="document.getElementById('catImageInput').click()">
+        <div id="catUploadPlaceholder">点击选择图片，或拖拽图片到此处</div>
+        <img id="catUploadPreview" style="display:none;max-width:100%;max-height:160px;border-radius:6px;margin-top:8px;">
+      </div>
+      <input type="file" id="catImageInput" accept="image/*" style="display:none" onchange="handleCatImageSelect(event)">
+      <div id="catUploadStatus" style="font-size:12px;color:var(--ink-muted);margin-top:6px;"></div>
+      <input type="hidden" id="catImage">
+    </div>
+    <div class="form-group">
+      <label>排序（数字越小越靠前）</label>
+      <input type="number" id="catSort" value="0" min="0" style="width:120px">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeCatModal()">取消</button>
+      <button class="btn-save" onclick="saveCat()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === 分类管理 ===
+let editingCatId = null;
+let catImageFile = null;
+let catPanelVisible = false;
+
+function toggleCatPanel() {
+  catPanelVisible = !catPanelVisible;
+  document.getElementById('catPanel').style.display = catPanelVisible ? '' : 'none';
+  const btn = document.getElementById('btnManageCat');
+  btn.textContent = catPanelVisible ? '收起分类' : '管理分类';
+  btn.classList.toggle('active', catPanelVisible);
+  if (catPanelVisible) renderCatPanel();
+}
+
+function resetCatPanel() {
+  catPanelVisible = false;
+  document.getElementById('catPanel').style.display = 'none';
+  const btn = document.getElementById('btnManageCat');
+  btn.textContent = '管理分类';
+  btn.classList.remove('active');
+}
+
+function renderCatPanel() {
+  const type = tabConfig[currentTab].type;
+  const cats = categoriesCache.filter(c => c.type === type).sort((a,b) => (a.sort_order||0)-(b.sort_order||0));
+  const list = document.getElementById('catCardList');
+  if (!cats.length) {
+    list.innerHTML = '<div class="cat-empty">暂无分类，点击「添加分类」创建第一个</div>';
+    return;
+  }
+  list.innerHTML = cats.map(c => `
+    <div class="cat-card">
+      ${c.cover_url
+        ? `<img class="cat-card-img" src="${c.cover_url}" alt="${c.name}">`
+        : `<div class="cat-card-no-img">🖼</div>`}
+      <div class="cat-card-info">
+        <div class="cat-card-name">${c.name}</div>
+        ${c.description ? `<div class="cat-card-desc">${c.description}</div>` : ''}
+      </div>
+      <button class="btn-edit" onclick="openCatModal('${c.id}')">编辑</button>
+      <button class="btn-delete" onclick="deleteCat('${c.id}', '${c.name.replace(/'/g,"\\'")}')">删除</button>
+    </div>
+  `).join('');
+}
+
+function openCatModal(id) {
+  editingCatId = id;
+  catImageFile = null;
+  document.getElementById('catModalTitle').textContent = id ? '编辑分类' : '添加分类';
+  document.getElementById('catUploadPreview').style.display = 'none';
+  document.getElementById('catUploadPlaceholder').style.display = 'block';
+  document.getElementById('catUploadStatus').textContent = '';
+  document.getElementById('catImage').value = '';
+  if (id) {
+    const c = categoriesCache.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('catName').value = c.name || '';
+    document.getElementById('catDesc').value = c.description || '';
+    document.getElementById('catSort').value = c.sort_order ?? 0;
+    if (c.cover_url) {
+      document.getElementById('catImage').value = c.cover_url;
+      document.getElementById('catUploadPreview').src = c.cover_url;
+      document.getElementById('catUploadPreview').style.display = 'block';
+      document.getElementById('catUploadPlaceholder').style.display = 'none';
+    }
+  } else {
+    document.getElementById('catName').value = '';
+    document.getElementById('catDesc').value = '';
+    const sameType = categoriesCache.filter(c => c.type === tabConfig[currentTab].type);
+    document.getElementById('catSort').value = sameType.length * 10;
+  }
+  document.getElementById('catModal').classList.add('open');
+}
+
+function closeCatModal() {
+  document.getElementById('catModal').classList.remove('open');
+  catImageFile = null;
+}
+
+function handleCatImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  catImageFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const preview = document.getElementById('catUploadPreview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    document.getElementById('catUploadPlaceholder').style.display = 'none';
+    document.getElementById('catUploadStatus').textContent = '图片已选择，保存时自动上传';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveCat() {
+  const name = document.getElementById('catName').value.trim();
+  if (!name) { alert('请填写分类名称'); return; }
+  const type = tabConfig[currentTab].type;
+  let coverUrl = document.getElementById('catImage').value;
+
+  if (catImageFile) {
+    document.getElementById('catUploadStatus').textContent = '上传中...';
+    const compressed = await compressImage(catImageFile);
+    const filename = 'cat_' + Date.now() + '.jpg';
+    const { data: upData, error: upErr } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
+    if (upErr) { alert('图片上传失败：' + upErr.message); return; }
+    const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(upData.path);
+    coverUrl = publicUrl;
+  }
+
+  const payload = {
+    name,
+    description: document.getElementById('catDesc').value.trim() || null,
+    cover_url: coverUrl || null,
+    sort_order: parseInt(document.getElementById('catSort').value) || 0,
+    type,
+  };
+
+  let error;
+  if (editingCatId) {
+    ({ error } = await db.from('categories').update(payload).eq('id', editingCatId));
+  } else {
+    payload.key = 'cat_' + Date.now().toString(36);
+    ({ error } = await db.from('categories').insert(payload));
+  }
+  if (error) { alert('保存失败：' + error.message); return; }
+
+  closeCatModal();
+  await loadCategories();
+  renderCatPanel();
+  renderFilterBar();
+  showToast('分类已保存');
+}
+
+async function deleteCat(id, name) {
+  if (!confirm('确认删除分类「' + name + '」？\n\n注意：只删除分类本身，该分类下的商品数据不会被删除。')) return;
+  const { error } = await db.from('categories').delete().eq('id', id);
+  if (error) { alert('删除失败：' + error.message); return; }
+  await loadCategories();
+  renderCatPanel();
+  renderFilterBar();
+  loadProducts();
+  showToast('分类已删除');
+}
+</script>
+
 </body>
 </html>
