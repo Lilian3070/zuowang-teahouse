@@ -1788,6 +1788,14 @@ function showToast(msg) {
   if (session) { showAdmin(); }
 })();
 
+// 通过邀请/重置密码链接进入时，自动弹出设置密码窗口
+db.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY' && session) {
+    showAdmin();
+    openPasswordModal();
+  }
+});
+
 function openPasswordModal() {
   document.getElementById('newPassword').value = '';
   document.getElementById('confirmPassword').value = '';
