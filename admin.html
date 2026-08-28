@@ -6,6 +6,7 @@
 <title>坐忘茗舍 · 管理后台</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/locales-all.global.min.js"></script>
 <style>
   :root {
     --bg: #F7F3EC;
@@ -1633,6 +1634,8 @@ async function renderCalendar() {
     locale: 'zh-cn',
     height: 'auto',
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay' },
+    buttonText: { today: '今天', multiMonthYear: '年', dayGridMonth: '月', timeGridWeek: '周', timeGridDay: '日', list: '列表' },
+    allDayText: '全天',
     initialView: 'dayGridMonth',
     events,
     selectable: true,
