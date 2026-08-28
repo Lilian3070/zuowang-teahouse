@@ -318,12 +318,17 @@ document.addEventListener('DOMContentLoaded', () => {
       : '【产品实拍图占位】';
     const spec = p.price ? `¥${p.price}` : (p.spec || '');
     const desc = p.description || p.category || '';
+    const descEl = desc
+      ? (desc.length > 20
+          ? `<p class="product-desc">${desc}</p>`
+          : `<span class="product-category">${desc}</span>`)
+      : '';
     card.innerHTML = `
       <div class="product-media">${media}</div>
       <div class="product-body">
         <h4>${p.name}</h4>
         ${spec ? `<p class="product-spec">${spec}</p>` : ''}
-        ${desc ? `<span class="product-category">${desc}</span>` : ''}
+        ${descEl}
         <button class="detail-btn" type="button">查看详情</button>
       </div>
     `;

@@ -871,6 +871,14 @@ footer {
   margin: 0 0 14px;
 }
 
+.product-desc {
+  font-size: 0.78rem;
+  color: var(--ink-muted, #888);
+  line-height: 1.65;
+  margin: 0 0 10px;
+  text-align: left;
+}
+
 .detail-btn {
   width: 100%;
   padding: 8px;
