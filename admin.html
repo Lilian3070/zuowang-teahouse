@@ -559,18 +559,20 @@
           <div class="page-subtitle" id="pageSubtitle">管理茶叶品牌与产品</div>
         </div>
         <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
-        <button class="btn-add" id="btnManageCat" onclick="toggleCatPanel()" style="display:none">管理分类</button>
         <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
         <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
       <div class="cat-panel" id="catPanel" style="display:none">
-        <div class="cat-panel-header">
+        <div class="cat-panel-header" onclick="toggleCatPanel()" style="cursor:pointer;margin-bottom:0">
           <span>分类管理</span>
-          <button class="btn-add" style="padding:6px 14px;font-size:13px" onclick="openCatModal(null)">+ 添加分类</button>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn-add" id="btnAddCat" style="padding:6px 14px;font-size:13px;display:none" onclick="event.stopPropagation();openCatModal(null)">+ 添加分类</button>
+            <span id="catArrow" style="font-size:12px;color:var(--ink-muted)">▶</span>
+          </div>
         </div>
-        <div class="cat-card-list" id="catCardList"></div>
+        <div class="cat-card-list" id="catCardList" style="display:none;margin-top:12px"></div>
       </div>
       <div id="productList"><div class="loading">加载中...</div></div>
     </div>
@@ -866,7 +868,7 @@ async function loadProducts() {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = 'none';
     document.getElementById('btnAddMember').style.display = 'none';
-    document.getElementById('btnManageCat').style.display = 'none';
+    document.getElementById('catPanel').style.display = 'none';
     resetCatPanel();
     document.getElementById('filterBar').innerHTML = '';
     document.getElementById('productList').innerHTML = '<div id="calendarEl"></div>';
@@ -877,7 +879,7 @@ async function loadProducts() {
   if (cfg.type === 'member') {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = 'none';
-    document.getElementById('btnManageCat').style.display = 'none';
+    document.getElementById('catPanel').style.display = 'none';
     resetCatPanel();
     const btnMember = document.getElementById('btnAddMember');
     btnMember.style.display = '';
@@ -892,7 +894,7 @@ async function loadProducts() {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = '';
     document.getElementById('btnAddMember').style.display = 'none';
-    document.getElementById('btnManageCat').style.display = 'none';
+    document.getElementById('catPanel').style.display = 'none';
     resetCatPanel();
     const { data } = await db.from('posters').select('*').eq('section', cfg.section).order('sort_order').order('created_at');
     renderPosters(data || [], cfg.section);
@@ -900,7 +902,7 @@ async function loadProducts() {
     return;
   }
 
-  document.getElementById('btnManageCat').style.display = '';
+  document.getElementById('catPanel').style.display = '';
   document.getElementById('btnAdd').style.display = '';
   document.getElementById('btnAddPoster').style.display = 'none';
   document.getElementById('btnAddMember').style.display = 'none';
@@ -2049,19 +2051,17 @@ let catPanelVisible = false;
 
 function toggleCatPanel() {
   catPanelVisible = !catPanelVisible;
-  document.getElementById('catPanel').style.display = catPanelVisible ? '' : 'none';
-  const btn = document.getElementById('btnManageCat');
-  btn.textContent = catPanelVisible ? '收起分类' : '管理分类';
-  btn.classList.toggle('active', catPanelVisible);
+  document.getElementById('catCardList').style.display = catPanelVisible ? '' : 'none';
+  document.getElementById('btnAddCat').style.display = catPanelVisible ? '' : 'none';
+  document.getElementById('catArrow').textContent = catPanelVisible ? '▼' : '▶';
   if (catPanelVisible) renderCatPanel();
 }
 
 function resetCatPanel() {
   catPanelVisible = false;
-  document.getElementById('catPanel').style.display = 'none';
-  const btn = document.getElementById('btnManageCat');
-  btn.textContent = '管理分类';
-  btn.classList.remove('active');
+  document.getElementById('catCardList').style.display = 'none';
+  document.getElementById('btnAddCat').style.display = 'none';
+  document.getElementById('catArrow').textContent = '▶';
 }
 
 function renderCatPanel() {
