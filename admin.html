@@ -1618,6 +1618,15 @@ async function deletePurchase(id) {
 
 let calendarInstance = null;
 
+function formatSlotLabel(date) {
+  const h = date.getHours();
+  const m = date.getMinutes();
+  const period = h < 12 ? '上午' : '下午';
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return m === 0 ? `${period}${h12}点` : `${period}${h12}点${m}分`;
+}
+
 async function renderCalendar() {
   const { data } = await db.from('schedule_events').select('*, members(name)').order('start_at');
   const events = (data || []).map(e => ({
@@ -1636,6 +1645,7 @@ async function renderCalendar() {
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay' },
     buttonText: { today: '今天', multiMonthYear: '年', dayGridMonth: '月', timeGridWeek: '周', timeGridDay: '日', list: '列表' },
     allDayText: '全天',
+    slotLabelContent: (arg) => formatSlotLabel(arg.date),
     initialView: 'dayGridMonth',
     events,
     selectable: true,
