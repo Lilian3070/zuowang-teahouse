@@ -457,19 +457,23 @@ document.addEventListener('DOMContentLoaded', () => {
     checkPosterCarousel(grid);
   }
 
-  // 海报轮播：手机端启用，桌面端普通横排
+  // 海报轮播：按实际是否装得下一排来判断，不依赖固定屏幕宽度断点
   function checkPosterCarousel(grid) {
-    const isMobile = window.innerWidth <= 860;
-    const hasCarousel = destroyers.has(grid);
-    if (isMobile && !hasCarousel) {
-      const cards = grid.querySelectorAll('.card');
-      if (cards.length >= 2) {
-        const destroy = initCarousel(grid);
-        if (destroy) destroyers.set(grid, destroy);
-      }
-    } else if (!isMobile && hasCarousel) {
+    // 先拆除旧轮播，恢复原始卡片以便测量真实宽度
+    if (destroyers.has(grid)) {
       destroyers.get(grid)();
       destroyers.delete(grid);
+      grid.classList.remove('has-carousel');
+    }
+    const cards = grid.querySelectorAll('.card');
+    if (cards.length < 2) return;
+    const overflowing = grid.scrollWidth > grid.clientWidth + 1;
+    if (overflowing) {
+      const destroy = initCarousel(grid);
+      if (destroy) {
+        destroyers.set(grid, destroy);
+        grid.classList.add('has-carousel');
+      }
     }
   }
 
