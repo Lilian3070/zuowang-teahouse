@@ -110,7 +110,7 @@
     padding: 24px 0;
     flex-shrink: 0;
   }
-  .sidebar-section { padding: 0 16px; margin-bottom: 8px; }
+  .sidebar-section { padding: 0 16px; margin-bottom: 32px; }
   .sidebar-label {
     font-size: 10px;
     letter-spacing: 0.12em;
@@ -122,7 +122,7 @@
   }
   .sidebar-item {
     display: block;
-    padding: 9px 12px;
+    padding: 9px 12px 9px 20px;
     border-radius: 8px;
     font-size: 14px;
     color: var(--ink-muted);
@@ -516,7 +516,7 @@
       <div class="sidebar-section">
         <div class="sidebar-label">会员管理</div>
         <button class="sidebar-item" onclick="switchTab('qinren')">琴人档案</button>
-        <button class="sidebar-item" onclick="switchTab('guests')">客人消费</button>
+        <button class="sidebar-item" onclick="switchTab('guests')">茗客档案</button>
       </div>
     </div>
 
@@ -721,7 +721,7 @@ const tabConfig = {
   qindao:   { title: '琴道传习', subtitle: '管理活动招生海报', type: 'poster', section: 'qindao' },
   yaji:     { title: '坐忘雅集', subtitle: '管理雅集活动海报', type: 'poster', section: 'yaji' },
   qinren:   { title: '琴人档案', subtitle: '管理学员课时套餐', type: 'member', memberType: 'class' },
-  guests:   { title: '客人消费', subtitle: '管理客人消费记录', type: 'member', memberType: 'purchase' },
+  guests:   { title: '茗客档案', subtitle: '管理客人消费记录', type: 'member', memberType: 'purchase' },
 };
 
 // 登录
@@ -1280,7 +1280,7 @@ async function movePoster(id, direction) {
 
 let currentMemberId = null;
 
-// 会员列表：琴人档案只显示有课时套餐的人，客人消费只显示有消费记录的人
+// 会员列表：琴人档案只显示有课时套餐的人，茗客档案只显示有消费记录的人
 async function loadMembers() {
   const cfg = tabConfig[currentTab];
   const memberType = cfg.memberType;
