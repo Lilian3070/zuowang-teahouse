@@ -321,9 +321,9 @@ document.addEventListener('DOMContentLoaded', () => {
     card.innerHTML = `
       <div class="product-media">${media}</div>
       <div class="product-body">
-        ${desc ? `<span class="product-category">${desc}</span>` : ''}
         <h4>${p.name}</h4>
         ${spec ? `<p class="product-spec">${spec}</p>` : ''}
+        ${desc ? `<span class="product-category">${desc}</span>` : ''}
         <button class="detail-btn" type="button">查看详情</button>
       </div>
     `;
