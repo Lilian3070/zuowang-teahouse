@@ -232,6 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const g = document.getElementById(id);
         if (g) checkPosterCarousel(g);
       });
+      // 手风琴的展开状态是手动切换的类名，跟屏幕宽度无关；
+      // 宽屏下子菜单靠 hover 显示，切回宽屏时把之前在窄屏点开的状态清掉，避免残留导致子菜单一直显示
+      if (window.innerWidth > 860) {
+        document.querySelectorAll('.has-submenu.submenu-open').forEach(li => li.classList.remove('submenu-open'));
+      }
     }, 150);
   });
 
@@ -243,8 +248,18 @@ document.addEventListener('DOMContentLoaded', () => {
     navMenu.classList.toggle('open');
   });
 
-  navMenu.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => navMenu.classList.remove('open'));
+  // 用事件委托而不是逐个绑定，子菜单项是分类数据加载完之后才动态生成的
+  navMenu.addEventListener('click', e => {
+    if (e.target.closest('a')) navMenu.classList.remove('open');
+  });
+
+  // 移动端子菜单手风琴展开/收起（桌面端靠 CSS :hover，这个按钮平时是隐藏的）
+  navMenu.querySelectorAll('.submenu-toggle').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      btn.closest('.has-submenu')?.classList.toggle('submenu-open');
+    });
   });
 
   // 席位预约 - 知音通道：手机号验证后再展开真正的预约表单。
@@ -283,6 +298,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // 前台分类缓存：{ tea: {key: catObj, ...}, teaware: {...}, guqin: {...} }
   const frontCatCache = {};
 
+  // 导航栏子菜单跟分类数据同源，后台改分类名字/增删分类，这里会跟着一起变
+  const navSubmenuConfig = {
+    tea:     { id: 'submenu-tea',     anchor: '#tea',     attr: 'data-brand' },
+    teaware: { id: 'submenu-teaware', anchor: '#teaware', attr: 'data-category' },
+    guqin:   { id: 'submenu-zhuoqin', anchor: '#zhuoqin', attr: 'data-guqin' },
+  };
+
+  function renderNavSubmenu(type) {
+    const cfg = navSubmenuConfig[type];
+    if (!cfg) return;
+    const ul = document.getElementById(cfg.id);
+    if (!ul) return;
+    const entries = Object.values(frontCatCache[type] || {});
+    ul.innerHTML = entries
+      .map(c => `<li><a href="${cfg.anchor}" class="nav-submenu-link" ${cfg.attr}="${c.key}">${c.name}</a></li>`)
+      .join('');
+  }
+
   async function loadFrontCategories(type, gridId, cardClass, imgClass, btnAttr, btnLabel) {
     const grid = document.getElementById(gridId);
     if (!grid) return;
@@ -290,25 +323,27 @@ document.addEventListener('DOMContentLoaded', () => {
       .select('*').eq('type', type).eq('is_visible', true).order('sort_order').order('created_at'));
     frontCatCache[type] = {};
     grid.innerHTML = '';
-    if (!data || !data.length) return;
-    data.forEach(c => {
-      frontCatCache[type][c.key] = c;
-      const mediaClass = type === 'guqin' ? 'card-media square' : 'card-media';
-      const imgTag = c.cover_url
-        ? `<img ${imgClass ? `class="${imgClass}"` : ''} src="${c.cover_url}" alt="${c.name}" loading="lazy">`
-        : '';
-      const card = document.createElement('div');
-      card.className = ('card ' + cardClass).trim();
-      card.innerHTML = `
-        <div class="${mediaClass}">${imgTag}</div>
-        <div class="card-body">
-          <h3>${c.name}</h3>
-          ${c.description ? `<p>${c.description}</p>` : ''}
-          <button class="explore-btn" type="button" ${btnAttr}="${c.key}">${btnLabel}</button>
-        </div>`;
-      grid.appendChild(card);
-    });
-    checkCarousel();
+    if (data && data.length) {
+      data.forEach(c => {
+        frontCatCache[type][c.key] = c;
+        const mediaClass = type === 'guqin' ? 'card-media square' : 'card-media';
+        const imgTag = c.cover_url
+          ? `<img ${imgClass ? `class="${imgClass}"` : ''} src="${c.cover_url}" alt="${c.name}" loading="lazy">`
+          : '';
+        const card = document.createElement('div');
+        card.className = ('card ' + cardClass).trim();
+        card.innerHTML = `
+          <div class="${mediaClass}">${imgTag}</div>
+          <div class="card-body">
+            <h3>${c.name}</h3>
+            ${c.description ? `<p>${c.description}</p>` : ''}
+            <button class="explore-btn" type="button" ${btnAttr}="${c.key}">${btnLabel}</button>
+          </div>`;
+        grid.appendChild(card);
+      });
+      checkCarousel();
+    }
+    renderNavSubmenu(type);
   }
 
   loadFrontCategories('tea',     'brandGrid',   'brand-card',   '',          'data-brand',     '探索系列 →');
@@ -456,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (p) openProductGallery(p);
       return;
     }
-    const btn = e.target.closest('.explore-btn');
+    const btn = e.target.closest('.explore-btn, .nav-submenu-link');
     if (!btn) return;
     if (btn.dataset.brand) {
       openEntryModal(frontCatCache.tea?.[btn.dataset.brand], 'BRAND', btn.dataset.brand);

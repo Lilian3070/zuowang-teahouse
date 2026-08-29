@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 茶 · 器 · 琴</title>
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -14,10 +14,28 @@
     <span></span><span></span><span></span>
   </button>
   <ul id="navMenu">
-    <li><a href="#tea">精选茗茶</a></li>
-    <li><a href="#teaware">茶器美学</a></li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#tea">精选茗茶</a>
+        <button class="submenu-toggle" type="button" aria-label="展开精选茗茶子菜单">⌄</button>
+      </span>
+      <ul class="submenu" id="submenu-tea"></ul>
+    </li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#teaware">茶器美学</a>
+        <button class="submenu-toggle" type="button" aria-label="展开茶器美学子菜单">⌄</button>
+      </span>
+      <ul class="submenu" id="submenu-teaware"></ul>
+    </li>
     <li><a href="#qindao">琴道传习</a></li>
-    <li><a href="#zhuoqin">斫琴甄选</a></li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#zhuoqin">斫琴甄选</a>
+        <button class="submenu-toggle" type="button" aria-label="展开斫琴甄选子菜单">⌄</button>
+      </span>
+      <ul class="submenu" id="submenu-zhuoqin"></ul>
+    </li>
     <li><a href="#booking">茶席预约</a></li>
     <li><a href="#yaji">坐忘雅集</a></li>
     <li><a href="#about">坐忘故事</a></li>
@@ -233,6 +251,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=8"></script>
+<script src="script.js?v=9"></script>
 </body>
 </html>
