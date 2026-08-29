@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 初始化：用 setTimeout 确保 CSS 布局完全稳定后再计算
     setTimeout(() => setTX(-origW()), 50);
 
-    let rafId = null, paused = false, pauseTimeout = null, autoTimer = null, animating = false;
+    let rafId = null, paused = false, pauseTimeout = null, autoTimer = null, firstStepTimer = null, animating = false;
 
     function pause() {
       paused = true;
@@ -110,8 +110,21 @@ document.addEventListener('DOMContentLoaded', () => {
       rafId = requestAnimationFrame(tick);
     }
 
-    function startAuto() { clearInterval(autoTimer); autoTimer = setInterval(autoStep, 3000); }
-    function stopAuto()  { clearInterval(autoTimer); cancelAnimationFrame(rafId); animating = false; }
+    // 首次进入视野后很快就切一次，让用户第一时间看出这里能滑动，之后再按正常节奏轮播
+    function startAuto() {
+      clearInterval(autoTimer);
+      clearTimeout(firstStepTimer);
+      firstStepTimer = setTimeout(() => {
+        autoStep();
+        autoTimer = setInterval(autoStep, 3000);
+      }, 900);
+    }
+    function stopAuto() {
+      clearInterval(autoTimer);
+      clearTimeout(firstStepTimer);
+      cancelAnimationFrame(rafId);
+      animating = false;
+    }
 
     // ── 鼠标拖拽（电脑端）──
     // 向右拖 → tx 减 → 内容左移 → 下一张
