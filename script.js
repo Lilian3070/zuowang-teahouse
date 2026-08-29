@@ -3,6 +3,16 @@ const db = supabase.createClient(
   'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl'
 );
 
+// 手机网络偶尔抖动会导致单次请求失败，失败时自动重试几次，避免某个板块的内容永久空白
+async function fetchWithRetry(queryFn, retries = 2, delayMs = 800) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const { data, error } = await queryFn();
+    if (!error) return data;
+    if (attempt < retries) await new Promise(r => setTimeout(r, delayMs));
+  }
+  return null;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // 无缝循环轮播 —— transform 控制，彻底消除 scrollLeft 跳帧
   function initCarousel(grid) {
@@ -263,8 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadFrontCategories(type, gridId, cardClass, imgClass, btnAttr, btnLabel) {
     const grid = document.getElementById(gridId);
     if (!grid) return;
-    const { data } = await db.from('categories')
-      .select('*').eq('type', type).eq('is_visible', true).order('sort_order').order('created_at');
+    const data = await fetchWithRetry(() => db.from('categories')
+      .select('*').eq('type', type).eq('is_visible', true).order('sort_order').order('created_at'));
     frontCatCache[type] = {};
     grid.innerHTML = '';
     if (!data || !data.length) return;
@@ -298,8 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function indexProducts(list) {
     (list || []).forEach(p => { productsById[p.id] = p; });
   }
-  db.from('products').select('*').eq('is_visible', true).order('sort_order').order('created_at')
-    .then(({ data }) => {
+  fetchWithRetry(() => db.from('products').select('*').eq('is_visible', true).order('sort_order').order('created_at'))
+    .then(data => {
       if (!data) return;
       data.forEach(p => {
         if (!productsCache[p.category_key]) productsCache[p.category_key] = [];
@@ -348,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const cached = productsCache[categoryKey];
     const products = cached !== undefined ? cached
-      : (await db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('sort_order').order('created_at')).data;
+      : await fetchWithRetry(() => db.from('products').select('*').eq('category_key', categoryKey).eq('is_visible', true).order('sort_order').order('created_at'));
     if (cached === undefined) indexProducts(products);
     if (products && products.length) {
       modalProducts.innerHTML = '';
@@ -460,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadPosters(section, gridId, btnText, btnHref) {
     const grid = document.getElementById(gridId);
     if (!grid) return;
-    const { data } = await db.from('posters').select('*').eq('section', section).eq('is_visible', true).order('sort_order').order('created_at');
+    const data = await fetchWithRetry(() => db.from('posters').select('*').eq('section', section).eq('is_visible', true).order('sort_order').order('created_at'));
     grid.innerHTML = '';
     if (!data || !data.length) return;
     data.forEach(p => {
