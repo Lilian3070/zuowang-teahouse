@@ -248,18 +248,19 @@ document.addEventListener('DOMContentLoaded', () => {
     navMenu.classList.toggle('open');
   });
 
-  // 用事件委托而不是逐个绑定，子菜单项是分类数据加载完之后才动态生成的
+  // 用事件委托而不是逐个绑定，子菜单项是分类数据加载完之后才动态生成的。
+  // 移动端（窄屏）点带子菜单的主菜单名字：只展开/收起子菜单，不跳转；
+  // 子菜单里的具体项目、以及没有子菜单的主菜单项，照常跳转并收起整个导航栏。
+  // 桌面端（宽屏）不受影响，主菜单名字照常跳转，子菜单靠鼠标悬停显示。
   navMenu.addEventListener('click', e => {
-    if (e.target.closest('a')) navMenu.classList.remove('open');
-  });
-
-  // 移动端子菜单手风琴展开/收起（桌面端靠 CSS :hover，这个按钮平时是隐藏的）
-  navMenu.querySelectorAll('.submenu-toggle').forEach(btn => {
-    btn.addEventListener('click', e => {
+    const link = e.target.closest('a');
+    if (!link) return;
+    if (link.classList.contains('nav-parent-link') && window.innerWidth <= 860) {
       e.preventDefault();
-      e.stopPropagation();
-      btn.closest('.has-submenu')?.classList.toggle('submenu-open');
-    });
+      link.closest('.has-submenu')?.classList.toggle('submenu-open');
+      return;
+    }
+    navMenu.classList.remove('open');
   });
 
   // 席位预约 - 知音通道：手机号验证后再展开真正的预约表单。

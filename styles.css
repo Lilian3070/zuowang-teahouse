@@ -97,26 +97,6 @@ a { color: inherit; }
 
 .nav li.has-submenu { position: relative; }
 
-.nav-item-row {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.submenu-toggle {
-  display: none;
-  background: none;
-  border: none;
-  padding: 2px;
-  cursor: pointer;
-  color: var(--ink-soft);
-  font-size: 0.7rem;
-  line-height: 1;
-  transition: transform 0.2s;
-}
-
-.nav li.has-submenu.submenu-open .submenu-toggle { transform: rotate(180deg); }
-
 /* .nav ul 那条通用规则会把 display:flex 也套到 .submenu 头上（它也是个 ul），
    这里用更高优先级的选择器强制改回竖排列表 */
 .nav .submenu {
@@ -1112,9 +1092,7 @@ body.modal-open { overflow: hidden; }
   .nav ul.open { transform: translateY(0); }
   .nav-toggle { display: flex; }
 
-  /* 子菜单在移动端改成手风琴式展开，不用悬浮下拉 */
-  .nav-item-row { width: 100%; justify-content: space-between; }
-  .submenu-toggle { display: inline-flex; }
+  /* 子菜单在移动端改成手风琴式展开，不用悬浮下拉：点主菜单名字本身展开/收起，不跳转 */
   .submenu {
     position: static;
     opacity: 1;
