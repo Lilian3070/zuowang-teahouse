@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`;
       grid.appendChild(card);
     });
+    checkCarousel();
   }
 
   loadFrontCategories('tea',     'brandGrid',   'brand-card',   '',          'data-brand',     '探索系列 →');
