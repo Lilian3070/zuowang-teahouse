@@ -1093,23 +1093,31 @@ body.modal-open { overflow: hidden; }
   .nav-toggle { display: flex; }
 
   /* 子菜单在移动端改成手风琴式展开，不用悬浮下拉：点主菜单名字本身展开/收起，不跳转。
-     .submenu 本身也是个 ul，会被上面 .nav ul 的 position:fixed 顶掉（同样的选择器碰撞问题），
-     这里用 .nav .submenu 提高优先级强制改回 static，让它老老实实地在文档流里撑开高度。 */
+     .submenu 本身也是个 ul，会被上面 .nav ul 那条规则的每一条属性顶掉（同样的选择器碰撞问题——
+     display、position 之前都撞过，这次连 transform、max-height 也一起中招了：.nav ul 的
+     translateY(-140%) 是按 .submenu 自己的高度算的，把子菜单整个顶到了前一项甚至更前面去，
+     max-height 也变成了 .nav ul 那个"整个导航栏可以有多高"的值，导致子菜单其实从来没收起过）。
+     这里把子菜单需要的每一条属性都放进 .nav .submenu 里，靠更高的优先级整体压过 .nav ul，
+     不再一条条属性去补漏洞。 */
   .nav .submenu {
     position: static;
-  }
-  .submenu {
-    opacity: 1;
-    pointer-events: none;
-    transform: none;
-    box-shadow: none;
-    border: none;
+    top: auto;
+    left: auto;
+    right: auto;
+    flex-direction: unset;
     background: none;
     padding: 0;
-    margin-top: 4px;
+    gap: 0;
+    border-bottom: none;
+    transform: none;
+    transition: max-height 0.25s ease;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.25s ease;
+    opacity: 1;
+    pointer-events: none;
+    box-shadow: none;
+    border: none;
+    margin-top: 4px;
   }
   .nav li.has-submenu.submenu-open .submenu {
     pointer-events: auto;
