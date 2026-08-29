@@ -514,25 +514,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // 海报板块的导航子菜单：用海报的"显示文字"当子菜单文字，没填文字的海报不出现在子菜单里
+  const posterNavSubmenuConfig = {
+    qindao: { id: 'submenu-qindao', anchor: '#qindao' },
+    yaji:   { id: 'submenu-yaji',   anchor: '#yaji' },
+  };
+
+  function renderPosterNavSubmenu(section, posters) {
+    const cfg = posterNavSubmenuConfig[section];
+    if (!cfg) return;
+    const ul = document.getElementById(cfg.id);
+    if (!ul) return;
+    const titled = (posters || []).filter(p => p.title);
+    ul.innerHTML = titled.map(p => `<li><a href="${cfg.anchor}">${p.title}</a></li>`).join('');
+  }
+
   // 海报加载
   async function loadPosters(section, gridId, btnText, btnHref) {
     const grid = document.getElementById(gridId);
     if (!grid) return;
     const data = await fetchWithRetry(() => db.from('posters').select('*').eq('section', section).eq('is_visible', true).order('sort_order').order('created_at'));
     grid.innerHTML = '';
-    if (!data || !data.length) return;
-    data.forEach(p => {
-      const card = document.createElement('div');
-      card.className = 'card poster-card';
-      card.innerHTML = `
-        <div class="card-media poster"><img src="${p.image_url}" alt="${p.title || '活动海报'}" loading="lazy"></div>
-        <div class="card-body">
-          ${p.title ? `<h3>${p.title}</h3>` : ''}
-          <a href="${btnHref}" class="cta-btn">${btnText}</a>
-        </div>`;
-      grid.appendChild(card);
-    });
-    checkPosterCarousel(grid);
+    if (data && data.length) {
+      data.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'card poster-card';
+        card.innerHTML = `
+          <div class="card-media poster"><img src="${p.image_url}" alt="${p.title || '活动海报'}" loading="lazy"></div>
+          <div class="card-body">
+            ${p.title ? `<h3>${p.title}</h3>` : ''}
+            <a href="${btnHref}" class="cta-btn">${btnText}</a>
+          </div>`;
+        grid.appendChild(card);
+      });
+      checkPosterCarousel(grid);
+    }
+    renderPosterNavSubmenu(section, data);
   }
 
   // 海报轮播：按实际是否装得下一排来判断，不依赖固定屏幕宽度断点

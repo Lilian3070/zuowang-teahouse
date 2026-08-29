@@ -17,6 +17,9 @@
 
 html { scroll-behavior: smooth; }
 
+/* 导航子菜单会直接跳到板块内部的某个小标题/卡片，加个顶部留白避免被固定导航栏挡住 */
+.track, .story-title, .contact-item { scroll-margin-top: 90px; }
+
 body {
   margin: 0;
   background: var(--paper);
@@ -113,6 +116,12 @@ a { color: inherit; }
 }
 
 .nav li.has-submenu.submenu-open .submenu-toggle { transform: rotate(180deg); }
+
+/* .nav ul 那条通用规则会把 display:flex 也套到 .submenu 头上（它也是个 ul），
+   这里用更高优先级的选择器强制改回竖排列表 */
+.nav .submenu {
+  display: block;
+}
 
 .submenu {
   list-style: none;

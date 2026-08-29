@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 茶 · 器 · 琴</title>
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 
@@ -28,7 +28,13 @@
       </span>
       <ul class="submenu" id="submenu-teaware"></ul>
     </li>
-    <li><a href="#qindao">琴道传习</a></li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#qindao">琴道传习</a>
+        <button class="submenu-toggle" type="button" aria-label="展开琴道传习子菜单">⌄</button>
+      </span>
+      <ul class="submenu" id="submenu-qindao"></ul>
+    </li>
     <li class="has-submenu">
       <span class="nav-item-row">
         <a href="#zhuoqin">斫琴甄选</a>
@@ -36,10 +42,44 @@
       </span>
       <ul class="submenu" id="submenu-zhuoqin"></ul>
     </li>
-    <li><a href="#booking">茶席预约</a></li>
-    <li><a href="#yaji">坐忘雅集</a></li>
-    <li><a href="#about">坐忘故事</a></li>
-    <li><a href="#contact">寻访茗舍</a></li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#booking">茶席预约</a>
+        <button class="submenu-toggle" type="button" aria-label="展开茶席预约子菜单">⌄</button>
+      </span>
+      <ul class="submenu">
+        <li><a href="#booking-new">初次到访</a></li>
+        <li><a href="#booking-verified">知音通道</a></li>
+      </ul>
+    </li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#yaji">坐忘雅集</a>
+        <button class="submenu-toggle" type="button" aria-label="展开坐忘雅集子菜单">⌄</button>
+      </span>
+      <ul class="submenu" id="submenu-yaji"></ul>
+    </li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#about">坐忘故事</a>
+        <button class="submenu-toggle" type="button" aria-label="展开坐忘故事子菜单">⌄</button>
+      </span>
+      <ul class="submenu">
+        <li><a href="#story-zuowang">坐忘茗舍 · 诗意栖居</a></li>
+        <li><a href="#story-yicha">一茶一琴 · 一念初心</a></li>
+      </ul>
+    </li>
+    <li class="has-submenu">
+      <span class="nav-item-row">
+        <a href="#contact">寻访茗舍</a>
+        <button class="submenu-toggle" type="button" aria-label="展开寻访茗舍子菜单">⌄</button>
+      </span>
+      <ul class="submenu">
+        <li><a href="#contact-wechat">微信专线</a></li>
+        <li><a href="#contact-phone">咨询热线</a></li>
+        <li><a href="#contact-address">茗舍地址</a></li>
+      </ul>
+    </li>
   </ul>
 </nav>
 
@@ -104,7 +144,7 @@
     <div class="divider"></div>
   </div>
   <div class="booking-tracks">
-    <div class="track track-new">
+    <div class="track track-new" id="booking-new">
       <span class="track-label">初次到访</span>
       <h3>新客初见</h3>
       <p class="track-lead">本馆实行预约制，初次到访请先与掌柜微信或电话联络，确认在地身份与空闲雅室。</p>
@@ -116,7 +156,7 @@
       <a href="#contact" class="cta-btn">添加掌柜微信 →</a>
     </div>
 
-    <div class="track track-verified">
+    <div class="track track-verified" id="booking-verified">
       <span class="track-label">知音通道</span>
       <h3>已联络知音</h3>
       <p class="track-lead">已与掌柜联络确认的知音，请在此验证预留手机号，即可直接填写席位预约。</p>
@@ -176,12 +216,12 @@
     <div class="divider"></div>
   </div>
   <div class="story">
-    <p class="story-title">「坐忘茗舍 · 诗意栖居」</p>
+    <p class="story-title" id="story-zuowang">「坐忘茗舍 · 诗意栖居」</p>
     <p>"坐忘"，源自先贤的智慧，是心灵的一种至高止息。在繁华与浮躁之中，我们构筑了这一处"坐忘茗舍"，只为寻一处安顿身心的清幽。</p>
     <p>这里，是茗品的栖息之所。我们不仅是在售茶，更是在传承一种源自山野的灵气。严选高山原产地明前好茶，从岩骨花香的武夷岩茶到清雅不凡的明前绿茶，每一叶都保留着自然的呼吸。我们设一方静谧茶席，宜围炉煮雪，谈笑有鸿儒；亦宜一盏独酌，任竹影摇曳，澄澈内心。</p>
     <p>这里，是七弦清音的传习之地。心远地偏，古音缭绕。我们致力于弘扬古琴这一流传千年的文人乐器。这里既有甄选良材古木、传统髹漆工艺斫制而成的传世名琴，也是传习琴道的雅集之所。减字谱里的启蒙、指法纠偏、余音微体验，我们愿带你在七弦之间，寻得那份久违的松透沉静。</p>
     <p>入舍，可卸下红尘琐事；坐忘，可回归心灵本真。一茶一琴，一坐一忘。我们在坐忘茗舍，静候每一位知音。</p>
-    <p class="story-title">「一茶一琴 · 一念初心」</p>
+    <p class="story-title" id="story-yicha">「一茶一琴 · 一念初心」</p>
     <p>与茶的相遇始于寻常。不过是市面上一包普通的茶叶，和朋友随手泡出的一盏热茶，却像是一颗石子落入水面。从起初觉得解渴、好喝，到忍不住想去探究不同山头与工艺的滋味，那种欢喜一旦生根，便一发不可收拾。日子久了，越深究越觉得浩瀚，不自觉地去翻阅茶书、钻研茶道，在经年累月的品味与浸润里，茶成了生活里推不开的深情。</p>
     <p>对古琴的念想，则是偶然在荧幕里听到了一声琴音。那一声空灵幽远，仿佛带着跨越岁月的穿透力，刹那间直击灵魂深处。真想去学时，方才发觉周遭寻师不易，全凭着一股韧劲四处打听、上下求索，好不容易才推开了学琴的门。从指尖生涩到与减字谱较劲，这一弹便是经年。只是这许多年弹下来，非但没有被岁月消磨了兴致，反倒是在日复一日的抚弄里，每一次把琴坐下，心底对它的那份欢喜与笃定就更深一层，宛如初见。</p>
     <p>正因自己淋过雨、寻过路，也因这份热爱而在岁月里得到了真正的滋养，才更懂得将这份传统流传下去的意义。如今在这里煮茶、教琴，只凭这一份纯粹的初心，想把这份从茶与琴里得到的安宁与踏实，毫无保留地分享给每一个路过的知音。</p>
@@ -196,17 +236,17 @@
     <div class="divider"></div>
   </div>
   <div class="contact-grid">
-    <div class="contact-item">
+    <div class="contact-item" id="contact-wechat">
       <div class="qr"><img src="assets/微信专线.png" alt="坐忘茗舍 微信二维码"></div>
       <h3>微信专线</h3>
       <p>扫码添加微信</p>
     </div>
-    <div class="contact-item">
+    <div class="contact-item" id="contact-phone">
       <div class="qr"><img src="assets/咨询热线.png" alt="咨询热线"></div>
       <h3>咨询热线</h3>
       <p>18668788289</p>
     </div>
-    <a class="contact-item map-link" href="https://www.amap.com/search?query=温州市鹿城区松台街道蛟翔巷111号" target="_blank" rel="noopener">
+    <a class="contact-item map-link" id="contact-address" href="https://www.amap.com/search?query=温州市鹿城区松台街道蛟翔巷111号" target="_blank" rel="noopener">
       <div class="qr"><img src="assets/茗舍地址.png" alt="茗舍地址"></div>
       <h3>茗舍地址</h3>
       <p>温州市鹿城区松台街道蛟翔巷111号</p>
@@ -251,6 +291,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=9"></script>
+<script src="script.js?v=10"></script>
 </body>
 </html>
