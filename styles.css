@@ -578,12 +578,15 @@ section {
 }
 .poster-scroll::-webkit-scrollbar { display: none; }
 
-/* 一排装不下时（不分屏幕宽度）：转为轮播容器 */
+/* 一排装不下时（不分屏幕宽度）：转为轮播容器。
+   轮播用 transform 位移计算轨道位置，必须让轨道贴在容器左边界，
+   不能让 justify-content: center 参与进来，否则位移量会跟实际显示位置对不上。 */
 .poster-scroll.has-carousel {
   overflow: hidden;
   position: relative;
   cursor: grab;
   gap: 0;
+  justify-content: flex-start;
 }
 .poster-scroll .carousel-track {
   display: flex;
