@@ -567,24 +567,6 @@ section {
   margin-bottom: 24px;
 }
 
-.yaji-posters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px;
-  justify-content: center;
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-#yajiGrid {
-  display: block;
-}
-
-#yajiGrid .card {
-  width: clamp(240px, 60%, 320px);
-  margin: 0 auto;
-}
-
 .poster-scroll {
   display: flex;
   gap: 24px;
