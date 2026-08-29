@@ -574,6 +574,7 @@ section {
   overflow-x: auto;
   padding-bottom: 12px;
   scrollbar-width: none;
+  justify-content: center;
 }
 .poster-scroll::-webkit-scrollbar { display: none; }
 
