@@ -1092,9 +1092,13 @@ body.modal-open { overflow: hidden; }
   .nav ul.open { transform: translateY(0); }
   .nav-toggle { display: flex; }
 
-  /* 子菜单在移动端改成手风琴式展开，不用悬浮下拉：点主菜单名字本身展开/收起，不跳转 */
-  .submenu {
+  /* 子菜单在移动端改成手风琴式展开，不用悬浮下拉：点主菜单名字本身展开/收起，不跳转。
+     .submenu 本身也是个 ul，会被上面 .nav ul 的 position:fixed 顶掉（同样的选择器碰撞问题），
+     这里用 .nav .submenu 提高优先级强制改回 static，让它老老实实地在文档流里撑开高度。 */
+  .nav .submenu {
     position: static;
+  }
+  .submenu {
     opacity: 1;
     pointer-events: none;
     transform: none;

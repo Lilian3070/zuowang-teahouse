@@ -257,7 +257,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!link) return;
     if (link.classList.contains('nav-parent-link') && window.innerWidth <= 860) {
       e.preventDefault();
-      link.closest('.has-submenu')?.classList.toggle('submenu-open');
+      const li = link.closest('.has-submenu');
+      const wasOpen = li?.classList.contains('submenu-open');
+      // 同一时间只展开一个子菜单，点开新的会先收起其他已展开的，不允许叠加
+      document.querySelectorAll('.has-submenu.submenu-open').forEach(el => el.classList.remove('submenu-open'));
+      if (li && !wasOpen) li.classList.add('submenu-open');
       return;
     }
     navMenu.classList.remove('open');
