@@ -1,0 +1,93 @@
+# 坐忘茗舍网站 · 交接文档
+
+最后更新：2026-08-29
+备份检查点（可回滚）：`checkpoint-2026-08-29`（回滚命令见文末）
+
+## 基本信息
+
+- 本地代码：`C:\Users\xianl\Desktop\Lilian\坐忘茗舍网站\`
+- GitHub：https://github.com/Lilian3070/zuowang-teahouse
+- **正式网址：https://zuowangmingshe.com**（Cloudflare CDN + GitHub Pages）
+- 后台地址：https://zuowangmingshe.com/admin.html
+- 部署方式：push 到 GitHub main 分支，约 1 分钟内自动生效
+- Cloudflare Page Rule：`*zuowangmingshe.com/*.html` → Cache Level Bypass（HTML 不缓存）
+
+## 技术架构
+
+纯静态 JAMstack：`index.html`（前台）+ `script.js` + `styles.css` + `admin.html`（后台，内嵌样式和脚本）
+
+数据库：Supabase，Project URL `https://wmatsdnpbpcltuoynyrh.supabase.co`，Publishable key `sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl`，区域 Southeast Asia (Singapore)。
+
+**前端库不再依赖 jsdelivr CDN**（国内偶尔连不上/慢，一旦失败前台商品和后台会整体失效），全部自托管在 `assets/vendor/`：
+- `supabase-js@2.112.4.min.js`（index.html + admin.html 共用）
+- `fullcalendar@6.1.15.global.min.js`（admin.html 日程日历）
+- `fullcalendar-locale-zh-cn@6.1.15.global.min.js`（原来引用的 `locales-all.global.min.js` 在该版本包里根本不存在、一直 404，日历中文语言包从未生效；已换成真实存在的路径）
+- **以后升级这几个库需要手动下载替换文件**，不会像 CDN 那样自动跟最新版
+
+**CSS/JS 缓存刷新**：每次改 `script.js` 或 `styles.css` 后，把 `index.html` 里对应的 `?v=` 版本号 +1。当前：`styles.css?v=14`、`script.js?v=12`。
+
+## 数据库表结构
+
+### categories
+`id, type(tea/teaware/guqin), key, name, description, cover_url, sort_order, is_visible`
+
+分类 key 对照：
+- tea：zhengshantang(正山堂·骏眉中国) / hexingyan(和星岩) / pinguvillage(品古村)
+- teaware：zhuchaqi(泡茶主器) / pinmingbei(品茗杯盏) / chaxiyashe(茶席雅设) / mingyao(名窑匠作)
+- guqin：chuxian(初弦) / miaoyin(妙音) / cangfeng(藏锋) / xiexing(携行)
+
+### products
+`id, category_key(字符串，对应上表 key，不是 UUID), name, description, price, image_url, detail_images(text[]，商品详情图片数组), is_visible, sort_order, created_at`
+
+### posters
+`id, section(qindao/yaji), title(显示文字，选填), image_url, is_visible, sort_order, created_at`
+
+## 已完成功能
+
+### 前台（index.html + script.js + styles.css）
+- 精选茗茶 / 茶器美学 / 斫琴甄选三个板块从 Supabase 动态读取分类和商品，隐藏分类不显示
+- 商品弹窗预缓存全部商品，点击秒开；商品"查看详情"弹出图片画廊（主图+详情图，缩略图/左右箭头/键盘切换）
+- 移动端（≤860px）分类/海报用横向轮播展示，首次加载即生效（不用等用户手动触发一次 resize）；轮播启动后 0.9 秒就开始第一次切换，不会让人误以为只有一个分类
+- 海报板块（琴道传习/坐忘雅集）横排展示，卡片数量少时居中，多到装不下时轮播
+- 顶部导航栏**全部 8 个菜单项都有子菜单**：
+  - 精选茗茶/茶器美学/斫琴甄选：子菜单内容跟分类数据同源，后台改分类会自动同步
+  - 琴道传习/坐忘雅集：子菜单用每张海报的"显示文字"，没填文字的海报不出现
+  - 茶席预约/坐忘故事/寻访茗舍：固定文字子菜单，跳转到板块内对应的小节（用 `scroll-margin-top` 避免被固定导航栏挡住）
+  - 桌面端鼠标悬停展开下拉；移动端点主菜单名字本身展开/收起（不跳转），同一时间只展开一个，其他主菜单项自动顺延；子菜单里的具体项目才会真正跳转/弹出详情框
+  - 点品牌/分类子项：跳转 + 直接弹出该项详情框；点海报/预约/故事/联系方式子项：直接跳转到对应位置（没有单独详情弹窗）
+- 数据请求失败自动重试（最多 2 次，间隔 0.8 秒），避免手机网络抖动导致某个板块内容永久空白
+- 首页大图（logo/店铺印章/联系方式图标）按实际显示尺寸压缩，省了约 2.1MB 首屏体积
+
+### 后台（admin.html）
+- 登录/退出、修改密码
+- 商品 CRUD，图片 canvas 压缩（最大 1200px，quality 0.82）上传 Supabase Storage
+- 商品详情图片：可加多张、随时增删，保存时才真正上传
+- 图片上传区支持真正的文件夹拖拽（之前文字写了但没接线）
+- 图片替换/删除时清理 Storage 孤儿文件（商品主图、详情图、分类封面图、海报）
+- 分类管理：CRUD、排序、显示隐藏，切换 tab 时正确收起/刷新（之前有 CSS 选择器碰撞导致的旧数据残留 bug，已修）
+- 商品编辑弹窗去掉了多余的"显示此商品"勾选框（显示/隐藏已由列表按钮控制，编辑保存不再覆盖该状态）
+- 会员管理：琴人档案（课时套餐）、茗客档案（消费记录）
+- 行程安排：FullCalendar 日历（中文语言包已修好）
+- 移动端小屏幕下菜单栏改为横向换行排列，不再竖排占位；顶栏用回真实类名，紧凑显示
+
+## 踩过的坑（给以后的自己提个醒）
+
+**`.nav ul` 选择器碰撞**：写导航子菜单时，`.submenu` 本身也是个 `<ul>`，会被 `.nav ul` 这条通用规则的**每一条属性**顶替（display、position、transform、max-height 都中过招）。教训：给一个新组件加样式时，如果它的标签名/结构会被某条更早、更宽泛的选择器意外匹配到，不要一条属性一条属性地打补丁，而是一次性用更高优先级的选择器（比如 `.nav .submenu`）把这个组件需要的所有属性都接管过来。
+
+## 待做事项
+
+- [ ] 删除测试商品"龙蛋"（或保留测试用）
+- [ ] 等主理人邮箱，建她的 Supabase 账号
+- [ ] 前台网页整体布局和设计（用户还在想方案）
+- [ ] 会员/学员/上课记录管理（后期再扩展）
+
+## 备份与回滚
+
+每个阶段性节点都打了 git tag，出问题可以直接回滚：
+
+```bash
+git tag                          # 查看所有备份点
+git checkout checkpoint-2026-08-29   # 回滚到这次的备份点（会进入 detached HEAD，确认要用再合并/新建分支）
+```
+
+已有备份点：`checkpoint-2026-08-28`、`checkpoint-2026-08-29`
