@@ -184,16 +184,18 @@
     gap: 16px;
   }
   .product-row img {
-    width: 60px;
-    height: 60px;
+    width: 80px;
+    aspect-ratio: 4 / 3;
+    height: auto;
     object-fit: cover;
     border-radius: 8px;
     background: var(--bg);
     flex-shrink: 0;
   }
   .product-row .no-img {
-    width: 60px;
-    height: 60px;
+    width: 80px;
+    aspect-ratio: 4 / 3;
+    height: auto;
     border-radius: 8px;
     background: var(--bg);
     border: 1px dashed var(--border);
@@ -504,7 +506,7 @@
 
     /* 商品行 */
     .product-row { flex-wrap: wrap; gap: 10px; padding: 12px; }
-    .product-row img, .product-row .no-img { width: 72px; height: 72px; }
+    .product-row img, .product-row .no-img { width: 92px; aspect-ratio: 4 / 3; height: auto; }
     .product-info { flex: 1; min-width: 0; }
     .product-name { font-size: 14px; }
     .product-actions { width: 100%; justify-content: flex-end; gap: 6px; }
@@ -988,13 +990,8 @@ async function loadProducts(forceRefresh = false) {
   renderProducts(filtered);
 }
 
-function renderProducts(products) {
-  const el = document.getElementById('productList');
-  if (!products.length) {
-    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">📦</div><p>暂无商品，点击「添加商品」开始</p></div>';
-    return;
-  }
-  el.innerHTML = '<div class="product-list" id="sortableList">' + products.map((p, i) => `
+function productRowHtml(p, i = 0) {
+  return `
     <div class="product-row" data-id="${p.id}" data-sort="${p.sort_order || i}" draggable="true">
       ${p.image_url ? `<img src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none'">` : '<div class="no-img">无图</div>'}
       <div class="product-info">
@@ -1014,7 +1011,16 @@ function renderProducts(products) {
         <button class="btn-delete" onclick="deleteProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}')">删除</button>
       </div>
     </div>
-  `).join('') + '</div>';
+  `;
+}
+
+function renderProducts(products) {
+  const el = document.getElementById('productList');
+  if (!products.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">📦</div><p>暂无商品，点击「添加商品」开始</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="product-list" id="sortableList">' + products.map(productRowHtml).join('') + '</div>';
   initDragSort();
 }
 
@@ -1248,11 +1254,11 @@ async function saveProduct() {
     detail_images: detailImageUrls,
   };
   if (!editingId) payload.is_visible = true;
-  let error;
+  let error, insertedRow;
   if (editingId) {
     ({ error } = await db.from('products').update(payload).eq('id', editingId));
   } else {
-    ({ error } = await db.from('products').insert(payload));
+    ({ data: insertedRow, error } = await db.from('products').insert(payload).select().single());
   }
   if (error) {
     showToast('保存失败：' + error.message);
@@ -1260,12 +1266,43 @@ async function saveProduct() {
     if (orphans.length) db.storage.from('product-images').remove(orphans);
     return;
   }
-  showToast(editingId ? '商品已更新' : '商品已添加');
+  const wasEditingId = editingId;
+  showToast(wasEditingId ? '商品已更新' : '商品已添加');
   const toRemove = pendingImageRemovals.map(storagePathFromUrl).filter(Boolean);
   if (toRemove.length) db.storage.from('product-images').remove(toRemove);
   closeModal();
-  delete tabProductsCache[currentTab];
-  loadProducts();
+
+  const catName = categoriesCache.find(c => c.key === payload.category_key)?.name || '';
+  const cache = tabProductsCache[currentTab];
+  if (wasEditingId) {
+    const cached = cache?.find(p => p.id === wasEditingId);
+    if (cached) Object.assign(cached, payload, { categories: { name: catName } });
+    const row = document.querySelector(`.product-row[data-id="${wasEditingId}"]`);
+    const stillMatchesFilter = !currentFilter || currentFilter === payload.category_key;
+    if (row) {
+      if (stillMatchesFilter) row.outerHTML = productRowHtml(cached || { ...payload, id: wasEditingId });
+      else { row.remove(); refreshEmptyStateIfNeeded(); }
+    }
+  } else if (insertedRow) {
+    const newProduct = { ...insertedRow, categories: { name: catName } };
+    if (cache) cache.unshift(newProduct);
+    if (!currentFilter || currentFilter === newProduct.category_key) {
+      const list = document.getElementById('sortableList');
+      if (list) {
+        list.insertAdjacentHTML('afterbegin', productRowHtml(newProduct));
+        initDragSort();
+      } else {
+        renderProducts([newProduct]);
+      }
+    }
+  }
+}
+
+function refreshEmptyStateIfNeeded() {
+  const list = document.getElementById('sortableList');
+  if (list && !list.children.length) {
+    document.getElementById('productList').innerHTML = '<div class="empty-state"><div style="font-size:32px">📦</div><p>暂无商品，点击「添加商品」开始</p></div>';
+  }
 }
 
 function setVisible(id, visible) {
@@ -1358,7 +1395,8 @@ async function moveProduct(id, direction) {
 
 function initDragSort() {
   const list = document.getElementById('sortableList');
-  if (!list) return;
+  if (!list || list.dataset.dragBound) return;
+  list.dataset.dragBound = '1';
   let dragging = null;
 
   list.addEventListener('dragstart', e => {
