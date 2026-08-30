@@ -770,10 +770,12 @@
     </div>
 
     <div class="member-detail-section">
-      <h4>会员登录密钥</h4>
+      <h4>会员账号</h4>
+      <div id="memberAccountInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:8px"></div>
       <div id="inviteCodeStatus" style="font-size:13px;color:var(--ink-muted);line-height:1.8;margin-bottom:8px"></div>
       <div class="add-inline-form">
-        <button class="btn-add-inline" onclick="generateInviteCode()">生成一次性密钥</button>
+        <button class="btn-add-inline" onclick="generateInviteCode()">生成注册密钥</button>
+        <button class="btn-add-inline" onclick="generateResetCode()">生成密码重置密钥</button>
       </div>
     </div>
 
@@ -1876,14 +1878,28 @@ function genInviteCode() {
 }
 
 async function loadInviteCodeStatus() {
-  const el = document.getElementById('inviteCodeStatus');
   if (!currentMemberId) return;
-  const { data } = await db.from('invite_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false });
-  if (!data || !data.length) { el.textContent = '尚未生成过密钥'; return; }
-  el.innerHTML = data.map(c => c.is_used
-    ? `已使用：${c.code}`
-    : `<strong>${c.code}</strong>（未使用，给客人后去首页点"登录"→"会员注册"填写）`
-  ).join('<br>');
+  const infoEl = document.getElementById('memberAccountInfo');
+  const codeEl = document.getElementById('inviteCodeStatus');
+
+  const { data: profile } = await db.from('profiles').select('login_account').eq('member_id', currentMemberId).eq('role', 'member').maybeSingle();
+  infoEl.textContent = profile ? `登录账号（邮箱/手机号）：${profile.login_account || '（未记录）'}` : '尚未注册会员账号';
+
+  const [{ data: invites }, { data: resets }] = await Promise.all([
+    db.from('invite_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false }),
+    db.from('password_reset_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false }),
+  ]);
+
+  const inviteLines = (invites || []).map(c => c.is_used
+    ? `已使用的注册密钥：${c.code}`
+    : `<strong>${c.code}</strong>（注册密钥，未使用，给客人后去首页点"登录"→"会员注册"填写）`
+  );
+  const resetLines = (resets || []).map(c => c.is_used
+    ? `已使用的重置密钥：${c.code}`
+    : `<strong>${c.code}</strong>（密码重置密钥，未使用，给客人后去首页"忘记密码"填写）`
+  );
+  const lines = [...inviteLines, ...resetLines];
+  codeEl.innerHTML = lines.length ? lines.join('<br>') : '尚未生成过密钥';
 }
 
 async function generateInviteCode() {
@@ -1891,7 +1907,16 @@ async function generateInviteCode() {
   const code = genInviteCode();
   const { error } = await db.from('invite_codes').insert({ code, member_id: currentMemberId });
   if (error) { showToast('生成失败：' + error.message); return; }
-  showToast('已生成密钥：' + code);
+  showToast('已生成注册密钥：' + code);
+  loadInviteCodeStatus();
+}
+
+async function generateResetCode() {
+  if (!currentMemberId) return;
+  const code = genInviteCode();
+  const { error } = await db.from('password_reset_codes').insert({ code, member_id: currentMemberId });
+  if (error) { showToast('生成失败：' + error.message); return; }
+  showToast('已生成密码重置密钥：' + code);
   loadInviteCodeStatus();
 }
 

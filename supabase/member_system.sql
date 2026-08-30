@@ -9,6 +9,7 @@ create table if not exists profiles (
   role text not null check (role in ('admin', 'member')),
   member_type text default 'offline',
   member_id uuid references members(id) on delete set null,
+  login_account text,
   created_at timestamptz default now()
 );
 
@@ -54,10 +55,13 @@ create policy "管理员管理邀请码" on invite_codes for all
   using (is_admin()) with check (is_admin());
 
 
--- 3. 注册函数：会员先用 supabase.auth.signUp() 建好账号，再调用这个函数传入密钥，
---    换取正式的 member 身份。security definer 让它能在校验通过后写 profiles / 改 invite_codes，
+-- 3. 注册函数：会员先用 supabase.auth.signUp() 建好账号（邮箱或手机号都会被包装成一个
+--    技术上合法的邮箱地址，客户端那层负责这个转换，这里只管存密钥校验和角色），
+--    再调用这个函数传入密钥，换取正式的 member 身份。login_account 存的是客人实际填的
+--    那个邮箱或手机号原文，给后台"忘记账号是哪个"时展示用。
+--    security definer 让它能在校验通过后写 profiles / 改 invite_codes，
 --    但这个函数只做"校验密钥 + 建会员身份"这一件事，客户端没法绕过校验直接拿到 admin。
-create or replace function redeem_invite_code(invite_code text)
+create or replace function redeem_invite_code(invite_code text, p_login_account text default null)
 returns void
 language plpgsql
 security definer
@@ -75,14 +79,70 @@ begin
     raise exception '密钥无效或已被使用';
   end if;
 
-  insert into profiles (id, role, member_type, member_id)
-  values (auth.uid(), 'member', 'offline', v_member_id);
+  insert into profiles (id, role, member_type, member_id, login_account)
+  values (auth.uid(), 'member', 'offline', v_member_id, p_login_account);
 
   update invite_codes set is_used = true, used_by = auth.uid() where code = invite_code;
 end;
 $$;
 
-grant execute on function redeem_invite_code(text) to authenticated;
+grant execute on function redeem_invite_code(text, text) to authenticated;
+
+
+-- 3b. 密码重置密钥表 + 函数：手机号注册的账号背后是个假邮箱，收不到 Supabase 原生的
+--     "忘记密码"邮件，所以密码重置也走跟注册一样的"主理人发一次性密钥"模式。
+--     这个函数直接改 auth.users 里的密码字段（用 Supabase/GoTrue 同款的 bcrypt 加密方式写入），
+--     不需要知道旧密码，也不需要邮箱/短信——所以必须严格校验密钥，且密钥用一次就失效。
+create table if not exists password_reset_codes (
+  code text primary key,
+  member_id uuid references members(id) on delete cascade,
+  is_used boolean not null default false,
+  created_at timestamptz default now()
+);
+
+alter table password_reset_codes enable row level security;
+
+create policy "管理员管理密码重置密钥" on password_reset_codes for all
+  using (is_admin()) with check (is_admin());
+
+create or replace function reset_password_with_code(reset_code text, new_password text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_member_id uuid;
+  v_user_id uuid;
+begin
+  if length(new_password) < 6 then
+    raise exception '密码至少 6 位';
+  end if;
+
+  select member_id into v_member_id
+  from password_reset_codes
+  where code = reset_code and is_used = false
+  for update;
+
+  if v_member_id is null then
+    raise exception '密钥无效或已被使用';
+  end if;
+
+  select id into v_user_id from profiles where member_id = v_member_id and role = 'member' limit 1;
+  if v_user_id is null then
+    raise exception '找不到对应的会员账号';
+  end if;
+
+  update auth.users set encrypted_password = extensions.crypt(new_password, extensions.gen_salt('bf'))
+  where id = v_user_id;
+
+  update password_reset_codes set is_used = true where code = reset_code;
+end;
+$$;
+
+-- 忘记密码的人此刻是未登录状态（anon），所以这个函数要开放给 anon 调用；
+-- 安全完全靠密钥校验兜底，不是靠"要求已登录"。
+grant execute on function reset_password_with_code(text, text) to anon, authenticated;
 
 
 -- 4. 把现有的管理员账号标记为 admin —— 去 Supabase 后台「Authentication → Users」核对邮箱，

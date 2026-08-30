@@ -50,16 +50,27 @@ function switchAccountTab(tab) {
   document.querySelectorAll('.account-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('loginForm').style.display = tab === 'login' ? '' : 'none';
   document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('forgotForm').style.display = tab === 'forgot' ? '' : 'none';
   document.getElementById('acctLoginError').textContent = '';
   document.getElementById('acctRegisterError').textContent = '';
+  document.getElementById('acctForgotError').textContent = '';
+}
+
+// 登录/注册允许填邮箱或手机号，系统按有没有 "@" 自动判断。手机号在 Supabase 里
+// 没法直接当邮箱用，所以包装成一个固定后缀的"假邮箱"存进去——客人自己完全看不到这层，
+// 她们眼里从头到尾都是"手机号 + 密码"。真邮箱原样使用。
+function accountToAuthEmail(input) {
+  const v = input.trim();
+  if (v.includes('@')) return v;
+  return v.replace(/\D/g, '') + '@member.zuowangmingshe.local';
 }
 
 // 密钥注册后是否立刻建好会员身份，取决于 Supabase 是否要求邮箱确认：
 // 免确认的话 signUp 直接带回 session，当场兑换密钥；要确认的话就先记住这个密钥，
-// 等她点完邮箱确认链接、回来登录成功那一刻再补上兑换。
-async function redeemPendingOrCode(code) {
-  const errEl = document.getElementById('acctLoginError');
-  const { error } = await db.rpc('redeem_invite_code', { invite_code: code });
+// 等她点完确认链接、回来登录成功那一刻再补上兑换。
+async function redeemPendingOrCode(code, loginAccount, errElId = 'acctLoginError') {
+  const errEl = document.getElementById(errElId);
+  const { error } = await db.rpc('redeem_invite_code', { invite_code: code, p_login_account: loginAccount });
   if (error) { errEl.textContent = error.message || '密钥无效或已被使用'; return; }
   try { localStorage.removeItem('pendingInviteCode'); } catch (e) {}
   closeAccountModal();
@@ -69,11 +80,11 @@ async function redeemPendingOrCode(code) {
 
 async function doAccountLogin(event) {
   event.preventDefault();
-  const email = document.getElementById('acctLoginEmail').value.trim();
+  const account = document.getElementById('acctLoginAccount').value.trim();
   const password = document.getElementById('acctLoginPassword').value;
   const errEl = document.getElementById('acctLoginError');
-  const { error } = await db.auth.signInWithPassword({ email, password });
-  if (error) { errEl.textContent = '邮箱或密码错误'; return false; }
+  const { error } = await db.auth.signInWithPassword({ email: accountToAuthEmail(account), password });
+  if (error) { errEl.textContent = '账号或密码错误'; return false; }
   await refreshAccountNav();
   if (currentAccountRole) {
     closeAccountModal();
@@ -82,8 +93,8 @@ async function doAccountLogin(event) {
   }
   let pending = null;
   try { pending = JSON.parse(localStorage.getItem('pendingInviteCode') || 'null'); } catch (e) {}
-  if (pending && pending.email === email) {
-    await redeemPendingOrCode(pending.code);
+  if (pending && pending.account === account) {
+    await redeemPendingOrCode(pending.code, account);
     return false;
   }
   errEl.textContent = '此账号还没有对应的身份，请联系主理人';
@@ -93,22 +104,30 @@ async function doAccountLogin(event) {
 async function doAccountRegister(event) {
   event.preventDefault();
   const code = document.getElementById('regCode').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
+  const account = document.getElementById('regAccount').value.trim();
   const password = document.getElementById('regPassword').value;
   const errEl = document.getElementById('acctRegisterError');
   errEl.textContent = '';
-  const { data: signUpData, error: signUpError } = await db.auth.signUp({ email, password });
-  if (signUpError) { errEl.textContent = signUpError.message.includes('already') ? '该邮箱已注册' : '注册失败：' + signUpError.message; return false; }
+  const { data: signUpData, error: signUpError } = await db.auth.signUp({ email: accountToAuthEmail(account), password });
+  if (signUpError) { errEl.textContent = signUpError.message.includes('already') ? '该账号已注册' : '注册失败：' + signUpError.message; return false; }
   if (!signUpData.session) {
-    try { localStorage.setItem('pendingInviteCode', JSON.stringify({ email, code })); } catch (e) {}
+    try { localStorage.setItem('pendingInviteCode', JSON.stringify({ account, code })); } catch (e) {}
     errEl.textContent = '注册成功，请到邮箱点击确认链接，然后回来登录完成会员激活';
     return false;
   }
-  const { error: redeemError } = await db.rpc('redeem_invite_code', { invite_code: code });
-  if (redeemError) { errEl.textContent = redeemError.message || '密钥无效或已被使用'; return false; }
-  closeAccountModal();
-  await refreshAccountNav();
-  location.href = 'member.html';
+  await redeemPendingOrCode(code, account, 'acctRegisterError');
+  return false;
+}
+
+async function doForgotPassword(event) {
+  event.preventDefault();
+  const code = document.getElementById('forgotCode').value.trim();
+  const password = document.getElementById('forgotPassword').value;
+  const errEl = document.getElementById('acctForgotError');
+  const { error } = await db.rpc('reset_password_with_code', { reset_code: code, new_password: password });
+  if (error) { errEl.textContent = error.message || '密钥无效或已被使用'; return false; }
+  switchAccountTab('login');
+  document.getElementById('acctLoginError').textContent = '密码已重置，请用新密码登录';
   return false;
 }
 

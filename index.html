@@ -304,32 +304,44 @@
     <div class="account-tabs">
       <button type="button" class="account-tab active" data-tab="login" onclick="switchAccountTab('login')">登录</button>
       <button type="button" class="account-tab" data-tab="register" onclick="switchAccountTab('register')">会员注册</button>
+      <button type="button" class="account-tab" data-tab="forgot" onclick="switchAccountTab('forgot')">忘记密码</button>
     </div>
 
     <form class="account-form booking-form" id="loginForm" onsubmit="return doAccountLogin(event)">
-      <label for="acctLoginEmail">邮箱</label>
-      <input type="email" id="acctLoginEmail" required>
+      <label for="acctLoginAccount">邮箱或手机号</label>
+      <input type="text" id="acctLoginAccount" required>
       <label for="acctLoginPassword">密码</label>
       <input type="password" id="acctLoginPassword" required>
       <button type="submit" class="submit-btn">登录</button>
       <p class="account-error" id="acctLoginError"></p>
+      <p class="account-hint" style="margin-top:14px">忘记密码？点上方"忘记密码"用密钥重置。</p>
     </form>
 
     <form class="account-form booking-form" id="registerForm" style="display:none" onsubmit="return doAccountRegister(event)">
       <p class="account-hint">凭主理人给到的一次性密钥完成会员注册。</p>
       <label for="regCode">密钥</label>
       <input type="text" id="regCode" required>
-      <label for="regEmail">邮箱</label>
-      <input type="email" id="regEmail" required>
+      <label for="regAccount">邮箱或手机号</label>
+      <input type="text" id="regAccount" required>
       <label for="regPassword">设置密码</label>
       <input type="password" id="regPassword" required minlength="6">
       <button type="submit" class="submit-btn">注册</button>
       <p class="account-error" id="acctRegisterError"></p>
     </form>
+
+    <form class="account-form booking-form" id="forgotForm" style="display:none" onsubmit="return doForgotPassword(event)">
+      <p class="account-hint">凭主理人给到的一次性密钥重置密码。</p>
+      <label for="forgotCode">密钥</label>
+      <input type="text" id="forgotCode" required>
+      <label for="forgotPassword">设置新密码</label>
+      <input type="password" id="forgotPassword" required minlength="6">
+      <button type="submit" class="submit-btn">重置密码</button>
+      <p class="account-error" id="acctForgotError"></p>
+    </form>
   </div>
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=14"></script>
+<script src="script.js?v=15"></script>
 </body>
 </html>
