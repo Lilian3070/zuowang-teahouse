@@ -15,6 +15,7 @@ async function fetchWithRetry(queryFn, retries = 2, delayMs = 800) {
 
 // 账号入口：识别当前登录人是管理员还是会员，决定导航栏那个按钮点了之后去哪
 let currentAccountRole = null; // 'admin' | 'member' | null（未登录或还没有角色记录）
+let loginFailCount = 0;
 
 async function refreshAccountNav() {
   const link = document.getElementById('navAccountLink');
@@ -46,6 +47,8 @@ function closeAccountModal() {
   modal.setAttribute('aria-hidden', 'true');
 }
 
+// 忘记密码不放在可见的 tab 里，免得会员手滑点进去就申请一次重置密钥；
+// 只有连续登录失败 3 次，错误提示里才会给出这个入口（见 doAccountLogin）
 function switchAccountTab(tab) {
   document.querySelectorAll('.account-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('loginForm').style.display = tab === 'login' ? '' : 'none';
@@ -54,6 +57,11 @@ function switchAccountTab(tab) {
   document.getElementById('acctLoginError').textContent = '';
   document.getElementById('acctRegisterError').textContent = '';
   document.getElementById('acctForgotError').textContent = '';
+  if (tab === 'login') loginFailCount = 0;
+}
+
+function revealForgotPassword() {
+  switchAccountTab('forgot');
 }
 
 // 登录/注册允许填邮箱或手机号，系统按有没有 "@" 自动判断。手机号在 Supabase 里
@@ -84,7 +92,17 @@ async function doAccountLogin(event) {
   const password = document.getElementById('acctLoginPassword').value;
   const errEl = document.getElementById('acctLoginError');
   const { error } = await db.auth.signInWithPassword({ email: accountToAuthEmail(account), password });
-  if (error) { errEl.textContent = '账号或密码错误'; return false; }
+  if (error) {
+    loginFailCount++;
+    // 连续错 3 次才露出"忘记密码"入口，避免会员随手一点就跑去申请重置密钥
+    if (loginFailCount >= 3) {
+      errEl.innerHTML = '账号或密码错误。<a href="#" onclick="revealForgotPassword(); return false;">忘记密码？点此用密钥重置</a>';
+    } else {
+      errEl.textContent = '账号或密码错误';
+    }
+    return false;
+  }
+  loginFailCount = 0;
   await refreshAccountNav();
   if (currentAccountRole) {
     closeAccountModal();
