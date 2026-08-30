@@ -910,12 +910,14 @@ footer {
 
 /* 一排挤两三个的时候，图片跟着变窄了，文字/按钮也跟着缩小一档，
    不然卡片会显得又高又瘦，很难看 */
+.modal-products.force-cols-2 .product-media { padding: 4px; }
 .modal-products.force-cols-2 .product-body { padding: 10px 10px 12px; }
 .modal-products.force-cols-2 .product-body h4 { font-size: 0.88rem; margin-bottom: 4px; }
 .modal-products.force-cols-2 .product-spec { font-size: 0.76rem; margin-bottom: 8px; }
 .modal-products.force-cols-2 .product-category { font-size: 0.64rem; padding: 3px 7px; margin-bottom: 6px; }
 .modal-products.force-cols-2 .detail-btn { padding: 6px; font-size: 0.76rem; }
 
+.modal-products.force-cols-3 .product-media { padding: 2px; }
 .modal-products.force-cols-3 .product-body { padding: 7px 6px 9px; }
 .modal-products.force-cols-3 .product-body h4 { font-size: 0.78rem; margin-bottom: 3px; }
 .modal-products.force-cols-3 .product-spec { font-size: 0.68rem; margin-bottom: 6px; }
