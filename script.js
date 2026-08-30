@@ -167,10 +167,38 @@ async function doForgotPassword(event) {
   return false;
 }
 
+// 密码框加一个"显示/隐藏密码"的小眼睛——手机浏览器大多不像部分安卓输入法那样自带这个按钮，
+// 加了之后跟平台无关，桌面/手机都一样能用
+const EYE_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a21.86 21.86 0 015.06-6.06M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 7 11 7a21.82 21.82 0 01-3.22 4.44M14.12 14.12a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+function addPasswordToggle(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative';
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  input.style.paddingRight = '40px';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.setAttribute('aria-label', '显示密码');
+  btn.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;line-height:0;color:var(--ink-soft)';
+  btn.innerHTML = EYE_ICON;
+  btn.onclick = () => {
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.innerHTML = showing ? EYE_ICON : EYE_OFF_ICON;
+    btn.setAttribute('aria-label', showing ? '显示密码' : '隐藏密码');
+  };
+  wrap.appendChild(btn);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   refreshAccountNav();
   document.getElementById('accountModalClose').addEventListener('click', closeAccountModal);
   document.getElementById('accountModalOverlay').addEventListener('click', closeAccountModal);
+  ['acctLoginPassword', 'regPassword', 'forgotPassword'].forEach(addPasswordToggle);
 });
 
 document.addEventListener('DOMContentLoaded', () => {
