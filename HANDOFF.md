@@ -24,7 +24,7 @@
 - `fullcalendar-locale-zh-cn@6.1.15.global.min.js`（原来引用的 `locales-all.global.min.js` 在该版本包里根本不存在、一直 404，日历中文语言包从未生效；已换成真实存在的路径）
 - **以后升级这几个库需要手动下载替换文件**，不会像 CDN 那样自动跟最新版
 
-**CSS/JS 缓存刷新**：每次改 `script.js` 或 `styles.css` 后，把 `index.html` 里对应的 `?v=` 版本号 +1。当前：`styles.css?v=21`、`script.js?v=13`。
+**CSS/JS 缓存刷新**：每次改 `script.js` 或 `styles.css` 后，把 `index.html` 里对应的 `?v=` 版本号 +1。当前：`styles.css?v=22`、`script.js?v=13`。
 
 ## 数据库表结构
 
