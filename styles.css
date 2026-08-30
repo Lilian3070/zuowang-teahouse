@@ -860,6 +860,43 @@ footer {
   margin: 0 0 32px;
 }
 
+.modal-view-toggle {
+  display: none; /* 只有一排只能放下一个商品时，由 JS 显示出来 */
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin: -20px 0 20px;
+}
+
+.view-toggle-label {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin-right: 2px;
+}
+
+.view-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.view-toggle-btn:hover { border-color: var(--seal); color: var(--seal); }
+
+.view-toggle-btn.active {
+  border-color: var(--seal);
+  color: var(--seal);
+  background: rgba(163, 49, 42, 0.08);
+}
+
 .modal-products-scroll {
   flex: 1;
   min-height: 0;
@@ -872,6 +909,9 @@ footer {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 22px;
 }
+
+.modal-products.force-cols-2 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.modal-products.force-cols-3 { grid-template-columns: repeat(3, 1fr); gap: 10px; }
 
 .product-card {
   border: 1px solid var(--line);

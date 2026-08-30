@@ -237,6 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (window.innerWidth > 860) {
         document.querySelectorAll('.has-submenu.submenu-open').forEach(li => li.classList.remove('submenu-open'));
       }
+      if (brandModal.classList.contains('open')) updateModalViewToggle();
     }, 150);
   });
 
@@ -408,6 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     brandModal.classList.add('open');
     brandModal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
+    updateModalViewToggle();
 
     const cached = productsCache[categoryKey];
     const products = cached !== undefined ? cached
@@ -419,7 +421,44 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       modalProducts.innerHTML = '<p style="color:#888;padding:20px 0">暂无商品</p>';
     }
+    updateModalViewToggle();
   }
+
+  // 商品浏览的每排数量切换：只有窄屏下一排天生只能放一个商品时才出现，
+  // 电脑/平板宽度够放 2、3 个时不受影响、也不显示这个控件
+  const modalViewToggle = document.getElementById('modalViewToggle');
+
+  function getNaturalGridColumns() {
+    const gap = 22, minCol = 200;
+    if (!modalProducts.clientWidth) return 1;
+    return Math.max(1, Math.floor((modalProducts.clientWidth + gap) / (minCol + gap)));
+  }
+
+  function applyModalGridCols(n) {
+    modalProducts.classList.remove('force-cols-2', 'force-cols-3');
+    if (n === 2) modalProducts.classList.add('force-cols-2');
+    if (n === 3) modalProducts.classList.add('force-cols-3');
+    modalViewToggle.querySelectorAll('.view-toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.cols, 10) === n);
+    });
+    try { localStorage.setItem('modalGridCols', String(n)); } catch (e) {}
+  }
+
+  function updateModalViewToggle() {
+    if (getNaturalGridColumns() >= 2) {
+      modalViewToggle.style.display = 'none';
+      modalProducts.classList.remove('force-cols-2', 'force-cols-3');
+      return;
+    }
+    modalViewToggle.style.display = 'flex';
+    let saved = 1;
+    try { saved = parseInt(localStorage.getItem('modalGridCols'), 10) || 1; } catch (e) {}
+    applyModalGridCols(saved);
+  }
+
+  modalViewToggle.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyModalGridCols(parseInt(btn.dataset.cols, 10)));
+  });
 
   function closeEntryModal() {
     brandModal.classList.remove('open');

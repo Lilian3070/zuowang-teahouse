@@ -244,6 +244,18 @@
       <h3 id="modalBrandName">品牌名称</h3>
       <p id="modalBrandDesc">品牌介绍</p>
     </div>
+    <div class="modal-view-toggle" id="modalViewToggle">
+      <span class="view-toggle-label">每排显示</span>
+      <button type="button" class="view-toggle-btn" data-cols="1" aria-label="每排显示 1 个">
+        <svg viewBox="0 0 20 14" width="20" height="14" fill="currentColor"><rect x="0" y="0" width="20" height="14" rx="2"/></svg>
+      </button>
+      <button type="button" class="view-toggle-btn" data-cols="2" aria-label="每排显示 2 个">
+        <svg viewBox="0 0 20 14" width="20" height="14" fill="currentColor"><rect x="0" y="0" width="9" height="14" rx="2"/><rect x="11" y="0" width="9" height="14" rx="2"/></svg>
+      </button>
+      <button type="button" class="view-toggle-btn" data-cols="3" aria-label="每排显示 3 个">
+        <svg viewBox="0 0 20 14" width="20" height="14" fill="currentColor"><rect x="0" y="0" width="5.3" height="14" rx="1.5"/><rect x="7.3" y="0" width="5.3" height="14" rx="1.5"/><rect x="14.6" y="0" width="5.3" height="14" rx="1.5"/></svg>
+      </button>
+    </div>
     <div class="modal-products-scroll">
       <div class="modal-products" id="modalProducts"></div>
     </div>
@@ -269,6 +281,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=12"></script>
+<script src="script.js?v=13"></script>
 </body>
 </html>
