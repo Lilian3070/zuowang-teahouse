@@ -352,6 +352,38 @@
   .upload-area:hover { border-color: var(--gold); color: var(--gold); }
   .upload-area.drag-over { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
 
+  .upload-area.crop-frame {
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+    width: 100%;
+    max-width: 300px;
+    aspect-ratio: 4 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    cursor: default;
+  }
+  .upload-area.crop-frame.has-image { cursor: grab; }
+  .upload-area.crop-frame.dragging { cursor: grabbing; }
+  .upload-area.crop-frame img {
+    position: absolute;
+    max-width: none;
+    max-height: none;
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+  .crop-controls { display: flex; align-items: center; gap: 8px; margin-top: 8px; max-width: 300px; }
+  .crop-controls-label { font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+  .crop-controls input[type=range] { flex: 1; accent-color: var(--gold); }
+  .crop-controls button {
+    font-size: 12px; padding: 5px 10px; border: 1px solid var(--border);
+    background: var(--surface); border-radius: 6px; cursor: pointer; color: var(--ink-muted);
+    white-space: nowrap;
+  }
+  .crop-controls button:hover { border-color: var(--gold); color: var(--gold); }
+
   .detail-img-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
   .detail-img-thumb { position: relative; width: 64px; height: 64px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); flex-shrink: 0; }
   .detail-img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -611,9 +643,14 @@
     </div>
     <div class="form-group">
       <label>商品图片（选填）</label>
-      <div class="upload-area" id="uploadArea" onclick="document.getElementById('imageFileInput').click()">
-        <div id="uploadPlaceholder">点击选择图片，或拖拽图片到此处</div>
-        <img id="uploadPreview" style="display:none;max-width:100%;max-height:180px;border-radius:6px;margin-top:8px;">
+      <div class="upload-area crop-frame" id="uploadArea">
+        <div id="uploadPlaceholder" style="padding:20px;text-align:center" onclick="document.getElementById('imageFileInput').click()">点击选择图片，或拖拽图片到此处</div>
+        <img id="uploadPreview" draggable="false" style="display:none">
+      </div>
+      <div class="crop-controls" id="uploadCropControls" style="display:none">
+        <span class="crop-controls-label">缩放</span>
+        <input type="range" id="uploadZoom" min="1" max="4" step="0.01" value="1">
+        <button type="button" onclick="document.getElementById('imageFileInput').click()">换一张图片</button>
       </div>
       <input type="file" id="imageFileInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
       <div id="uploadStatus" style="font-size:12px;color:var(--ink-muted);margin-top:6px;"></div>
@@ -812,6 +849,12 @@ let editingId = null;
 let detailImages = []; // [{ url } for saved images | { file, previewUrl } for pending uploads]
 let pendingImageRemovals = [];
 let newUploadsThisSave = []; // 本次保存中新上传的文件，若数据库写入失败要回滚删除，避免孤儿文件
+
+// 商品主图裁剪状态
+let _prodCropScale = 1, _prodCropX = 0, _prodCropY = 0;
+let _prodImgDirty = false; // 图片是否被新选择/拖动/缩放过，决定保存时是否要重新生成裁剪图
+let _prodDragging = false;
+let _prodDragStart = null;
 const tabProductsCache = {}; // { tabKey: allProductsArray }
 let categoriesCache = [];
 
@@ -983,6 +1026,9 @@ function openAddModal() {
   document.getElementById('modalDesc').value = '';
   document.getElementById('modalPrice').value = '';
   document.getElementById('modalImage').value = '';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadPlaceholder').style.display = 'block';
+  resetProductCropState();
   resetDetailImages();
   populateCategorySelect();
   document.getElementById('productModal').classList.add('open');
@@ -997,15 +1043,12 @@ async function openEditModal(id) {
   document.getElementById('modalDesc').value = data.description || '';
   document.getElementById('modalPrice').value = data.price || '';
   document.getElementById('modalImage').value = data.image_url || '';
-  const preview = document.getElementById('uploadPreview');
-  const placeholder = document.getElementById('uploadPlaceholder');
+  resetProductCropState();
   if (data.image_url) {
-    preview.src = data.image_url;
-    preview.style.display = 'block';
-    placeholder.style.display = 'none';
+    loadProductCropImage(data.image_url);
   } else {
-    preview.style.display = 'none';
-    placeholder.style.display = 'block';
+    document.getElementById('uploadPreview').style.display = 'none';
+    document.getElementById('uploadPlaceholder').style.display = 'block';
   }
   detailImages = (data.detail_images || []).map(url => ({ url, previewUrl: url }));
   pendingImageRemovals = [];
@@ -1026,6 +1069,7 @@ function closeModal() {
   document.getElementById('uploadPlaceholder').style.display = 'block';
   document.getElementById('uploadStatus').textContent = '';
   document.getElementById('imageFileInput').value = '';
+  resetProductCropState();
   resetDetailImages();
   editingId = null;
 }
@@ -1087,26 +1131,85 @@ function compressImage(file, maxW = 1200, quality = 0.82) {
 function handleImageSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
-  const preview = document.getElementById('uploadPreview');
+  loadProductCropImage(URL.createObjectURL(file));
+  _prodImgDirty = true;
+  document.getElementById('uploadStatus').textContent = '拖动图片调整位置，滚轮或拖动滑块缩放';
+}
+
+// 把图片载入裁剪框：按 4:3 铺满显示（不留白），默认居中，可再拖动/缩放调整
+function loadProductCropImage(url) {
+  const img = document.getElementById('uploadPreview');
+  const frame = document.getElementById('uploadArea');
+  const zoom = document.getElementById('uploadZoom');
   const placeholder = document.getElementById('uploadPlaceholder');
-  const reader = new FileReader();
-  reader.onload = e => {
-    preview.src = e.target.result;
-    preview.style.display = 'block';
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    const fw = frame.clientWidth, fh = frame.clientHeight;
+    const fitScale = Math.max(fw / img.naturalWidth, fh / img.naturalHeight);
+    _prodCropScale = fitScale;
+    _prodCropX = (fw - img.naturalWidth * fitScale) / 2;
+    _prodCropY = (fh - img.naturalHeight * fitScale) / 2;
+    zoom.min = fitScale;
+    zoom.max = fitScale * 4;
+    zoom.step = fitScale * 0.01;
+    zoom.value = fitScale;
+    applyProductCropTransform();
+    img.style.display = 'block';
     placeholder.style.display = 'none';
+    document.getElementById('uploadCropControls').style.display = 'flex';
+    frame.classList.add('has-image');
   };
-  reader.readAsDataURL(file);
-  document.getElementById('uploadStatus').textContent = '图片已选择，保存时自动上传';
+  img.src = url;
+}
+
+function applyProductCropTransform() {
+  const img = document.getElementById('uploadPreview');
+  const frame = document.getElementById('uploadArea');
+  if (!img.naturalWidth) return;
+  const fw = frame.clientWidth, fh = frame.clientHeight;
+  const iw = img.naturalWidth * _prodCropScale, ih = img.naturalHeight * _prodCropScale;
+  _prodCropX = Math.min(0, Math.max(fw - iw, _prodCropX));
+  _prodCropY = Math.min(0, Math.max(fh - ih, _prodCropY));
+  img.style.width = iw + 'px';
+  img.style.height = ih + 'px';
+  img.style.left = _prodCropX + 'px';
+  img.style.top = _prodCropY + 'px';
+}
+
+function resetProductCropState() {
+  _prodCropScale = 1; _prodCropX = 0; _prodCropY = 0; _prodImgDirty = false;
+  document.getElementById('uploadArea').classList.remove('has-image');
+  document.getElementById('uploadCropControls').style.display = 'none';
+}
+
+// 把裁剪框当前显示的内容烘焙成一张 4:3 的图
+async function bakeProductCrop() {
+  const img = document.getElementById('uploadPreview');
+  const frame = document.getElementById('uploadArea');
+  const fw = frame.clientWidth, fh = frame.clientHeight;
+  const outW = 1200, outH = Math.round(outW * fh / fw);
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(outW / fw, outH / fh);
+  ctx.translate(_prodCropX, _prodCropY);
+  ctx.scale(_prodCropScale, _prodCropScale);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
+  return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.82));
 }
 
 async function uploadImageIfNeeded() {
-  const file = document.getElementById('imageFileInput').files[0];
   const oldUrl = document.getElementById('modalImage').value || null;
-  if (!file) return oldUrl;
+  const img = document.getElementById('uploadPreview');
+  const hasImage = img.style.display !== 'none' && !!img.src;
+  if (!hasImage) return null;
+  if (!_prodImgDirty) return oldUrl;
   document.getElementById('uploadStatus').textContent = '上传中...';
-  const compressed = await compressImage(file);
+  const blob = await bakeProductCrop();
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-  const { error } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
+  const { error } = await db.storage.from('product-images').upload(filename, blob, { contentType: 'image/jpeg' });
   if (error) { showToast('图片上传失败'); return oldUrl; }
   const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
   document.getElementById('uploadStatus').textContent = '上传成功';
@@ -1963,6 +2066,49 @@ document.addEventListener('DOMContentLoaded', () => {
   enableDropUpload(document.getElementById('uploadArea'), document.getElementById('imageFileInput'), false);
   enableDropUpload(document.getElementById('detailUploadArea'), document.getElementById('detailImageFileInput'), true);
   enableDropUpload(document.getElementById('catUploadArea'), document.getElementById('catImageInput'), false);
+
+  // 商品主图裁剪框：拖动改位置、滚轮/滑块缩放
+  const cropFrame = document.getElementById('uploadArea');
+  const cropZoom = document.getElementById('uploadZoom');
+
+  cropZoom.addEventListener('input', function() {
+    _prodCropScale = parseFloat(this.value);
+    applyProductCropTransform();
+    _prodImgDirty = true;
+  });
+
+  cropFrame.addEventListener('wheel', e => {
+    if (!cropFrame.classList.contains('has-image')) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+    _prodCropScale = Math.max(parseFloat(cropZoom.min), Math.min(parseFloat(cropZoom.max), _prodCropScale + delta * _prodCropScale));
+    cropZoom.value = _prodCropScale;
+    applyProductCropTransform();
+    _prodImgDirty = true;
+  }, { passive: false });
+
+  cropFrame.addEventListener('pointerdown', e => {
+    if (!cropFrame.classList.contains('has-image')) return;
+    e.preventDefault();
+    _prodDragging = true;
+    _prodDragStart = { x: e.clientX, y: e.clientY, cropX: _prodCropX, cropY: _prodCropY };
+    cropFrame.classList.add('dragging');
+    cropFrame.setPointerCapture(e.pointerId);
+  });
+  cropFrame.addEventListener('pointermove', e => {
+    if (!_prodDragging) return;
+    _prodCropX = _prodDragStart.cropX + (e.clientX - _prodDragStart.x);
+    _prodCropY = _prodDragStart.cropY + (e.clientY - _prodDragStart.y);
+    applyProductCropTransform();
+  });
+  const endProductDrag = () => {
+    if (!_prodDragging) return;
+    _prodDragging = false;
+    cropFrame.classList.remove('dragging');
+    _prodImgDirty = true;
+  };
+  cropFrame.addEventListener('pointerup', endProductDrag);
+  cropFrame.addEventListener('pointercancel', endProductDrag);
 });
 
 // 初始化
