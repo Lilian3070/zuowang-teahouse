@@ -863,7 +863,8 @@ footer {
 .modal-view-toggle {
   display: none; /* 只有一排只能放下一个商品时，由 JS 显示出来 */
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
   flex-shrink: 0;
   margin: -20px 0 20px;
 }
@@ -872,11 +873,11 @@ footer {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 5px;
   background: var(--paper);
   color: var(--ink-soft);
   cursor: pointer;
