@@ -38,7 +38,7 @@ async function refreshAccountNav() {
   if (!user) { currentAccountRole = null; link.textContent = '登录'; return; }
   const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).maybeSingle();
   currentAccountRole = profile ? profile.role : null;
-  link.textContent = currentAccountRole === 'admin' ? '进入后台' : currentAccountRole === 'member' ? '会员中心' : '登录';
+  link.textContent = currentAccountRole === 'admin' ? '管理中心' : currentAccountRole === 'member' ? '知音中心' : '登录';
 }
 
 function onNavAccountClick(event) {
