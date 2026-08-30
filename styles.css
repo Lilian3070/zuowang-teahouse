@@ -337,9 +337,6 @@ section {
   color: var(--ink-soft);
   font-size: 0.94rem;
   margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* two-column (guqin / booking) */
