@@ -557,7 +557,11 @@
     </div>
     <div class="form-group">
       <label>密码</label>
-      <input type="password" id="loginPassword" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="password" id="loginPassword" autocomplete="off" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="form-group" style="display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="rememberLoginCheckbox" style="width:auto">
+      <label for="rememberLoginCheckbox" style="margin:0;font-size:13px">记住密码（仅限本人设备，公用电脑请勿勾选）</label>
     </div>
     <button class="btn-primary" onclick="doLogin()">登录</button>
     <div class="error-msg" id="loginError"></div>
@@ -854,7 +858,19 @@
 const SUPABASE_URL = 'https://wmatsdnpbpcltuoynyrh.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl';
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+// 登录状态存哪里由"记住密码"勾选框决定：勾了存 localStorage（关浏览器也不用重登），
+// 不勾存 sessionStorage（关掉标签页/浏览器就清空，不会留在别人打开的同一台设备上）
+const authStorage = {
+  getItem: (key) => localStorage.getItem(key) ?? sessionStorage.getItem(key),
+  setItem: (key, value) => {
+    (localStorage.getItem('rememberLogin') === '1' ? localStorage : sessionStorage).setItem(key, value);
+  },
+  removeItem: (key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  },
+};
+const db = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: authStorage } });
 
 let currentTab = 'tea';
 let currentFilter = null;
@@ -887,15 +903,37 @@ async function doLogin() {
   const password = document.getElementById('loginPassword').value;
   document.getElementById('loginError').textContent = '';
   if (!email || !password) { document.getElementById('loginError').textContent = '请填写邮箱和密码'; return; }
+  localStorage.setItem('rememberLogin', document.getElementById('rememberLoginCheckbox').checked ? '1' : '0');
   const { error } = await db.auth.signInWithPassword({ email, password });
   if (error) { document.getElementById('loginError').textContent = '邮箱或密码错误'; return; }
+  // 新设备登录成功后，把这个账号在其他设备上的登录状态都踢掉，同一账号同时只保留一处登录
+  await db.auth.signOut({ scope: 'others' });
   showAdmin();
 }
 
 async function doLogout() {
-  await db.auth.signOut();
+  stopSessionWatch();
+  await db.auth.signOut({ scope: 'local' });
   document.getElementById('adminPage').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
+}
+
+let sessionWatchTimer = null;
+function startSessionWatch() {
+  if (sessionWatchTimer) return;
+  sessionWatchTimer = setInterval(async () => {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) {
+      stopSessionWatch();
+      await db.auth.signOut({ scope: 'local' });
+      document.getElementById('adminPage').style.display = 'none';
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('loginError').textContent = '此账号已在其他设备登录，本设备已自动退出';
+    }
+  }, 3 * 60 * 1000);
+}
+function stopSessionWatch() {
+  if (sessionWatchTimer) { clearInterval(sessionWatchTimer); sessionWatchTimer = null; }
 }
 
 async function showAdmin() {
@@ -903,7 +941,7 @@ async function showAdmin() {
   if (!user) return;
   const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).maybeSingle();
   if (!profile || profile.role !== 'admin') {
-    await db.auth.signOut();
+    await db.auth.signOut({ scope: 'local' });
     document.getElementById('loginError').textContent = '此账号不是管理员';
     document.getElementById('adminPage').style.display = 'none';
     document.getElementById('loginPage').style.display = 'flex';
@@ -912,6 +950,7 @@ async function showAdmin() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('adminPage').style.display = 'block';
   document.getElementById('userEmail').textContent = user.email;
+  startSessionWatch();
   await loadCategories();
   await loadProducts();
 }

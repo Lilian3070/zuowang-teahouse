@@ -61,9 +61,22 @@
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
 <script>
+// 登录状态存哪里由首页登录时的"记住密码"勾选决定，这里跟首页/后台用同一套判断逻辑，
+// 否则这边会读不到首页写的登录状态
+const authStorage = {
+  getItem: (key) => localStorage.getItem(key) ?? sessionStorage.getItem(key),
+  setItem: (key, value) => {
+    (localStorage.getItem('rememberLogin') === '1' ? localStorage : sessionStorage).setItem(key, value);
+  },
+  removeItem: (key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  },
+};
 const db = supabase.createClient(
   'https://wmatsdnpbpcltuoynyrh.supabase.co',
-  'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl'
+  'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl',
+  { auth: { storage: authStorage } }
 );
 
 function showGate(message) {
@@ -72,8 +85,22 @@ function showGate(message) {
   document.getElementById('memberPage').style.display = 'none';
 }
 
+let sessionWatchTimer = null;
+function startSessionWatch() {
+  if (sessionWatchTimer) return;
+  sessionWatchTimer = setInterval(async () => {
+    const { data: { user } } = await db.auth.getUser();
+    if (!user) {
+      clearInterval(sessionWatchTimer);
+      await db.auth.signOut({ scope: 'local' });
+      showGate('此账号已在其他设备登录，本设备已自动退出');
+    }
+  }, 3 * 60 * 1000);
+}
+
 async function doMemberLogout() {
-  await db.auth.signOut();
+  if (sessionWatchTimer) clearInterval(sessionWatchTimer);
+  await db.auth.signOut({ scope: 'local' });
   location.href = 'index.html';
 }
 
@@ -86,6 +113,7 @@ async function init() {
 
   document.getElementById('gateBox').style.display = 'none';
   document.getElementById('memberPage').style.display = 'block';
+  startSessionWatch();
 
   const [{ data: packages }, { data: purchases }] = await Promise.all([
     db.from('class_packages').select('*').eq('member_id', profile.member_id).order('created_at'),

@@ -310,7 +310,11 @@
       <label for="acctLoginAccount">邮箱或手机号</label>
       <input type="text" id="acctLoginAccount" autocomplete="username" required>
       <label for="acctLoginPassword">密码</label>
-      <input type="password" id="acctLoginPassword" autocomplete="current-password" required>
+      <input type="password" id="acctLoginPassword" autocomplete="off" required>
+      <label style="display:flex;align-items:center;gap:6px;margin:14px 0 0;font-size:0.85rem;color:var(--ink-soft)">
+        <input type="checkbox" id="acctRememberLogin" style="width:auto;margin:0">
+        记住密码（仅限本人设备）
+      </label>
       <button type="submit" class="submit-btn">登录</button>
       <p class="account-error" id="acctLoginError"></p>
     </form>
@@ -341,6 +345,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=16"></script>
+<script src="script.js?v=17"></script>
 </body>
 </html>

@@ -1,6 +1,20 @@
+// 登录状态存哪里由"记住密码"勾选框决定：勾了存 localStorage（关浏览器也不用重登），
+// 不勾存 sessionStorage（关掉标签页/浏览器就清空，不会留在别人打开的同一台设备上）。
+// admin.html / member.html 用的是同一套逻辑，三处必须保持一致，否则互相读不到登录状态。
+const authStorage = {
+  getItem: (key) => localStorage.getItem(key) ?? sessionStorage.getItem(key),
+  setItem: (key, value) => {
+    (localStorage.getItem('rememberLogin') === '1' ? localStorage : sessionStorage).setItem(key, value);
+  },
+  removeItem: (key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  },
+};
 const db = supabase.createClient(
   'https://wmatsdnpbpcltuoynyrh.supabase.co',
-  'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl'
+  'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl',
+  { auth: { storage: authStorage } }
 );
 
 // 手机网络偶尔抖动会导致单次请求失败，失败时自动重试几次，避免某个板块的内容永久空白
@@ -91,6 +105,8 @@ async function doAccountLogin(event) {
   const account = document.getElementById('acctLoginAccount').value.trim();
   const password = document.getElementById('acctLoginPassword').value;
   const errEl = document.getElementById('acctLoginError');
+  const remember = document.getElementById('acctRememberLogin').checked;
+  localStorage.setItem('rememberLogin', remember ? '1' : '0');
   const { error } = await db.auth.signInWithPassword({ email: accountToAuthEmail(account), password });
   if (error) {
     loginFailCount++;
@@ -103,6 +119,8 @@ async function doAccountLogin(event) {
     return false;
   }
   loginFailCount = 0;
+  // 新设备登录成功后，把这个账号在其他设备上的登录状态都踢掉，同一账号同时只保留一处登录
+  await db.auth.signOut({ scope: 'others' });
   await refreshAccountNav();
   if (currentAccountRole) {
     closeAccountModal();
