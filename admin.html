@@ -26,7 +26,7 @@
   /* 登录页 */
   #loginPage {
     min-height: 100vh;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
   }
@@ -937,7 +937,7 @@ function stopSessionWatch() {
 
 async function showAdmin() {
   const { data: { user } } = await db.auth.getUser();
-  if (!user) return;
+  if (!user) { document.getElementById('loginPage').style.display = 'flex'; return; }
   const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).maybeSingle();
   if (!profile || profile.role !== 'admin') {
     await db.auth.signOut({ scope: 'local' });
@@ -2325,10 +2325,15 @@ document.addEventListener('DOMContentLoaded', () => {
   cropFrame.addEventListener('pointercancel', endProductDrag);
 });
 
-// 初始化
+// 初始化：登录状态在确认清楚之前，登录框和后台都先不显示，避免"先闪一下登录框
+// 再跳进后台"这种视觉抖动（getSession/getUser 都是要等网络请求回来的异步调用）
 (async () => {
   const { data: { session } } = await db.auth.getSession();
-  if (session) { showAdmin(); }
+  if (session) {
+    await showAdmin();
+  } else {
+    document.getElementById('loginPage').style.display = 'flex';
+  }
 })();
 
 // 通过邀请/重置密码链接进入时，自动弹出设置密码窗口
