@@ -113,11 +113,6 @@ async function init() {
 
   document.getElementById('gateBox').style.display = 'none';
   document.getElementById('memberPage').style.display = 'block';
-  // 只有刚登录/注册成功落地到这里才踢其他设备，避免每次刷新页面都误伤正在用的其他设备
-  if (sessionStorage.getItem('justLoggedIn') === '1') {
-    sessionStorage.removeItem('justLoggedIn');
-    await db.auth.signOut({ scope: 'others' });
-  }
   startSessionWatch();
 
   const [{ data: packages }, { data: purchases }] = await Promise.all([

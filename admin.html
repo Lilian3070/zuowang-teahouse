@@ -924,11 +924,6 @@ async function showAdmin() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('adminPage').style.display = 'block';
   document.getElementById('userEmail').textContent = user.email;
-  // 只有刚登录成功落地到这里才踢其他设备，避免每次刷新/重新打开页面都误伤正在用的其他设备
-  if (sessionStorage.getItem('justLoggedIn') === '1') {
-    sessionStorage.removeItem('justLoggedIn');
-    await db.auth.signOut({ scope: 'others' });
-  }
   startSessionWatch();
   await loadCategories();
   await loadProducts();
