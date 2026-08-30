@@ -1317,6 +1317,16 @@ async function saveProduct() {
       const removePaths = toRemove.map(storagePathFromUrl).filter(Boolean);
       if (removePaths.length) db.storage.from('product-images').remove(removePaths);
 
+      // 换成正式链接前先在背后把图片预加载/解码好，真正切换时浏览器直接用缓存，不会看到"慢慢加载"
+      if (bakedBlob) {
+        await new Promise(resolve => {
+          const preloadImg = new Image();
+          preloadImg.onload = resolve;
+          preloadImg.onerror = resolve;
+          preloadImg.src = finalImageUrl;
+        });
+      }
+
       const realId = wasEditingId || insertedRow.id;
       const cachedNow = tabProductsCache[currentTab]?.find(p => p.id === rowId);
       if (cachedNow) {
