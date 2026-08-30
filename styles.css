@@ -555,12 +555,22 @@ section {
 .booking-form textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(43, 40, 34, 0.35);
   border-radius: 4px;
   background: #fff;
   font-family: inherit;
   font-size: 0.95rem;
   color: var(--ink);
+}
+
+/* 输入框边框原来用的是 --line（0.14 透明度），在部分显示器上跟表单浅色背景
+   区分不明显，看起来像没有输入框。上面加深到 0.35，这里再加个聚焦态高亮兜底。 */
+.booking-form input:focus,
+.booking-form select:focus,
+.booking-form textarea:focus {
+  outline: none;
+  border-color: var(--seal);
+  box-shadow: 0 0 0 2px rgba(163, 49, 42, 0.12);
 }
 
 .booking-form textarea { resize: vertical; min-height: 70px; }
