@@ -95,6 +95,7 @@ async function redeemPendingOrCode(code, loginAccount, errElId = 'acctLoginError
   const { error } = await db.rpc('redeem_invite_code', { invite_code: code, p_login_account: loginAccount });
   if (error) { errEl.textContent = error.message || '密钥无效或已被使用'; return; }
   try { localStorage.removeItem('pendingInviteCode'); } catch (e) {}
+  sessionStorage.setItem('justLoggedIn', '1');
   closeAccountModal();
   await refreshAccountNav();
   location.href = 'member.html';
@@ -119,8 +120,11 @@ async function doAccountLogin(event) {
     return false;
   }
   loginFailCount = 0;
-  // 新设备登录成功后，把这个账号在其他设备上的登录状态都踢掉，同一账号同时只保留一处登录
-  await db.auth.signOut({ scope: 'others' });
+  // "踢掉其他设备"放到落地页（admin.html/member.html）确认完自己的身份之后再做，
+  // 不在这里跳转前做——实测这里调用 signOut({scope:'others'}) 紧接着跳页面，会把
+  // 刚建好的本机登录状态也一起冲掉，导致跳过去还要再登一次。用这个标记告诉落地页
+  // "我是刚登录的，该踢一下其他设备了"。
+  sessionStorage.setItem('justLoggedIn', '1');
   await refreshAccountNav();
   if (currentAccountRole) {
     closeAccountModal();

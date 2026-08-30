@@ -906,8 +906,7 @@ async function doLogin() {
   localStorage.setItem('rememberLogin', document.getElementById('rememberLoginCheckbox').checked ? '1' : '0');
   const { error } = await db.auth.signInWithPassword({ email, password });
   if (error) { document.getElementById('loginError').textContent = '邮箱或密码错误'; return; }
-  // 新设备登录成功后，把这个账号在其他设备上的登录状态都踢掉，同一账号同时只保留一处登录
-  await db.auth.signOut({ scope: 'others' });
+  sessionStorage.setItem('justLoggedIn', '1');
   showAdmin();
 }
 
@@ -950,6 +949,11 @@ async function showAdmin() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('adminPage').style.display = 'block';
   document.getElementById('userEmail').textContent = user.email;
+  // 只有刚登录成功落地到这里才踢其他设备，避免每次刷新/重新打开页面都误伤正在用的其他设备
+  if (sessionStorage.getItem('justLoggedIn') === '1') {
+    sessionStorage.removeItem('justLoggedIn');
+    await db.auth.signOut({ scope: 'others' });
+  }
   startSessionWatch();
   await loadCategories();
   await loadProducts();
