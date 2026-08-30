@@ -850,7 +850,6 @@ let currentFilter = null;
 let editingId = null;
 let detailImages = []; // [{ url } for saved images | { file, previewUrl } for pending uploads]
 let pendingImageRemovals = [];
-let newUploadsThisSave = []; // 本次保存中新上传的文件，若数据库写入失败要回滚删除，避免孤儿文件
 
 // 商品主图裁剪状态
 let _prodCropScale = 1, _prodCropX = 0, _prodCropY = 0;
@@ -1206,96 +1205,147 @@ async function bakeProductCrop() {
   return new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.82));
 }
 
-async function uploadImageIfNeeded() {
-  const oldUrl = document.getElementById('modalImage').value || null;
-  const img = document.getElementById('uploadPreview');
-  const hasImage = img.style.display !== 'none' && !!img.src;
-  if (!hasImage) return null;
-  if (!_prodImgDirty) return oldUrl;
-  document.getElementById('uploadStatus').textContent = '上传中...';
-  const blob = await bakeProductCrop();
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-  const { error } = await db.storage.from('product-images').upload(filename, blob, { contentType: 'image/jpeg' });
-  if (error) { showToast('图片上传失败'); return oldUrl; }
-  const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
-  document.getElementById('uploadStatus').textContent = '上传成功';
-  if (oldUrl) pendingImageRemovals.push(oldUrl);
-  newUploadsThisSave.push(publicUrl);
-  return publicUrl;
-}
-
-async function uploadDetailImagesIfNeeded() {
+// 详情图快照上传：只处理还没有 url（新选的）的项，已有 url 的原样返回
+async function uploadDetailImagesFromSnapshot(snapshot) {
   const urls = [];
-  for (const item of detailImages) {
+  const uploadedUrls = [];
+  for (const item of snapshot) {
     if (item.url) { urls.push(item.url); continue; }
     const compressed = await compressImage(item.file);
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
     const { error } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
-    if (error) { showToast('详情图片上传失败'); continue; }
+    if (error) continue;
     const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
     urls.push(publicUrl);
-    newUploadsThisSave.push(publicUrl);
+    uploadedUrls.push(publicUrl);
   }
-  return urls;
+  return { urls, uploadedUrls };
 }
 
+// 保存商品：界面立刻乐观更新+关闭弹窗，图片上传和数据库写入放到后台去做，
+// 不让用户等网络（跟显示/隐藏切换的丝滑原则一致）。失败了再提示并把界面改回去。
 async function saveProduct() {
   const name = document.getElementById('modalName').value.trim();
   if (!name) { showToast('请填写商品名称'); return; }
-  newUploadsThisSave = [];
-  const imageUrl = await uploadImageIfNeeded();
-  const detailImageUrls = await uploadDetailImagesIfNeeded();
-  const payload = {
-    category_key: document.getElementById('modalCategory').value,
+
+  const wasEditingId = editingId;
+  const catKey = document.getElementById('modalCategory').value;
+  const catName = categoriesCache.find(c => c.key === catKey)?.name || '';
+  const basePayload = {
+    category_key: catKey,
     name,
     description: document.getElementById('modalDesc').value.trim() || null,
     price: document.getElementById('modalPrice').value.trim() || null,
-    image_url: imageUrl,
-    detail_images: detailImageUrls,
   };
-  if (!editingId) payload.is_visible = true;
-  let error, insertedRow;
-  if (editingId) {
-    ({ error } = await db.from('products').update(payload).eq('id', editingId));
-  } else {
-    ({ data: insertedRow, error } = await db.from('products').insert(payload).select().single());
+  if (!wasEditingId) basePayload.is_visible = true;
+
+  // 主图：本地烘焙（纯 canvas，很快），生成本地预览 URL 立刻展示；真正上传放到后台
+  const oldImageUrl = document.getElementById('modalImage').value || null;
+  const imgEl = document.getElementById('uploadPreview');
+  const hasImage = imgEl.style.display !== 'none' && !!imgEl.src;
+  let bakedBlob = null, optimisticImageUrl = null;
+  if (hasImage && _prodImgDirty) {
+    bakedBlob = await bakeProductCrop();
+    optimisticImageUrl = URL.createObjectURL(bakedBlob);
+  } else if (hasImage) {
+    optimisticImageUrl = oldImageUrl;
   }
-  if (error) {
-    showToast('保存失败：' + error.message);
-    const orphans = newUploadsThisSave.map(storagePathFromUrl).filter(Boolean);
-    if (orphans.length) db.storage.from('product-images').remove(orphans);
-    return;
-  }
-  const wasEditingId = editingId;
-  showToast(wasEditingId ? '商品已更新' : '商品已添加');
-  const toRemove = pendingImageRemovals.map(storagePathFromUrl).filter(Boolean);
-  if (toRemove.length) db.storage.from('product-images').remove(toRemove);
+
+  // 详情图：拍个快照，真正上传也放到后台
+  const detailSnapshot = detailImages.map(item => ({ ...item }));
+  const detailRemovals = pendingImageRemovals.slice();
+  const optimisticDetailUrls = detailSnapshot.filter(item => item.url).map(item => item.url);
+
+  const optimisticPayload = { ...basePayload, image_url: optimisticImageUrl, detail_images: optimisticDetailUrls };
+  const cache = tabProductsCache[currentTab];
   closeModal();
 
-  const catName = categoriesCache.find(c => c.key === payload.category_key)?.name || '';
-  const cache = tabProductsCache[currentTab];
+  let rowId = wasEditingId;
+  let originalCachedSnapshot = null;
   if (wasEditingId) {
     const cached = cache?.find(p => p.id === wasEditingId);
-    if (cached) Object.assign(cached, payload, { categories: { name: catName } });
+    if (cached) {
+      originalCachedSnapshot = { ...cached };
+      Object.assign(cached, optimisticPayload, { categories: { name: catName } });
+    }
     const row = document.querySelector(`.product-row[data-id="${wasEditingId}"]`);
-    const stillMatchesFilter = !currentFilter || currentFilter === payload.category_key;
+    const stillMatchesFilter = !currentFilter || currentFilter === catKey;
     if (row) {
-      if (stillMatchesFilter) row.outerHTML = productRowHtml(cached || { ...payload, id: wasEditingId });
+      if (stillMatchesFilter) row.outerHTML = productRowHtml(cached || { ...optimisticPayload, id: wasEditingId });
       else { row.remove(); refreshEmptyStateIfNeeded(); }
     }
-  } else if (insertedRow) {
-    const newProduct = { ...insertedRow, categories: { name: catName } };
-    if (cache) cache.unshift(newProduct);
-    if (!currentFilter || currentFilter === newProduct.category_key) {
+  } else {
+    rowId = 'temp_' + Date.now();
+    const tempProduct = { ...optimisticPayload, id: rowId, categories: { name: catName }, sort_order: 0 };
+    if (cache) cache.unshift(tempProduct);
+    if (!currentFilter || currentFilter === catKey) {
       const list = document.getElementById('sortableList');
-      if (list) {
-        list.insertAdjacentHTML('afterbegin', productRowHtml(newProduct));
-        initDragSort();
-      } else {
-        renderProducts([newProduct]);
-      }
+      if (list) { list.insertAdjacentHTML('afterbegin', productRowHtml(tempProduct)); initDragSort(); }
+      else { renderProducts([tempProduct]); }
     }
   }
+
+  // 后台：真正上传 + 写数据库
+  (async () => {
+    const uploadedUrls = [];
+    try {
+      let finalImageUrl = optimisticImageUrl;
+      if (bakedBlob) {
+        const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+        const { error } = await db.storage.from('product-images').upload(filename, bakedBlob, { contentType: 'image/jpeg' });
+        if (error) throw error;
+        finalImageUrl = db.storage.from('product-images').getPublicUrl(filename).data.publicUrl;
+        uploadedUrls.push(finalImageUrl);
+      }
+      const { urls: finalDetailUrls, uploadedUrls: detailUploaded } = await uploadDetailImagesFromSnapshot(detailSnapshot);
+      uploadedUrls.push(...detailUploaded);
+
+      const finalPayload = { ...basePayload, image_url: finalImageUrl, detail_images: finalDetailUrls };
+      let error, insertedRow;
+      if (wasEditingId) {
+        ({ error } = await db.from('products').update(finalPayload).eq('id', wasEditingId));
+      } else {
+        ({ data: insertedRow, error } = await db.from('products').insert(finalPayload).select().single());
+      }
+      if (error) throw error;
+
+      showToast(wasEditingId ? '商品已更新' : '商品已添加');
+
+      const toRemove = [];
+      if (bakedBlob && oldImageUrl) toRemove.push(oldImageUrl);
+      toRemove.push(...detailRemovals);
+      const removePaths = toRemove.map(storagePathFromUrl).filter(Boolean);
+      if (removePaths.length) db.storage.from('product-images').remove(removePaths);
+
+      const realId = wasEditingId || insertedRow.id;
+      const cachedNow = tabProductsCache[currentTab]?.find(p => p.id === rowId);
+      if (cachedNow) {
+        cachedNow.id = realId;
+        cachedNow.image_url = finalImageUrl;
+        cachedNow.detail_images = finalDetailUrls;
+        if (insertedRow) { cachedNow.sort_order = insertedRow.sort_order; cachedNow.created_at = insertedRow.created_at; }
+      }
+      const rowEl = document.querySelector(`.product-row[data-id="${rowId}"]`);
+      if (rowEl && cachedNow) rowEl.outerHTML = productRowHtml(cachedNow);
+      if (bakedBlob) URL.revokeObjectURL(optimisticImageUrl);
+    } catch (err) {
+      showToast('保存失败：' + (err?.message || '网络错误'));
+      if (uploadedUrls.length) db.storage.from('product-images').remove(uploadedUrls.map(storagePathFromUrl).filter(Boolean));
+      if (bakedBlob) URL.revokeObjectURL(optimisticImageUrl);
+      if (wasEditingId) {
+        const cached = tabProductsCache[currentTab]?.find(p => p.id === wasEditingId);
+        if (cached && originalCachedSnapshot) Object.assign(cached, originalCachedSnapshot);
+        const rowEl = document.querySelector(`.product-row[data-id="${wasEditingId}"]`);
+        if (rowEl && cached) rowEl.outerHTML = productRowHtml(cached);
+        else loadProducts(true);
+      } else {
+        const cache2 = tabProductsCache[currentTab];
+        if (cache2) { const idx = cache2.findIndex(p => p.id === rowId); if (idx > -1) cache2.splice(idx, 1); }
+        document.querySelector(`.product-row[data-id="${rowId}"]`)?.remove();
+        refreshEmptyStateIfNeeded();
+      }
+    }
+  })();
 }
 
 function refreshEmptyStateIfNeeded() {
