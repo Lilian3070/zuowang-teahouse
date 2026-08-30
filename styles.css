@@ -337,6 +337,9 @@ section {
   color: var(--ink-soft);
   font-size: 0.94rem;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* two-column (guqin / booking) */
@@ -896,6 +899,7 @@ footer {
 
 .product-category {
   display: inline-block;
+  max-width: 100%;
   font-size: 0.72rem;
   letter-spacing: 0.05em;
   color: var(--seal);
@@ -904,6 +908,10 @@ footer {
   padding: 4px 10px;
   margin: 0 0 10px;
   line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
 }
 
 .product-body h4 {
