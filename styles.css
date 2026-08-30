@@ -844,6 +844,46 @@ footer {
 
 .modal-close:hover { color: var(--seal); }
 
+.account-modal-panel {
+  max-width: 380px;
+  padding: 46px 36px;
+}
+
+.account-tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-tab {
+  background: none;
+  border: none;
+  padding: 0 0 12px;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.account-tab.active {
+  color: var(--seal);
+  border-bottom-color: var(--seal);
+}
+
+.account-hint {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.account-error {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--seal);
+  min-height: 1em;
+}
+
 .modal-header {
   flex-shrink: 0;
 }

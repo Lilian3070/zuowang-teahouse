@@ -13,6 +13,111 @@ async function fetchWithRetry(queryFn, retries = 2, delayMs = 800) {
   return null;
 }
 
+// 账号入口：识别当前登录人是管理员还是会员，决定导航栏那个按钮点了之后去哪
+let currentAccountRole = null; // 'admin' | 'member' | null（未登录或还没有角色记录）
+
+async function refreshAccountNav() {
+  const link = document.getElementById('navAccountLink');
+  if (!link) return;
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { currentAccountRole = null; link.textContent = '登录'; return; }
+  const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).maybeSingle();
+  currentAccountRole = profile ? profile.role : null;
+  link.textContent = currentAccountRole === 'admin' ? '进入后台' : currentAccountRole === 'member' ? '会员中心' : '登录';
+}
+
+function onNavAccountClick(event) {
+  event.preventDefault();
+  if (currentAccountRole === 'admin') { location.href = 'admin.html'; return; }
+  if (currentAccountRole === 'member') { location.href = 'member.html'; return; }
+  openAccountModal();
+}
+
+function openAccountModal() {
+  switchAccountTab('login');
+  const modal = document.getElementById('accountModal');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeAccountModal() {
+  const modal = document.getElementById('accountModal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function switchAccountTab(tab) {
+  document.querySelectorAll('.account-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('loginForm').style.display = tab === 'login' ? '' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('acctLoginError').textContent = '';
+  document.getElementById('acctRegisterError').textContent = '';
+}
+
+// 密钥注册后是否立刻建好会员身份，取决于 Supabase 是否要求邮箱确认：
+// 免确认的话 signUp 直接带回 session，当场兑换密钥；要确认的话就先记住这个密钥，
+// 等她点完邮箱确认链接、回来登录成功那一刻再补上兑换。
+async function redeemPendingOrCode(code) {
+  const errEl = document.getElementById('acctLoginError');
+  const { error } = await db.rpc('redeem_invite_code', { invite_code: code });
+  if (error) { errEl.textContent = error.message || '密钥无效或已被使用'; return; }
+  try { localStorage.removeItem('pendingInviteCode'); } catch (e) {}
+  closeAccountModal();
+  await refreshAccountNav();
+  location.href = 'member.html';
+}
+
+async function doAccountLogin(event) {
+  event.preventDefault();
+  const email = document.getElementById('acctLoginEmail').value.trim();
+  const password = document.getElementById('acctLoginPassword').value;
+  const errEl = document.getElementById('acctLoginError');
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) { errEl.textContent = '邮箱或密码错误'; return false; }
+  await refreshAccountNav();
+  if (currentAccountRole) {
+    closeAccountModal();
+    location.href = currentAccountRole === 'admin' ? 'admin.html' : 'member.html';
+    return false;
+  }
+  let pending = null;
+  try { pending = JSON.parse(localStorage.getItem('pendingInviteCode') || 'null'); } catch (e) {}
+  if (pending && pending.email === email) {
+    await redeemPendingOrCode(pending.code);
+    return false;
+  }
+  errEl.textContent = '此账号还没有对应的身份，请联系主理人';
+  return false;
+}
+
+async function doAccountRegister(event) {
+  event.preventDefault();
+  const code = document.getElementById('regCode').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const errEl = document.getElementById('acctRegisterError');
+  errEl.textContent = '';
+  const { data: signUpData, error: signUpError } = await db.auth.signUp({ email, password });
+  if (signUpError) { errEl.textContent = signUpError.message.includes('already') ? '该邮箱已注册' : '注册失败：' + signUpError.message; return false; }
+  if (!signUpData.session) {
+    try { localStorage.setItem('pendingInviteCode', JSON.stringify({ email, code })); } catch (e) {}
+    errEl.textContent = '注册成功，请到邮箱点击确认链接，然后回来登录完成会员激活';
+    return false;
+  }
+  const { error: redeemError } = await db.rpc('redeem_invite_code', { invite_code: code });
+  if (redeemError) { errEl.textContent = redeemError.message || '密钥无效或已被使用'; return false; }
+  closeAccountModal();
+  await refreshAccountNav();
+  location.href = 'member.html';
+  return false;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  refreshAccountNav();
+  document.getElementById('accountModalClose').addEventListener('click', closeAccountModal);
+  document.getElementById('accountModalOverlay').addEventListener('click', closeAccountModal);
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   // 无缝循环轮播 —— transform 控制，彻底消除 scrollLeft 跳帧
   function initCarousel(grid) {

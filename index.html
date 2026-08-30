@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 茶 · 器 · 琴</title>
-<link rel="stylesheet" href="styles.css?v=22">
+<link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
 
@@ -56,6 +56,7 @@
         <li><a href="#contact-address">茗舍地址</a></li>
       </ul>
     </li>
+    <li><a href="#" id="navAccountLink" onclick="onNavAccountClick(event)">登录</a></li>
   </ul>
 </nav>
 
@@ -296,7 +297,39 @@
   </div>
 </div>
 
+<div class="brand-modal account-modal" id="accountModal" aria-hidden="true">
+  <div class="brand-modal-overlay" id="accountModalOverlay"></div>
+  <div class="brand-modal-panel account-modal-panel" role="dialog" aria-modal="true">
+    <button class="modal-close" id="accountModalClose" type="button" aria-label="关闭">✕</button>
+    <div class="account-tabs">
+      <button type="button" class="account-tab active" data-tab="login" onclick="switchAccountTab('login')">登录</button>
+      <button type="button" class="account-tab" data-tab="register" onclick="switchAccountTab('register')">会员注册</button>
+    </div>
+
+    <form class="account-form booking-form" id="loginForm" onsubmit="return doAccountLogin(event)">
+      <label for="acctLoginEmail">邮箱</label>
+      <input type="email" id="acctLoginEmail" required>
+      <label for="acctLoginPassword">密码</label>
+      <input type="password" id="acctLoginPassword" required>
+      <button type="submit" class="submit-btn">登录</button>
+      <p class="account-error" id="acctLoginError"></p>
+    </form>
+
+    <form class="account-form booking-form" id="registerForm" style="display:none" onsubmit="return doAccountRegister(event)">
+      <p class="account-hint">凭主理人给到的一次性密钥完成会员注册。</p>
+      <label for="regCode">密钥</label>
+      <input type="text" id="regCode" required>
+      <label for="regEmail">邮箱</label>
+      <input type="email" id="regEmail" required>
+      <label for="regPassword">设置密码</label>
+      <input type="password" id="regPassword" required minlength="6">
+      <button type="submit" class="submit-btn">注册</button>
+      <p class="account-error" id="acctRegisterError"></p>
+    </form>
+  </div>
+</div>
+
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=13"></script>
+<script src="script.js?v=14"></script>
 </body>
 </html>

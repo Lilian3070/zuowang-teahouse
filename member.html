@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会员中心 · 坐忘茗舍</title>
+<link rel="stylesheet" href="styles.css?v=23">
+<style>
+  body { min-height: 100vh; }
+  .member-page { max-width: 640px; margin: 0 auto; padding: 100px 24px 80px; }
+  .member-top-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px; background: var(--paper); border-bottom: 1px solid var(--line);
+  }
+  .member-top-bar .brand { font-size: 1.1rem; }
+  .member-top-bar-actions button {
+    background: none; border: none; font-size: 0.85rem; color: var(--ink-soft);
+    cursor: pointer; margin-left: 16px;
+  }
+  .member-top-bar-actions button:hover { color: var(--seal); }
+  .member-section { margin-bottom: 40px; }
+  .member-section h2 { font-size: 1.15rem; margin: 0 0 16px; }
+  .member-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .member-row:last-child { border-bottom: none; }
+  .member-row .row-name { font-weight: 500; }
+  .member-row .row-meta { font-size: 0.85rem; color: var(--ink-soft); }
+  .empty-hint { color: var(--ink-soft); font-size: 0.9rem; }
+  .gate-box { text-align: center; padding: 120px 24px; }
+  .gate-box p { color: var(--ink-soft); margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<div class="member-top-bar">
+  <span class="brand">坐忘茗舍 · 会员中心</span>
+  <div class="member-top-bar-actions">
+    <button onclick="location.href='index.html'">返回主页</button>
+    <button onclick="doMemberLogout()">退出登录</button>
+  </div>
+</div>
+
+<div id="gateBox" class="gate-box" style="display:none">
+  <p id="gateMessage">请先登录</p>
+  <a href="index.html" class="submit-btn" style="display:inline-block;width:auto;padding:12px 28px;text-decoration:none">回主页登录</a>
+</div>
+
+<div class="member-page" id="memberPage" style="display:none">
+  <div class="member-section">
+    <h2>我的课时套餐</h2>
+    <div id="packageList"><p class="empty-hint">加载中...</p></div>
+  </div>
+  <div class="member-section">
+    <h2>我的消费记录</h2>
+    <div id="purchaseList"><p class="empty-hint">加载中...</p></div>
+  </div>
+</div>
+
+<script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
+<script>
+const db = supabase.createClient(
+  'https://wmatsdnpbpcltuoynyrh.supabase.co',
+  'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl'
+);
+
+function showGate(message) {
+  document.getElementById('gateMessage').textContent = message;
+  document.getElementById('gateBox').style.display = 'block';
+  document.getElementById('memberPage').style.display = 'none';
+}
+
+async function doMemberLogout() {
+  await db.auth.signOut();
+  location.href = 'index.html';
+}
+
+async function init() {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) { showGate('请先登录会员账号'); return; }
+
+  const { data: profile } = await db.from('profiles').select('role, member_id').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'member') { showGate('此账号不是会员账号'); return; }
+
+  document.getElementById('gateBox').style.display = 'none';
+  document.getElementById('memberPage').style.display = 'block';
+
+  const [{ data: packages }, { data: purchases }] = await Promise.all([
+    db.from('class_packages').select('*').eq('member_id', profile.member_id).order('created_at'),
+    db.from('purchases').select('*').eq('member_id', profile.member_id).order('purchased_at', { ascending: false }),
+  ]);
+
+  const pkgEl = document.getElementById('packageList');
+  if (!packages || !packages.length) {
+    pkgEl.innerHTML = '<p class="empty-hint">暂无课时套餐记录</p>';
+  } else {
+    pkgEl.innerHTML = packages.map(p => `
+      <div class="member-row">
+        <span class="row-name">${p.package_name}</span>
+        <span class="row-meta">已用 ${p.used_hours} / 共 ${p.total_hours} 节 · 剩余 ${p.total_hours - p.used_hours} 节</span>
+      </div>`).join('');
+  }
+
+  const purEl = document.getElementById('purchaseList');
+  if (!purchases || !purchases.length) {
+    purEl.innerHTML = '<p class="empty-hint">暂无消费记录</p>';
+  } else {
+    purEl.innerHTML = purchases.map(p => `
+      <div class="member-row">
+        <span class="row-name">${p.item}</span>
+        <span class="row-meta">${p.purchased_at || ''}${p.amount ? ' · ¥' + p.amount : ''}</span>
+      </div>`).join('');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

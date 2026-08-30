@@ -570,6 +570,7 @@
     <div class="top-bar-title">坐忘茗舍 · 管理后台</div>
     <div class="top-bar-right">
       <span id="userEmail" style="font-size:13px;color:var(--ink-muted)"></span>
+      <button class="btn-logout" onclick="location.href='index.html'">返回主页</button>
       <button class="btn-logout" onclick="openPasswordModal()">修改密码</button>
       <button class="btn-logout" onclick="doLogout()">退出登录</button>
     </div>
@@ -769,6 +770,14 @@
     </div>
 
     <div class="member-detail-section">
+      <h4>会员登录密钥</h4>
+      <div id="inviteCodeStatus" style="font-size:13px;color:var(--ink-muted);line-height:1.8;margin-bottom:8px"></div>
+      <div class="add-inline-form">
+        <button class="btn-add-inline" onclick="generateInviteCode()">生成一次性密钥</button>
+      </div>
+    </div>
+
+    <div class="member-detail-section">
       <h4>预约上课</h4>
       <div id="upcomingList"></div>
       <div class="add-inline-form">
@@ -890,6 +899,14 @@ async function doLogout() {
 async function showAdmin() {
   const { data: { user } } = await db.auth.getUser();
   if (!user) return;
+  const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).maybeSingle();
+  if (!profile || profile.role !== 'admin') {
+    await db.auth.signOut();
+    document.getElementById('loginError').textContent = '此账号不是管理员';
+    document.getElementById('adminPage').style.display = 'none';
+    document.getElementById('loginPage').style.display = 'flex';
+    return;
+  }
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('adminPage').style.display = 'block';
   document.getElementById('userEmail').textContent = user.email;
@@ -1844,7 +1861,38 @@ async function openMemberDetail(id) {
   renderPackages(packages || []);
   renderPurchases(purchases || []);
   renderUpcoming(upcoming || []);
+  loadInviteCodeStatus();
   document.getElementById('memberDetailModal').classList.add('open');
+}
+
+// 会员登录密钥：字符集去掉了容易看错/念错的 0/O/1/I，方便当面口述或手写给客人
+function genInviteCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const arr = new Uint8Array(8);
+  crypto.getRandomValues(arr);
+  let code = '';
+  for (let i = 0; i < 8; i++) code += chars[arr[i] % chars.length];
+  return code;
+}
+
+async function loadInviteCodeStatus() {
+  const el = document.getElementById('inviteCodeStatus');
+  if (!currentMemberId) return;
+  const { data } = await db.from('invite_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false });
+  if (!data || !data.length) { el.textContent = '尚未生成过密钥'; return; }
+  el.innerHTML = data.map(c => c.is_used
+    ? `已使用：${c.code}`
+    : `<strong>${c.code}</strong>（未使用，给客人后去首页点"登录"→"会员注册"填写）`
+  ).join('<br>');
+}
+
+async function generateInviteCode() {
+  if (!currentMemberId) return;
+  const code = genInviteCode();
+  const { error } = await db.from('invite_codes').insert({ code, member_id: currentMemberId });
+  if (error) { showToast('生成失败：' + error.message); return; }
+  showToast('已生成密钥：' + code);
+  loadInviteCodeStatus();
 }
 
 function closeMemberDetail() {
