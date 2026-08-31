@@ -265,6 +265,11 @@
     display: none;
   }
   .modal-overlay.open { display: flex; }
+  .blank-key-tab {
+    background: none; border: none; padding: 0 0 10px; font-size: 14px;
+    color: var(--ink-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .blank-key-tab.active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 600; }
   .modal {
     background: white;
     border-radius: 12px;
@@ -600,12 +605,11 @@
           <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
           <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
           <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
-          <button class="btn-add" id="btnGenBlankKey" style="display:none" onclick="generateBlankInviteCode()">生成新客户注册密钥</button>
+          <button class="btn-add" id="btnGenBlankKey" style="display:none" onclick="openBlankKeyModal()">生成/查看新客户密钥</button>
         </div>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
-      <div id="blankCodesPanel" style="display:none;margin-bottom:16px"></div>
       <div class="cat-panel" id="catPanel" style="display:none">
         <div class="cat-panel-header" onclick="toggleCatPanel()" style="cursor:pointer;margin-bottom:0">
           <span>分类管理</span>
@@ -702,6 +706,31 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeCodeDisplayModal()">关闭</button>
       <button class="btn-save" onclick="copyCodeDisplayValue()">复制密钥</button>
+    </div>
+  </div>
+</div>
+
+<!-- 生成/查看新客户密钥模态框：跟首页登录/注册那样，用 tab 分"生成"和"查看"两块 -->
+<div class="modal-overlay" id="blankKeyModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-title">新客户密钥</div>
+    <div style="display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:16px">
+      <button type="button" class="blank-key-tab active" data-tab="generate" onclick="switchBlankKeyTab('generate')">生成密钥</button>
+      <button type="button" class="blank-key-tab" data-tab="view" onclick="switchBlankKeyTab('view')">待使用密钥</button>
+    </div>
+
+    <div id="blankKeyGenerateTab">
+      <p style="color:var(--ink-muted);font-size:13px;margin:0 0 14px">给完全没在系统里出现过的新客人生成一个专属密钥，注册后自动帮她建档，不用先手动建档案。</p>
+      <button class="btn-primary" onclick="generateBlankInviteCode()">+ 生成新密钥</button>
+      <div id="blankKeyResult"></div>
+    </div>
+
+    <div id="blankKeyViewTab" style="display:none">
+      <div id="blankKeyList" style="max-height:280px;overflow-y:auto"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeBlankKeyModal()">关闭</button>
     </div>
   </div>
 </div>
@@ -988,14 +1017,12 @@ async function loadProducts(forceRefresh = false) {
   const hasCached = !!tabProductsCache[currentTab];
   if (!hasCached) document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
   document.getElementById('btnGenBlankKey').style.display = 'none';
-  document.getElementById('blankCodesPanel').style.display = 'none';
 
   if (cfg.type === 'allmembers') {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = 'none';
     document.getElementById('catPanel').style.display = 'none';
     resetCatPanel();
-    loadBlankCodes();
     const btnMember = document.getElementById('btnAddMember');
     btnMember.style.display = '';
     btnMember.textContent = '+ 新建客户档案';
@@ -1910,32 +1937,61 @@ async function openNewBlankMemberPrompt() {
 }
 
 // 不挂靠任何已有档案的注册密钥：给完全没在系统里出现过的新客人用，
-// 她注册时 redeem_invite_code() 会自动新建一条空白档案绑定给她
+// 她注册时 redeem_invite_code() 会自动新建一条空白档案绑定给她。
+// 生成入口和查看入口合并到同一个模态框里，跟首页登录/注册那样用 tab 切换，
+// 避免常驻在页面上一个大大的"删除"按钮，容易被误点。
+function openBlankKeyModal() {
+  switchBlankKeyTab('generate');
+  document.getElementById('blankKeyResult').innerHTML = '';
+  document.getElementById('blankKeyModal').classList.add('open');
+}
+
+function closeBlankKeyModal() {
+  document.getElementById('blankKeyModal').classList.remove('open');
+}
+
+function switchBlankKeyTab(tab) {
+  document.querySelectorAll('.blank-key-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('blankKeyGenerateTab').style.display = tab === 'generate' ? '' : 'none';
+  document.getElementById('blankKeyViewTab').style.display = tab === 'view' ? '' : 'none';
+  if (tab === 'view') loadBlankKeyList();
+}
+
 async function generateBlankInviteCode() {
   const code = genInviteCode();
   const { error } = await db.from('invite_codes').insert({ code, member_id: null });
   if (error) { showToast('生成失败：' + error.message); return; }
-  showCodeModal('新客户注册密钥', code, '给到客人后，她在首页「登录」→「会员注册」填这个密钥即可，注册后会自动建好她自己的档案。');
-  loadBlankCodes();
+  document.getElementById('blankKeyResult').innerHTML = `
+    <div class="form-group">
+      <input type="text" readonly value="${code}" id="blankKeyResultValue" style="font-size:20px;font-weight:600;letter-spacing:2px;text-align:center">
+    </div>
+    <button class="btn-save" onclick="copyBlankKeyResult()" style="width:100%">复制密钥</button>
+    <p style="color:var(--ink-muted);font-size:13px;margin-top:10px">给到客人后，她在首页「登录」→「会员注册」填这个密钥即可，注册后会自动建好她自己的档案。</p>
+  `;
 }
 
-// 不挂靠档案的密钥没有归属的会员详情页可以看，单独在"全部客户资料"顶部列出来，
-// 方便还没被使用的密钥能被看到、删掉
-async function loadBlankCodes() {
-  const panel = document.getElementById('blankCodesPanel');
+async function copyBlankKeyResult() {
+  const input = document.getElementById('blankKeyResultValue');
+  try { await navigator.clipboard.writeText(input.value); } catch (e) { input.select(); document.execCommand('copy'); }
+  showToast('已复制');
+}
+
+// 待使用密钥列表固定高度、内部滚动，不会因为密钥变多把整个弹窗撑得很长
+async function loadBlankKeyList() {
+  const el = document.getElementById('blankKeyList');
+  el.innerHTML = '<div class="loading">加载中...</div>';
   const { data, error } = await db.from('invite_codes').select('*').is('member_id', null).eq('is_used', false).order('created_at', { ascending: false });
-  if (error || !data || !data.length) { panel.style.display = 'none'; return; }
-  panel.style.display = '';
-  panel.innerHTML = `<div style="font-size:13px;color:var(--ink-muted);margin-bottom:6px">待使用的新客户密钥：</div>` +
-    data.map(c => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <span><strong>${c.code}</strong></span>
+  if (error) { el.innerHTML = '加载失败：' + error.message; return; }
+  if (!data || !data.length) { el.innerHTML = '<p style="color:var(--ink-muted);font-size:13px">暂无待使用的新客户密钥</p>'; return; }
+  el.innerHTML = data.map(c => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="flex:1"><strong>${c.code}</strong></span>
       <button class="btn-mini-delete" onclick="deleteBlankCode('${c.id}')">删除</button>
     </div>`).join('');
 }
 
 async function deleteBlankCode(id) {
   await db.from('invite_codes').delete().eq('id', id);
-  loadBlankCodes();
+  loadBlankKeyList();
 }
 
 // 添加课时套餐 / 消费记录（可选已有会员，也可新建会员）
