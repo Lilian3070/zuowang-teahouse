@@ -951,18 +951,12 @@ async function showAdmin() {
   document.getElementById('adminPage').style.display = 'block';
   document.getElementById('userEmail').textContent = user.email;
   startSessionWatch();
-  cleanupExpiredCodes();
   await loadCategories();
   await loadProducts();
 }
 
-// 密钥生成 3 天内没被用掉就自动清掉，免得越积越多。每次登录后台时顺手清一次
-// （项目里没有后台定时任务，靠这个触发点做"自动"，不需要额外的服务器）
-async function cleanupExpiredCodes() {
-  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-  await db.from('invite_codes').delete().eq('is_used', false).lt('created_at', cutoff);
-  await db.from('password_reset_codes').delete().eq('is_used', false).lt('created_at', cutoff);
-}
+// 密钥超过 3 天未使用会被自动清理——这个不在网页代码里做，改由 Supabase 自带的
+// 定时任务（pg_cron）在数据库内部每天执行，见 supabase/cleanup_expired_codes.sql
 
 // 分类
 async function loadCategories() {
