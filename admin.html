@@ -265,11 +265,11 @@
     display: none;
   }
   .modal-overlay.open { display: flex; }
-  .blank-key-tab {
+  .tab-btn {
     background: none; border: none; padding: 0 0 10px; font-size: 14px;
     color: var(--ink-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
   }
-  .blank-key-tab.active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 600; }
+  .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 600; }
   .modal {
     background: white;
     border-radius: 12px;
@@ -715,8 +715,8 @@
   <div class="modal" style="width:400px">
     <div class="modal-title">新客户密钥</div>
     <div style="display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:16px">
-      <button type="button" class="blank-key-tab active" data-tab="generate" onclick="switchBlankKeyTab('generate')">生成密钥</button>
-      <button type="button" class="blank-key-tab" data-tab="view" onclick="switchBlankKeyTab('view')">待使用密钥</button>
+      <button type="button" class="tab-btn active" data-tab="generate" onclick="switchBlankKeyTab('generate')">生成密钥</button>
+      <button type="button" class="tab-btn" data-tab="view" onclick="switchBlankKeyTab('view')">待使用密钥</button>
     </div>
 
     <div id="blankKeyGenerateTab">
@@ -788,70 +788,81 @@
   </div>
 </div>
 
-<!-- 会员详情模态框 -->
+<!-- 会员详情模态框：琴茶往来（预约/课时/消费）放前面，知音详情（姓名/联系方式等资料）
+     放后面——资料这块改动了会真的写库，往来记录只是查看居多，怕手滑改到资料，故意把
+     资料那页往后放一步 -->
 <div class="modal-overlay member-detail-modal" id="memberDetailModal">
   <div class="modal">
     <div class="modal-title">会员详情</div>
 
-    <div class="form-group">
-      <label>姓名（客人自己注册后填写，也可以你直接填）</label>
-      <input type="text" id="memberDetailName" placeholder="留空的话，等客人自己注册后在「个人信息」里填">
-    </div>
-    <div class="form-group">
-      <label>联系方式</label>
-      <input type="text" id="memberDetailPhone" placeholder="手机号 / 微信">
-    </div>
-    <div class="form-group">
-      <label>备注昵称</label>
-      <input type="text" id="memberDetailNickname" placeholder="备注昵称优先显示，仅管理员可见">
-    </div>
-    <div class="form-group">
-      <label>内部备注（仅后台可见，客人看不到）</label>
-      <textarea id="memberDetailNote" placeholder="其他备注信息..."></textarea>
-    </div>
-    <div id="memberSelfInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:12px"></div>
-    <div class="modal-actions" style="margin-top:12px">
-      <button class="btn-delete" onclick="deleteMember()">删除该会员</button>
-      <button class="btn-save" onclick="saveMemberBasic()">保存基本信息</button>
+    <div style="display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:16px">
+      <button type="button" class="tab-btn active" data-tab="qincha" onclick="switchMemberDetailTab('qincha')">琴茶往来</button>
+      <button type="button" class="tab-btn" data-tab="zhiyin" onclick="switchMemberDetailTab('zhiyin')">知音详情</button>
     </div>
 
-    <div class="member-detail-section">
-      <h4>会员账号</h4>
-      <div id="memberAccountInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:8px"></div>
-      <div id="inviteCodeStatus" style="font-size:13px;color:var(--ink-muted);line-height:1.8;margin-bottom:8px"></div>
-      <div class="add-inline-form">
-        <button class="btn-add-inline" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
-        <button class="btn-add-inline" onclick="generateResetCode()">生成密码重置密钥</button>
+    <div id="memberDetailTabQincha">
+      <div class="member-detail-section" style="margin-top:0">
+        <h4>预约上课</h4>
+        <div id="upcomingList"></div>
+        <div class="add-inline-form">
+          <button class="btn-add-inline" onclick="quickAddEventForMember()">+ 预约上课</button>
+        </div>
+      </div>
+
+      <div class="member-detail-section">
+        <h4>课时记录</h4>
+        <div id="packageList"></div>
+        <div class="add-inline-form">
+          <input type="text" id="newPkgName" placeholder="套餐名，例：12课时入门小班" style="flex:2">
+          <input type="number" id="newPkgHours" placeholder="总课时" style="width:90px">
+          <input type="text" id="newPkgPrice" placeholder="价格（选填）" style="width:110px">
+          <button class="btn-add-inline" onclick="addClassPackage()">+ 添加套餐</button>
+        </div>
+      </div>
+
+      <div class="member-detail-section">
+        <h4>消费记录</h4>
+        <div id="purchaseList"></div>
+        <div class="add-inline-form">
+          <input type="text" id="newPurItem" placeholder="购买项目，例：正山堂骏眉红茶" style="flex:2">
+          <input type="text" id="newPurAmount" placeholder="金额（选填）" style="width:110px">
+          <input type="date" id="newPurDate" style="width:150px">
+          <button class="btn-add-inline" onclick="addPurchase()">+ 添加消费</button>
+        </div>
       </div>
     </div>
 
-    <div class="member-detail-section">
-      <h4>预约上课</h4>
-      <div id="upcomingList"></div>
-      <div class="add-inline-form">
-        <button class="btn-add-inline" onclick="quickAddEventForMember()">+ 预约上课</button>
+    <div id="memberDetailTabZhiyin" style="display:none">
+      <div class="form-group">
+        <label>姓名（客人自己注册后填写，也可以你直接填）</label>
+        <input type="text" id="memberDetailName" placeholder="留空的话，等客人自己注册后在「个人信息」里填">
       </div>
-    </div>
-
-    <div class="member-detail-section">
-      <h4>课时记录</h4>
-      <div id="packageList"></div>
-      <div class="add-inline-form">
-        <input type="text" id="newPkgName" placeholder="套餐名，例：12课时入门小班" style="flex:2">
-        <input type="number" id="newPkgHours" placeholder="总课时" style="width:90px">
-        <input type="text" id="newPkgPrice" placeholder="价格（选填）" style="width:110px">
-        <button class="btn-add-inline" onclick="addClassPackage()">+ 添加套餐</button>
+      <div class="form-group">
+        <label>联系方式</label>
+        <input type="text" id="memberDetailPhone" placeholder="手机号 / 微信">
       </div>
-    </div>
+      <div class="form-group">
+        <label>备注昵称</label>
+        <input type="text" id="memberDetailNickname" placeholder="备注昵称优先显示，仅管理员可见">
+      </div>
+      <div class="form-group">
+        <label>内部备注（仅后台可见，客人看不到）</label>
+        <textarea id="memberDetailNote" placeholder="其他备注信息..."></textarea>
+      </div>
+      <div id="memberSelfInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:12px"></div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button class="btn-delete" onclick="deleteMember()">删除该会员</button>
+        <button class="btn-save" onclick="saveMemberBasic()">保存基本信息</button>
+      </div>
 
-    <div class="member-detail-section">
-      <h4>消费记录</h4>
-      <div id="purchaseList"></div>
-      <div class="add-inline-form">
-        <input type="text" id="newPurItem" placeholder="购买项目，例：正山堂骏眉红茶" style="flex:2">
-        <input type="text" id="newPurAmount" placeholder="金额（选填）" style="width:110px">
-        <input type="date" id="newPurDate" style="width:150px">
-        <button class="btn-add-inline" onclick="addPurchase()">+ 添加消费</button>
+      <div class="member-detail-section">
+        <h4>会员账号</h4>
+        <div id="memberAccountInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:8px"></div>
+        <div id="inviteCodeStatus" style="font-size:13px;color:var(--ink-muted);line-height:1.8;margin-bottom:8px"></div>
+        <div class="add-inline-form">
+          <button class="btn-add-inline" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
+          <button class="btn-add-inline" onclick="generateResetCode()">生成密码重置密钥</button>
+        </div>
       </div>
     </div>
 
@@ -1951,7 +1962,7 @@ function closeBlankKeyModal() {
 }
 
 function switchBlankKeyTab(tab) {
-  document.querySelectorAll('.blank-key-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('#blankKeyModal .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('blankKeyGenerateTab').style.display = tab === 'generate' ? '' : 'none';
   document.getElementById('blankKeyViewTab').style.display = tab === 'view' ? '' : 'none';
   if (tab === 'view') loadBlankKeyList();
@@ -2093,7 +2104,14 @@ async function openMemberDetail(id) {
   renderPurchases(purchases || []);
   renderUpcoming(upcoming || []);
   loadInviteCodeStatus();
+  switchMemberDetailTab('qincha');
   document.getElementById('memberDetailModal').classList.add('open');
+}
+
+function switchMemberDetailTab(tab) {
+  document.querySelectorAll('#memberDetailModal .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('memberDetailTabQincha').style.display = tab === 'qincha' ? '' : 'none';
+  document.getElementById('memberDetailTabZhiyin').style.display = tab === 'zhiyin' ? '' : 'none';
 }
 
 // 会员登录密钥：字符集去掉了容易看错/念错的 0/O/1/I，方便当面口述或手写给客人
