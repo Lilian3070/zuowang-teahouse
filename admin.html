@@ -1769,13 +1769,17 @@ async function loadMembers(forceRefresh = false) {
 
   let rawData = tabProductsCache[currentTab];
   if (!rawData || forceRefresh) {
-    if (memberType === 'class') {
-      const { data } = await db.from('class_packages').select('member_id, total_hours, used_hours, members(id, name, nickname, phone)').order('created_at');
-      rawData = data || [];
-    } else {
-      const { data } = await db.from('purchases').select('member_id, amount, members(id, name, nickname, phone)').order('purchased_at', { ascending: false });
-      rawData = data || [];
-    }
+    // 课时套餐/消费记录表跟 members 表分开单独查，再在前端拼起来——RLS 开了之后
+    // 用内嵌语法一次查（members(...) 写在 select 里）会莫名把行漏掉，拆成两条
+    // 独立查询规避这个问题，两边各自的管理员权限都是确认有效的。
+    const [{ data: records }, { data: members }] = await Promise.all([
+      memberType === 'class'
+        ? db.from('class_packages').select('member_id, total_hours, used_hours').order('created_at')
+        : db.from('purchases').select('member_id, amount').order('purchased_at', { ascending: false }),
+      db.from('members').select('id, name, nickname, phone'),
+    ]);
+    const memberMap = new Map((members || []).map(m => [m.id, m]));
+    rawData = (records || []).map(r => ({ ...r, members: memberMap.get(r.member_id) || null }));
     tabProductsCache[currentTab] = rawData;
   }
 
@@ -2219,13 +2223,17 @@ function formatSlotLabel(date) {
 async function renderCalendar(forceRefresh = false) {
   let events = tabProductsCache['schedule'];
   if (!events || forceRefresh) {
-    const { data } = await db.from('schedule_events').select('*, members(name)').order('start_at');
-    events = (data || []).map(e => ({
-      id: e.id,
-      title: e.members?.name ? `${e.members.name} · ${e.title}` : e.title,
-      start: e.start_at,
-      end: e.end_at,
-    }));
+    // 跟会员列表同理，跟 members 分开查再前端拼，避免内嵌 join 在 RLS 开启后漏数据
+    const [{ data: rows }, { data: members }] = await Promise.all([
+      db.from('schedule_events').select('*').order('start_at'),
+      db.from('members').select('id, name, nickname'),
+    ]);
+    const memberMap = new Map((members || []).map(m => [m.id, m]));
+    events = (rows || []).map(e => {
+      const m = memberMap.get(e.member_id);
+      const label = m ? (m.nickname || m.name) : null;
+      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: e.start_at, end: e.end_at };
+    });
     tabProductsCache['schedule'] = events;
   }
 
