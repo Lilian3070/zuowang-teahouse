@@ -596,10 +596,12 @@
           <div class="page-title" id="pageTitle">精选茗茶</div>
           <div class="page-subtitle" id="pageSubtitle">管理茶叶品牌与产品</div>
         </div>
-        <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
-        <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
-        <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
-        <button class="btn-add" id="btnGenBlankKey" style="display:none" onclick="generateBlankInviteCode()">生成新客户注册密钥</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
+          <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
+          <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
+          <button class="btn-add" id="btnGenBlankKey" style="display:none" onclick="generateBlankInviteCode()">生成新客户注册密钥</button>
+        </div>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
@@ -684,6 +686,21 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closePasswordModal()">取消</button>
       <button class="btn-save" onclick="savePassword()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 密钥展示模态框：生成密钥后弹出，方便直接复制 -->
+<div class="modal-overlay" id="codeDisplayModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-title" id="codeDisplayTitle">密钥</div>
+    <p id="codeDisplayHint" style="color:var(--ink-muted);font-size:13px;margin-top:-8px"></p>
+    <div class="form-group">
+      <input type="text" id="codeDisplayValue" readonly style="font-size:20px;font-weight:600;letter-spacing:2px;text-align:center">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeCodeDisplayModal()">关闭</button>
+      <button class="btn-save" onclick="copyCodeDisplayValue()">复制密钥</button>
     </div>
   </div>
 </div>
@@ -1884,7 +1901,7 @@ async function generateBlankInviteCode() {
   const code = genInviteCode();
   const { error } = await db.from('invite_codes').insert({ code, member_id: null });
   if (error) { showToast('生成失败：' + error.message); return; }
-  alert('新客户注册密钥：' + code + '\n\n给到客人后，她在首页「登录」→「会员注册」填这个密钥即可，注册后会自动建好她自己的档案。');
+  showCodeModal('新客户注册密钥', code, '给到客人后，她在首页「登录」→「会员注册」填这个密钥即可，注册后会自动建好她自己的档案。');
 }
 
 // 添加课时套餐 / 消费记录（可选已有会员，也可新建会员）
@@ -2012,16 +2029,23 @@ async function loadInviteCodeStatus() {
     db.from('password_reset_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false }),
   ]);
 
-  const inviteLines = (invites || []).map(c => c.is_used
-    ? `已使用的注册密钥：${c.code}`
-    : `<strong>${c.code}</strong>（注册密钥，未使用，给客人后去首页点"登录"→"会员注册"填写）`
-  );
-  const resetLines = (resets || []).map(c => c.is_used
-    ? `已使用的重置密钥：${c.code}`
-    : `<strong>${c.code}</strong>（密码重置密钥，未使用，给客人后去首页"忘记密码"填写）`
-  );
+  const inviteLines = (invites || []).map(c => codeLineHtml(c, 'invite', c.is_used ? '已使用的注册密钥' : '注册密钥（未使用）'));
+  const resetLines = (resets || []).map(c => codeLineHtml(c, 'reset', c.is_used ? '已使用的重置密钥' : '密码重置密钥（未使用）'));
   const lines = [...inviteLines, ...resetLines];
-  codeEl.innerHTML = lines.length ? lines.join('<br>') : '尚未生成过密钥';
+  codeEl.innerHTML = lines.length ? lines.join('') : '尚未生成过密钥';
+}
+
+function codeLineHtml(c, kind, label) {
+  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+    <span>${label}：<strong>${c.code}</strong></span>
+    <button class="btn-mini-delete" onclick="deleteCode('${kind}', '${c.id}')">删除</button>
+  </div>`;
+}
+
+async function deleteCode(kind, id) {
+  const table = kind === 'invite' ? 'invite_codes' : 'password_reset_codes';
+  await db.from(table).delete().eq('id', id);
+  loadInviteCodeStatus();
 }
 
 async function generateInviteCode() {
@@ -2029,8 +2053,8 @@ async function generateInviteCode() {
   const code = genInviteCode();
   const { error } = await db.from('invite_codes').insert({ code, member_id: currentMemberId });
   if (error) { showToast('生成失败：' + error.message); return; }
-  showToast('已生成注册密钥：' + code);
   loadInviteCodeStatus();
+  showCodeModal('注册密钥', code, '给客人后，去首页点"登录"→"会员注册"填写，绑定到这条档案。');
 }
 
 async function generateResetCode() {
@@ -2038,8 +2062,30 @@ async function generateResetCode() {
   const code = genInviteCode();
   const { error } = await db.from('password_reset_codes').insert({ code, member_id: currentMemberId });
   if (error) { showToast('生成失败：' + error.message); return; }
-  showToast('已生成密码重置密钥：' + code);
   loadInviteCodeStatus();
+  showCodeModal('密码重置密钥', code, '给客人后，去首页"忘记密码"填写重设密码。');
+}
+
+function showCodeModal(title, code, hint) {
+  document.getElementById('codeDisplayTitle').textContent = title;
+  document.getElementById('codeDisplayHint').textContent = hint || '';
+  document.getElementById('codeDisplayValue').value = code;
+  document.getElementById('codeDisplayModal').classList.add('open');
+}
+
+function closeCodeDisplayModal() {
+  document.getElementById('codeDisplayModal').classList.remove('open');
+}
+
+async function copyCodeDisplayValue() {
+  const input = document.getElementById('codeDisplayValue');
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch (e) {
+    input.select();
+    document.execCommand('copy');
+  }
+  showToast('已复制');
 }
 
 function closeMemberDetail() {
