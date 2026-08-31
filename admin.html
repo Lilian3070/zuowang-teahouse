@@ -1772,12 +1772,16 @@ async function loadMembers(forceRefresh = false) {
     // 课时套餐/消费记录表跟 members 表分开单独查，再在前端拼起来——RLS 开了之后
     // 用内嵌语法一次查（members(...) 写在 select 里）会莫名把行漏掉，拆成两条
     // 独立查询规避这个问题，两边各自的管理员权限都是确认有效的。
-    const [{ data: records }, { data: members }] = await Promise.all([
+    const [{ data: records, error: recordsErr }, { data: members, error: membersErr }] = await Promise.all([
       memberType === 'class'
         ? db.from('class_packages').select('member_id, total_hours, used_hours').order('created_at')
         : db.from('purchases').select('member_id, amount').order('purchased_at', { ascending: false }),
       db.from('members').select('id, name, nickname, phone'),
     ]);
+    if (recordsErr || membersErr) {
+      showToast('加载失败：' + ((recordsErr || membersErr).message || '未知错误'));
+      console.error('loadMembers error', recordsErr, membersErr);
+    }
     const memberMap = new Map((members || []).map(m => [m.id, m]));
     rawData = (records || []).map(r => ({ ...r, members: memberMap.get(r.member_id) || null }));
     tabProductsCache[currentTab] = rawData;
