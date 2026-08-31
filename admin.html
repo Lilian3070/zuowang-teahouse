@@ -580,6 +580,7 @@
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">会员管理</div>
+        <button class="sidebar-item" onclick="switchTab('allmembers')">全部客户资料</button>
         <button class="sidebar-item" onclick="switchTab('qinren')">琴人档案</button>
         <button class="sidebar-item" onclick="switchTab('guests')">茗客档案</button>
       </div>
@@ -598,6 +599,7 @@
         <button class="btn-add" id="btnAdd" onclick="openAddModal()">+ 添加商品</button>
         <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
         <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
+        <button class="btn-add" id="btnGenBlankKey" style="display:none" onclick="generateBlankInviteCode()">生成新客户注册密钥</button>
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
@@ -745,17 +747,22 @@
     <div class="modal-title">会员详情</div>
 
     <div class="form-group">
-      <label>姓名</label>
-      <input type="text" id="memberDetailName">
+      <label>姓名（客人自己注册后填写，也可以你直接填）</label>
+      <input type="text" id="memberDetailName" placeholder="留空的话，等客人自己注册后在「个人信息」里填">
     </div>
     <div class="form-group">
       <label>联系方式</label>
       <input type="text" id="memberDetailPhone" placeholder="手机号 / 微信">
     </div>
     <div class="form-group">
-      <label>备注</label>
+      <label>备注昵称（列表显示用：填了就优先显示这个，没填才显示上面的姓名）</label>
+      <input type="text" id="memberDetailNickname" placeholder="例如：3号桌客人、老王">
+    </div>
+    <div class="form-group">
+      <label>内部备注（仅后台可见，客人看不到）</label>
       <textarea id="memberDetailNote" placeholder="其他备注信息..."></textarea>
     </div>
+    <div id="memberSelfInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:12px"></div>
     <div class="modal-actions" style="margin-top:12px">
       <button class="btn-delete" onclick="deleteMember()">删除该会员</button>
       <button class="btn-save" onclick="saveMemberBasic()">保存基本信息</button>
@@ -766,7 +773,7 @@
       <div id="memberAccountInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:8px"></div>
       <div id="inviteCodeStatus" style="font-size:13px;color:var(--ink-muted);line-height:1.8;margin-bottom:8px"></div>
       <div class="add-inline-form">
-        <button class="btn-add-inline" onclick="generateInviteCode()">生成注册密钥</button>
+        <button class="btn-add-inline" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
         <button class="btn-add-inline" onclick="generateResetCode()">生成密码重置密钥</button>
       </div>
     </div>
@@ -880,6 +887,7 @@ const tabConfig = {
   guqin:    { title: '斫琴甄选', subtitle: '管理古琴分类与商品', type: 'guqin' },
   qindao:   { title: '琴道传习', subtitle: '管理活动招生海报', type: 'poster', section: 'qindao' },
   yaji:     { title: '坐忘雅集', subtitle: '管理雅集活动海报', type: 'poster', section: 'yaji' },
+  allmembers: { title: '全部客户资料', subtitle: '所有客户档案，含已注册与代建档', type: 'allmembers' },
   qinren:   { title: '琴人档案', subtitle: '管理学员课时套餐', type: 'member', memberType: 'class' },
   guests:   { title: '茗客档案', subtitle: '管理客人消费记录', type: 'member', memberType: 'purchase' },
   schedule: { title: '行程安排', subtitle: '管理主理人行程与学员约课时间', type: 'schedule' },
@@ -958,6 +966,22 @@ async function loadProducts(forceRefresh = false) {
   const cfg = tabConfig[currentTab];
   const hasCached = !!tabProductsCache[currentTab];
   if (!hasCached) document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
+  document.getElementById('btnGenBlankKey').style.display = 'none';
+
+  if (cfg.type === 'allmembers') {
+    document.getElementById('btnAdd').style.display = 'none';
+    document.getElementById('btnAddPoster').style.display = 'none';
+    document.getElementById('catPanel').style.display = 'none';
+    resetCatPanel();
+    const btnMember = document.getElementById('btnAddMember');
+    btnMember.style.display = '';
+    btnMember.textContent = '+ 新建客户档案';
+    btnMember.onclick = () => openNewBlankMemberPrompt();
+    document.getElementById('btnGenBlankKey').style.display = '';
+    document.getElementById('filterBar').innerHTML = '<input type="text" class="member-search" id="memberSearch" placeholder="搜索姓名/备注昵称..." oninput="loadAllMembers()">';
+    await loadAllMembers();
+    return;
+  }
 
   if (cfg.type === 'schedule') {
     document.getElementById('btnAdd').style.display = 'none';
@@ -1729,10 +1753,10 @@ async function loadMembers(forceRefresh = false) {
   let rawData = tabProductsCache[currentTab];
   if (!rawData || forceRefresh) {
     if (memberType === 'class') {
-      const { data } = await db.from('class_packages').select('member_id, total_hours, used_hours, members(id, name, phone)').order('created_at');
+      const { data } = await db.from('class_packages').select('member_id, total_hours, used_hours, members(id, name, nickname, phone)').order('created_at');
       rawData = data || [];
     } else {
-      const { data } = await db.from('purchases').select('member_id, amount, members(id, name, phone)').order('purchased_at', { ascending: false });
+      const { data } = await db.from('purchases').select('member_id, amount, members(id, name, nickname, phone)').order('purchased_at', { ascending: false });
       rawData = data || [];
     }
     tabProductsCache[currentTab] = rawData;
@@ -1742,7 +1766,7 @@ async function loadMembers(forceRefresh = false) {
   if (memberType === 'class') {
     rawData.forEach(r => {
       if (!r.members) return;
-      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, phone: r.members.phone, remaining: 0, packages: 0 });
+      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, nickname: r.members.nickname, phone: r.members.phone, remaining: 0, packages: 0 });
       const entry = map.get(r.member_id);
       entry.remaining += (r.total_hours - r.used_hours);
       entry.packages += 1;
@@ -1750,15 +1774,20 @@ async function loadMembers(forceRefresh = false) {
   } else {
     rawData.forEach(r => {
       if (!r.members) return;
-      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, phone: r.members.phone, total: 0, count: 0 });
+      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, nickname: r.members.nickname, phone: r.members.phone, total: 0, count: 0 });
       const entry = map.get(r.member_id);
       entry.total += Number(r.amount) || 0;
       entry.count += 1;
     });
   }
   let list = [...map.values()];
-  if (keyword) list = list.filter(m => m.name.toLowerCase().includes(keyword));
+  if (keyword) list = list.filter(m => displayMemberName(m).toLowerCase().includes(keyword));
   renderMemberList(list, memberType);
+}
+
+// 列表显示名字：备注昵称优先，没填才显示客人自己注册后填的姓名
+function displayMemberName(m) {
+  return m.nickname || m.name || '（资料未完善）';
 }
 
 function renderMemberList(list, type) {
@@ -1772,11 +1801,12 @@ function renderMemberList(list, type) {
     const summary = type === 'class'
       ? `剩余课时 ${m.remaining} 节 · ${m.packages} 个套餐`
       : `累计消费 ¥${m.total} · ${m.count} 笔`;
+    const name = displayMemberName(m);
     return `
     <div class="member-row" data-id="${m.id}">
-      <div class="member-avatar">${(m.name || '?').slice(0, 1)}</div>
+      <div class="member-avatar">${name.slice(0, 1)}</div>
       <div class="member-info">
-        <div class="member-name">${m.name}</div>
+        <div class="member-name">${name}</div>
         <div class="member-meta">${m.phone || '未填写联系方式'} · ${summary}</div>
       </div>
       <div class="product-actions">
@@ -1784,6 +1814,77 @@ function renderMemberList(list, type) {
       </div>
     </div>`;
   }).join('');
+}
+
+// ── 全部客户资料：不依赖课时套餐/消费记录，直接列 members 表全部记录，
+// 顺便标出谁已经注册账号（在 profiles 表里有对应行），谁还只是主理人建的空壳档案 ──
+async function loadAllMembers(forceRefresh = false) {
+  const search = document.getElementById('memberSearch');
+  const keyword = (search ? search.value.trim() : '').toLowerCase();
+
+  let cache = tabProductsCache['allmembers'];
+  if (!cache || forceRefresh) {
+    const [{ data: members }, { data: profiles }] = await Promise.all([
+      db.from('members').select('*').order('created_at', { ascending: false }),
+      db.from('profiles').select('member_id').eq('role', 'member'),
+    ]);
+    const registeredIds = new Set((profiles || []).map(p => p.member_id));
+    cache = (members || []).map(m => ({ ...m, registered: registeredIds.has(m.id) }));
+    tabProductsCache['allmembers'] = cache;
+  }
+
+  let list = cache;
+  if (keyword) list = list.filter(m => displayMemberName(m).toLowerCase().includes(keyword));
+  renderAllMembers(list);
+}
+
+function renderAllMembers(list) {
+  const el = document.getElementById('productList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">👤</div><p>暂无客户档案，点击「+ 新建客户档案」开始</p></div>';
+    return;
+  }
+  el.innerHTML = list.map(m => {
+    const name = displayMemberName(m);
+    const statusTag = m.registered
+      ? '<span style="color:var(--pine, #3f4a3a)">已注册</span>'
+      : '<span style="color:var(--ink-muted)">代建档 · 未注册</span>';
+    return `
+    <div class="member-row" data-id="${m.id}">
+      <div class="member-avatar">${name.slice(0, 1)}</div>
+      <div class="member-info">
+        <div class="member-name">${name}</div>
+        <div class="member-meta">${m.phone || '未填写联系方式'} · ${statusTag}</div>
+      </div>
+      <div class="product-actions">
+        <button class="btn-edit" onclick="openMemberDetail('${m.id}')">查看详情</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 新建一条只有备注昵称（或姓名）的空壳档案，用于给还没注册的老客人先占个位子，
+// 之后在这条档案上生成"注册密钥（绑定这条档案）"给她
+async function openNewBlankMemberPrompt() {
+  const nickname = prompt('给这位客人起个备注昵称（她自己注册后会填真实姓名，这里只是方便你自己认人）：');
+  if (nickname === null) return;
+  const trimmed = nickname.trim();
+  if (!trimmed) { showToast('请填写备注昵称'); return; }
+  const phone = prompt('联系方式（选填，可直接留空）：') || null;
+  const { error } = await db.from('members').insert({ nickname: trimmed, phone: phone ? phone.trim() || null : null });
+  if (error) { showToast('创建失败：' + error.message); return; }
+  showToast('已创建，点进详情可以生成注册密钥给她');
+  delete tabProductsCache['allmembers'];
+  loadAllMembers();
+}
+
+// 不挂靠任何已有档案的注册密钥：给完全没在系统里出现过的新客人用，
+// 她注册时 redeem_invite_code() 会自动新建一条空白档案绑定给她
+async function generateBlankInviteCode() {
+  const code = genInviteCode();
+  const { error } = await db.from('invite_codes').insert({ code, member_id: null });
+  if (error) { showToast('生成失败：' + error.message); return; }
+  alert('新客户注册密钥：' + code + '\n\n给到客人后，她在首页「登录」→「会员注册」填这个密钥即可，注册后会自动建好她自己的档案。');
 }
 
 // 添加课时套餐 / 消费记录（可选已有会员，也可新建会员）
@@ -1870,9 +1971,17 @@ async function openMemberDetail(id) {
     db.from('schedule_events').select('*').eq('member_id', id).gte('start_at', new Date().toISOString()).order('start_at'),
   ]);
   if (!member) return;
-  document.getElementById('memberDetailName').value = member.name;
+  document.getElementById('memberDetailName').value = member.name || '';
   document.getElementById('memberDetailPhone').value = member.phone || '';
+  document.getElementById('memberDetailNickname').value = member.nickname || '';
   document.getElementById('memberDetailNote').value = member.note || '';
+  const selfBits = [];
+  if (member.email) selfBits.push('邮箱：' + member.email);
+  if (member.address) selfBits.push('住址：' + member.address);
+  if (member.age) selfBits.push('年龄：' + member.age);
+  document.getElementById('memberSelfInfo').textContent = selfBits.length
+    ? '客人在「个人信息」里自己填的：' + selfBits.join(' · ')
+    : '';
   renderPackages(packages || []);
   renderPurchases(purchases || []);
   renderUpcoming(upcoming || []);
@@ -1937,16 +2046,18 @@ function closeMemberDetail() {
   document.getElementById('memberDetailModal').classList.remove('open');
   currentMemberId = null;
   delete tabProductsCache[currentTab];
-  loadMembers();
+  if (currentTab === 'allmembers') { delete tabProductsCache['allmembers']; loadAllMembers(); }
+  else loadMembers();
 }
 
 async function saveMemberBasic() {
   if (!currentMemberId) return;
-  const name = document.getElementById('memberDetailName').value.trim();
-  if (!name) { showToast('请填写姓名'); return; }
+  const name = document.getElementById('memberDetailName').value.trim() || null;
   const phone = document.getElementById('memberDetailPhone').value.trim() || null;
+  const nickname = document.getElementById('memberDetailNickname').value.trim() || null;
   const note = document.getElementById('memberDetailNote').value.trim() || null;
-  await db.from('members').update({ name, phone, note }).eq('id', currentMemberId);
+  if (!name && !nickname) { showToast('姓名和备注昵称至少填一个，方便列表里认出是谁'); return; }
+  await db.from('members').update({ name, phone, nickname, note }).eq('id', currentMemberId);
   showToast('已保存');
 }
 

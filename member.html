@@ -50,6 +50,24 @@
 
 <div class="member-page" id="memberPage" style="display:none">
   <div class="member-section">
+    <h2>个人信息</h2>
+    <p class="empty-hint" style="margin:-8px 0 16px">姓名、电话必填，其余选填，只有你自己能看到和修改。</p>
+    <form class="booking-form" id="profileForm" onsubmit="return saveProfile(event)">
+      <label for="profName">姓名</label>
+      <input type="text" id="profName" required>
+      <label for="profPhone">电话</label>
+      <input type="text" id="profPhone" required>
+      <label for="profEmail">邮箱（选填）</label>
+      <input type="email" id="profEmail">
+      <label for="profAddress">住址（选填）</label>
+      <input type="text" id="profAddress">
+      <label for="profAge">年龄（选填）</label>
+      <input type="number" id="profAge" min="0" max="120">
+      <button type="submit" class="submit-btn">保存</button>
+      <p class="account-error" id="profileStatus"></p>
+    </form>
+  </div>
+  <div class="member-section">
     <h2>我的课时套餐</h2>
     <div id="packageList"><p class="empty-hint">加载中...</p></div>
   </div>
@@ -104,21 +122,50 @@ async function doMemberLogout() {
   location.href = 'index.html';
 }
 
+let currentMemberId = null;
+
+async function saveProfile(event) {
+  event.preventDefault();
+  const statusEl = document.getElementById('profileStatus');
+  const name = document.getElementById('profName').value.trim();
+  const phone = document.getElementById('profPhone').value.trim();
+  if (!name || !phone) { statusEl.style.color = 'var(--seal)'; statusEl.textContent = '姓名和电话是必填的'; return false; }
+  const email = document.getElementById('profEmail').value.trim() || null;
+  const address = document.getElementById('profAddress').value.trim() || null;
+  const ageVal = document.getElementById('profAge').value;
+  const age = ageVal ? parseInt(ageVal, 10) : null;
+  const { error } = await db.from('members').update({ name, phone, email, address, age }).eq('id', currentMemberId);
+  if (error) { statusEl.style.color = 'var(--seal)'; statusEl.textContent = '保存失败：' + error.message; return false; }
+  statusEl.style.color = 'var(--pine)';
+  statusEl.textContent = '已保存';
+  return false;
+}
+
 async function init() {
   const { data: { user } } = await db.auth.getUser();
   if (!user) { showGate('请先登录会员账号'); return; }
 
   const { data: profile } = await db.from('profiles').select('role, member_id').eq('id', user.id).maybeSingle();
   if (!profile || profile.role !== 'member') { showGate('此账号不是会员账号'); return; }
+  currentMemberId = profile.member_id;
 
   document.getElementById('gateBox').style.display = 'none';
   document.getElementById('memberPage').style.display = 'block';
   startSessionWatch();
 
-  const [{ data: packages }, { data: purchases }] = await Promise.all([
+  const [{ data: memberRow }, { data: packages }, { data: purchases }] = await Promise.all([
+    db.from('members').select('name, phone, email, address, age').eq('id', profile.member_id).single(),
     db.from('class_packages').select('*').eq('member_id', profile.member_id).order('created_at'),
     db.from('purchases').select('*').eq('member_id', profile.member_id).order('purchased_at', { ascending: false }),
   ]);
+
+  if (memberRow) {
+    document.getElementById('profName').value = memberRow.name || '';
+    document.getElementById('profPhone').value = memberRow.phone || '';
+    document.getElementById('profEmail').value = memberRow.email || '';
+    document.getElementById('profAddress').value = memberRow.address || '';
+    document.getElementById('profAge').value = memberRow.age || '';
+  }
 
   const pkgEl = document.getElementById('packageList');
   if (!packages || !packages.length) {
