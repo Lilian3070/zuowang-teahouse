@@ -1,0 +1,19 @@
+name: Keep Supabase Alive
+
+# Supabase 免费版项目连续 7 天没有任何 API 请求会自动暂停。
+# 这个任务每天访问一次数据库（只读一条 categories 记录，不改任何数据），
+# 让 Supabase 一直认为项目"有在被使用"，不会被暂停。
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          curl -sS -o /dev/null -w "HTTP status: %{http_code}\n" \
+            "https://wmatsdnpbpcltuoynyrh.supabase.co/rest/v1/categories?select=id&limit=1" \
+            -H "apikey: sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl"
