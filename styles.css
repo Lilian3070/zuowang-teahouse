@@ -386,7 +386,7 @@ section {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 32px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .track {
@@ -395,6 +395,16 @@ section {
   border-radius: 8px;
   padding: 40px 36px;
   border-top: 3px solid var(--tea);
+  display: flex;
+  flex-direction: column;
+}
+
+/* 两张卡片内容长短不一样时，靠这个把各自卡片里最后那个按钮统一顶到底部对齐，
+   而不是紧跟在文字后面——配合 .track 的 flex 列布局和 .cta-btn 的 margin-top:auto */
+.booking-login-prompt {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .track-verified {
