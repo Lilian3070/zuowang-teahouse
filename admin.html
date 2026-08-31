@@ -605,6 +605,7 @@
       </div>
 
       <div class="filter-bar" id="filterBar"></div>
+      <div id="blankCodesPanel" style="display:none;margin-bottom:16px"></div>
       <div class="cat-panel" id="catPanel" style="display:none">
         <div class="cat-panel-header" onclick="toggleCatPanel()" style="cursor:pointer;margin-bottom:0">
           <span>分类管理</span>
@@ -984,12 +985,14 @@ async function loadProducts(forceRefresh = false) {
   const hasCached = !!tabProductsCache[currentTab];
   if (!hasCached) document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
   document.getElementById('btnGenBlankKey').style.display = 'none';
+  document.getElementById('blankCodesPanel').style.display = 'none';
 
   if (cfg.type === 'allmembers') {
     document.getElementById('btnAdd').style.display = 'none';
     document.getElementById('btnAddPoster').style.display = 'none';
     document.getElementById('catPanel').style.display = 'none';
     resetCatPanel();
+    loadBlankCodes();
     const btnMember = document.getElementById('btnAddMember');
     btnMember.style.display = '';
     btnMember.textContent = '+ 新建客户档案';
@@ -1910,6 +1913,26 @@ async function generateBlankInviteCode() {
   const { error } = await db.from('invite_codes').insert({ code, member_id: null });
   if (error) { showToast('生成失败：' + error.message); return; }
   showCodeModal('新客户注册密钥', code, '给到客人后，她在首页「登录」→「会员注册」填这个密钥即可，注册后会自动建好她自己的档案。');
+  loadBlankCodes();
+}
+
+// 不挂靠档案的密钥没有归属的会员详情页可以看，单独在"全部客户资料"顶部列出来，
+// 方便还没被使用的密钥能被看到、删掉
+async function loadBlankCodes() {
+  const panel = document.getElementById('blankCodesPanel');
+  const { data, error } = await db.from('invite_codes').select('*').is('member_id', null).eq('is_used', false).order('created_at', { ascending: false });
+  if (error || !data || !data.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  panel.innerHTML = `<div style="font-size:13px;color:var(--ink-muted);margin-bottom:6px">待使用的新客户密钥：</div>` +
+    data.map(c => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span><strong>${c.code}</strong></span>
+      <button class="btn-mini-delete" onclick="deleteBlankCode('${c.id}')">删除</button>
+    </div>`).join('');
+}
+
+async function deleteBlankCode(id) {
+  await db.from('invite_codes').delete().eq('id', id);
+  loadBlankCodes();
 }
 
 // 添加课时套餐 / 消费记录（可选已有会员，也可新建会员）
