@@ -588,6 +588,7 @@
         <button class="sidebar-item" onclick="switchTab('allmembers')">全部客户资料</button>
         <button class="sidebar-item" onclick="switchTab('qinren')">琴人档案</button>
         <button class="sidebar-item" onclick="switchTab('guests')">茗客档案</button>
+        <button class="sidebar-item" onclick="switchTab('bookings')">茶席预约</button>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">行程安排</div>
@@ -948,6 +949,7 @@ const tabConfig = {
   allmembers: { title: '全部客户资料', subtitle: '所有客户档案，含已注册与代建档', type: 'allmembers' },
   qinren:   { title: '琴人档案', subtitle: '管理学员课时套餐', type: 'member', memberType: 'class' },
   guests:   { title: '茗客档案', subtitle: '管理客人消费记录', type: 'member', memberType: 'purchase' },
+  bookings: { title: '茶席预约', subtitle: '查看并处理会员提交的预约申请', type: 'bookings' },
   schedule: { title: '行程安排', subtitle: '管理主理人行程与学员约课时间', type: 'schedule' },
 };
 
@@ -1041,6 +1043,17 @@ async function loadProducts(forceRefresh = false) {
     document.getElementById('btnGenBlankKey').style.display = '';
     document.getElementById('filterBar').innerHTML = '<input type="text" class="member-search" id="memberSearch" placeholder="搜索姓名/备注昵称..." oninput="loadAllMembers()">';
     await loadAllMembers();
+    return;
+  }
+
+  if (cfg.type === 'bookings') {
+    document.getElementById('btnAdd').style.display = 'none';
+    document.getElementById('btnAddPoster').style.display = 'none';
+    document.getElementById('btnAddMember').style.display = 'none';
+    document.getElementById('catPanel').style.display = 'none';
+    resetCatPanel();
+    document.getElementById('filterBar').innerHTML = '';
+    await loadBookingRequests();
     return;
   }
 
@@ -1945,6 +1958,67 @@ async function openNewBlankMemberPrompt() {
   showToast('已创建，点进详情可以生成注册密钥给她');
   delete tabProductsCache['allmembers'];
   loadAllMembers();
+}
+
+// ── 茶席预约申请 ──────────────────────────────────────────
+// 跟会员列表同理，跟 members 分开单独查再前端拼，避免内嵌 join 在 RLS 下漏数据
+async function loadBookingRequests(forceRefresh = false) {
+  let list = tabProductsCache['bookings'];
+  if (!list || forceRefresh) {
+    const [{ data: requests, error }, { data: members }] = await Promise.all([
+      db.from('booking_requests').select('*').order('created_at', { ascending: false }),
+      db.from('members').select('id, name, nickname, phone'),
+    ]);
+    if (error) { showToast('加载失败：' + error.message); }
+    const memberMap = new Map((members || []).map(m => [m.id, m]));
+    list = (requests || []).map(r => ({ ...r, member: memberMap.get(r.member_id) || null }));
+    tabProductsCache['bookings'] = list;
+  }
+  renderBookingRequests(list);
+}
+
+function renderBookingRequests(list) {
+  const el = document.getElementById('productList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">🍵</div><p>暂无预约申请</p></div>';
+    return;
+  }
+  const statusLabel = { pending: '待确认', confirmed: '已确认', declined: '已回绝' };
+  el.innerHTML = list.map(r => {
+    const name = r.member ? displayMemberName(r.member) : '（会员已删除）';
+    return `
+    <div class="member-row" style="align-items:flex-start;flex-wrap:wrap">
+      <div class="member-avatar">${name.slice(0, 1)}</div>
+      <div class="member-info">
+        <div class="member-name">${name}<span style="font-weight:400;font-size:12px;color:var(--ink-muted)"> · ${statusLabel[r.status] || r.status}</span></div>
+        <div class="member-meta">期望时间：${r.preferred_time || '未填写'}${r.note ? ' · ' + r.note : ''}</div>
+        ${r.admin_note ? `<div class="member-meta">已回复：${r.admin_note}</div>` : ''}
+      </div>
+      <div class="product-actions">
+        ${r.status !== 'confirmed' ? `<button class="btn-edit" onclick="setBookingStatus('${r.id}','confirmed')">确认</button>` : ''}
+        ${r.status !== 'declined' ? `<button class="btn-delete" onclick="setBookingStatus('${r.id}','declined')">回绝</button>` : ''}
+        <button class="btn-mini-delete" onclick="deleteBookingRequest('${r.id}')">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function setBookingStatus(id, status) {
+  const update = { status };
+  if (status === 'confirmed') {
+    const adminNote = prompt('给客人留句回复（选填，比如确认的具体时间）：');
+    if (adminNote) update.admin_note = adminNote;
+  }
+  await db.from('booking_requests').update(update).eq('id', id);
+  delete tabProductsCache['bookings'];
+  loadBookingRequests();
+}
+
+async function deleteBookingRequest(id) {
+  if (!confirm('确定删除这条预约申请吗？')) return;
+  await db.from('booking_requests').delete().eq('id', id);
+  delete tabProductsCache['bookings'];
+  loadBookingRequests();
 }
 
 // 不挂靠任何已有档案的注册密钥：给完全没在系统里出现过的新客人用，

@@ -27,18 +27,47 @@ async function fetchWithRetry(queryFn, retries = 2, delayMs = 800) {
   return null;
 }
 
-// 账号入口：识别当前登录人是管理员还是会员，决定导航栏那个按钮点了之后去哪
+// 账号入口：识别当前登录人是管理员还是会员，决定导航栏那个按钮点了之后去哪，
+// 也用来决定"知音通道"预约表单要不要显示
 let currentAccountRole = null; // 'admin' | 'member' | null（未登录或还没有角色记录）
+let currentMemberId = null;
 let loginFailCount = 0;
 
 async function refreshAccountNav() {
   const link = document.getElementById('navAccountLink');
   if (!link) return;
   const { data: { user } } = await db.auth.getUser();
-  if (!user) { currentAccountRole = null; link.textContent = '登录'; return; }
-  const { data: profile } = await db.from('profiles').select('role').eq('id', user.id).maybeSingle();
+  if (!user) { currentAccountRole = null; currentMemberId = null; link.textContent = '登录'; updateBookingSectionVisibility(); return; }
+  const { data: profile } = await db.from('profiles').select('role, member_id').eq('id', user.id).maybeSingle();
   currentAccountRole = profile ? profile.role : null;
+  currentMemberId = profile ? profile.member_id : null;
   link.textContent = currentAccountRole === 'admin' ? '管理中心' : currentAccountRole === 'member' ? '知音中心' : '登录';
+  updateBookingSectionVisibility();
+}
+
+function updateBookingSectionVisibility() {
+  const prompt = document.getElementById('bookingLoginPrompt');
+  const form = document.getElementById('realBookingForm');
+  if (!prompt || !form) return;
+  const isMember = currentAccountRole === 'member';
+  prompt.style.display = isMember ? 'none' : '';
+  form.style.display = isMember ? '' : 'none';
+}
+
+async function submitBookingRequest(event) {
+  event.preventDefault();
+  const statusEl = document.getElementById('bookingFormStatus');
+  if (!currentMemberId) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先登录会员账号'; return false; }
+  const mode = document.getElementById('mode').value;
+  const datetime = document.getElementById('datetime').value.trim();
+  const note = document.getElementById('note').value.trim();
+  const combinedNote = '泡茶方式：' + mode + (note ? '；' + note : '');
+  const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime, note: combinedNote });
+  if (error) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '提交失败：' + error.message; return false; }
+  statusEl.style.color = '#cfe0b8';
+  statusEl.textContent = '已收到您的预约申请，我们会尽快与您确认。';
+  document.getElementById('realBookingForm').reset();
+  return false;
 }
 
 function onNavAccountClick(event) {
@@ -454,39 +483,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     navMenu.classList.remove('open');
-  });
-
-  // 席位预约 - 知音通道：手机号验证后再展开真正的预约表单。
-  // 白名单目前是前端写死的演示数据，仅用于验证交互流程，
-  // 不具备真实校验能力（任何人查看网页源码都能看到号码）——
-  // 正式上线需要把这一步换成真实的后端接口 + 会员数据库。
-  const demoWhitelist = ['13800138000', '13900139000'];
-
-  const verifyForm = document.getElementById('verifyForm');
-  const verifyPhone = document.getElementById('verifyPhone');
-  const verifyMessage = document.getElementById('verifyMessage');
-  const realBookingForm = document.getElementById('realBookingForm');
-  const formStatus = document.getElementById('formStatus');
-
-  verifyForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const phone = verifyPhone.value.trim();
-
-    if (demoWhitelist.includes(phone)) {
-      verifyMessage.textContent = '验证通过，欢迎回来，请填写席位预约信息。';
-      verifyMessage.className = 'verify-message success';
-      realBookingForm.classList.add('expanded');
-    } else {
-      verifyMessage.textContent = '未查询到您的预约资格，请先添加掌柜微信沟通。';
-      verifyMessage.className = 'verify-message error';
-      realBookingForm.classList.remove('expanded');
-    }
-  });
-
-  realBookingForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    formStatus.style.display = 'block';
-    realBookingForm.reset();
   });
 
   // 前台分类缓存：{ tea: {key: catObj, ...}, teaware: {...}, guqin: {...} }

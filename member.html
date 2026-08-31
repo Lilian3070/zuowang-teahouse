@@ -68,6 +68,10 @@
     </form>
   </div>
   <div class="member-section">
+    <h2>我的预约申请</h2>
+    <div id="bookingRequestList"><p class="empty-hint">加载中...</p></div>
+  </div>
+  <div class="member-section">
     <h2>我的课时套餐</h2>
     <div id="packageList"><p class="empty-hint">加载中...</p></div>
   </div>
@@ -153,10 +157,11 @@ async function init() {
   document.getElementById('memberPage').style.display = 'block';
   startSessionWatch();
 
-  const [{ data: memberRow }, { data: packages }, { data: purchases }] = await Promise.all([
+  const [{ data: memberRow }, { data: packages }, { data: purchases }, { data: bookings }] = await Promise.all([
     db.from('members').select('name, phone, email, address, age').eq('id', profile.member_id).single(),
     db.from('class_packages').select('*').eq('member_id', profile.member_id).order('created_at'),
     db.from('purchases').select('*').eq('member_id', profile.member_id).order('purchased_at', { ascending: false }),
+    db.from('booking_requests').select('*').eq('member_id', profile.member_id).order('created_at', { ascending: false }),
   ]);
 
   if (memberRow) {
@@ -165,6 +170,19 @@ async function init() {
     document.getElementById('profEmail').value = memberRow.email || '';
     document.getElementById('profAddress').value = memberRow.address || '';
     document.getElementById('profAge').value = memberRow.age || '';
+  }
+
+  const bookingStatusLabel = { pending: '待确认', confirmed: '已确认', declined: '已回绝' };
+  const bookingEl = document.getElementById('bookingRequestList');
+  if (!bookings || !bookings.length) {
+    bookingEl.innerHTML = '<p class="empty-hint">暂无预约申请</p>';
+  } else {
+    bookingEl.innerHTML = bookings.map(b => `
+      <div class="member-row" style="align-items:flex-start;flex-direction:column;gap:4px">
+        <span class="row-name">${b.preferred_time || '（未填写期望时间）'} · ${bookingStatusLabel[b.status] || b.status}</span>
+        <span class="row-meta">${b.note || ''}</span>
+        ${b.admin_note ? `<span class="row-meta">主理人回复：${b.admin_note}</span>` : ''}
+      </div>`).join('');
   }
 
   const pkgEl = document.getElementById('packageList');

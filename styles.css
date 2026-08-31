@@ -508,26 +508,6 @@ section {
 .verify-message.error { color: #e7a39c; }
 .verify-message.success { color: #cfe0b8; }
 
-.real-booking-form {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  margin-top: 0;
-  transition: max-height 0.45s ease, opacity 0.35s ease, margin-top 0.45s ease;
-}
-
-.real-booking-form.expanded {
-  max-height: 900px;
-  opacity: 1;
-  margin-top: 26px;
-}
-
-.proto-note {
-  margin: 18px 0 0;
-  font-size: 0.78rem;
-  color: #b6a988;
-}
-
 .booking-form {
   background: transparent;
   padding: 0;

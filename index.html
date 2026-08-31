@@ -135,20 +135,14 @@
 
     <div class="track track-verified" id="booking-verified">
       <span class="track-label">知音通道</span>
-      <h3>已联络知音</h3>
-      <p class="track-lead">已与掌柜联络确认的知音，请在此验证预留手机号，即可直接填写席位预约。</p>
+      <h3>已是知音</h3>
+      <p class="track-lead">已注册的知音，登录后可直接提交席位预约申请，我们会尽快与您确认具体时间。</p>
 
-      <form class="verify-form" id="verifyForm">
-        <label for="verifyPhone">预留手机号</label>
-        <input type="tel" id="verifyPhone" name="verifyPhone" placeholder="请输入手机号" required>
-        <button type="submit" class="submit-btn">验证身份</button>
-      </form>
-      <p class="verify-message" id="verifyMessage"></p>
+      <div id="bookingLoginPrompt" style="color:#d9cdae;font-size:0.9rem;margin-bottom:8px">
+        请先<a href="#" onclick="onNavAccountClick(event); return false;" style="color:var(--paper);text-decoration:underline">登录会员账号</a>再提交预约申请（还不是会员？到店联络掌柜即可申请）。
+      </div>
 
-      <form class="booking-form real-booking-form" id="realBookingForm">
-        <label for="name">姓名</label>
-        <input type="text" id="name" name="name" placeholder="请输入姓名" required>
-
+      <form class="booking-form real-booking-form" id="realBookingForm" style="display:none" onsubmit="return submitBookingRequest(event)">
         <label for="mode">泡茶方式</label>
         <select id="mode" name="mode">
           <option>自主泡茶</option>
@@ -162,11 +156,9 @@
         <label for="note">备注</label>
         <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
 
-        <button type="submit" class="submit-btn">提交预约</button>
-        <div class="form-status" id="formStatus">已收到您的预约，我们会尽快与您确认。</div>
+        <button type="submit" class="submit-btn">提交预约申请</button>
+        <p id="bookingFormStatus" style="margin-top:12px;font-size:0.85rem;min-height:1.2em"></p>
       </form>
-
-      <p class="proto-note">当前为原型演示，手机号验证暂由前端模拟，正式上线后将接入真实的知音名单数据。</p>
     </div>
   </div>
 </section>
@@ -345,6 +337,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=20"></script>
+<script src="script.js?v=21"></script>
 </body>
 </html>
