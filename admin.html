@@ -863,7 +863,6 @@
         <div class="add-inline-form">
           <button class="btn-add-inline" id="btnGenInvite" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
           <button class="btn-add-inline" id="btnGenReset" onclick="generateResetCode()">生成密码重置密钥</button>
-          <button class="btn-add-inline" id="btnRebindLogin" onclick="openRebindModal()">找回误删账号（重新绑定）</button>
         </div>
       </div>
     </div>
@@ -903,24 +902,6 @@
       <button class="btn-delete" id="eventDeleteBtn" onclick="deleteEvent()" style="display:none">删除</button>
       <button class="btn-cancel" onclick="closeEventModal()">取消</button>
       <button class="btn-save" onclick="saveEvent()">保存</button>
-    </div>
-  </div>
-</div>
-
-<!-- 误删会员后，把TA原来的登录账号重新绑定到（新建的）这条档案上 -->
-<div class="modal-overlay" id="rebindModal">
-  <div class="modal" style="width:420px">
-    <div class="modal-title">找回误删账号</div>
-    <p style="font-size:13px;color:var(--ink-muted);margin-bottom:16px">
-      把这位客人原来的登录账号重新绑定到当前这条档案上。旧档案的课时/消费/预约记录如果已经被删，找不回来了。
-    </p>
-    <div class="form-group">
-      <label>TA注册时用的手机号或邮箱</label>
-      <input type="text" id="rebindAccount" placeholder="填手机号或邮箱，跟当初注册的完全一致">
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeRebindModal()">取消</button>
-      <button class="btn-save" onclick="saveRebind()">重新绑定</button>
     </div>
   </div>
 </div>
@@ -2284,7 +2265,6 @@ async function loadInviteCodeStatus() {
   infoEl.textContent = profile ? `登录账号（邮箱/手机号）：${profile.login_account || '（未记录）'}` : '尚未注册会员账号';
   document.getElementById('btnGenInvite').style.display = profile ? 'none' : '';
   document.getElementById('btnGenReset').style.display = profile ? '' : 'none';
-  document.getElementById('btnRebindLogin').style.display = profile ? 'none' : '';
 
   // 已注册的会员（有真实登录账号、课时/消费/预约都是她本人在用的数据）不允许删除，
   // 避免误删连带把客人自己账号里能看到的东西一起清没了；只有代建档还没注册的空壳档案能删
@@ -2322,27 +2302,6 @@ async function generateInviteCode() {
   if (error) { showToast('生成失败：' + error.message); return; }
   loadInviteCodeStatus();
   showCodeModal('注册密钥', code, '给客人后，去首页点"登录"→"会员注册"填写，绑定到这条档案。');
-}
-
-function openRebindModal() {
-  if (!currentMemberId) return;
-  document.getElementById('rebindAccount').value = '';
-  document.getElementById('rebindModal').classList.add('open');
-}
-
-function closeRebindModal() {
-  document.getElementById('rebindModal').classList.remove('open');
-}
-
-async function saveRebind() {
-  const account = document.getElementById('rebindAccount').value.trim();
-  if (!account) { showToast('请填写账号'); return; }
-
-  const { error } = await db.rpc('admin_rebind_login', { p_login_account: account, p_member_id: currentMemberId });
-  if (error) { showToast('绑定失败：' + error.message); return; }
-  showToast('已找回，重新绑定成功');
-  closeRebindModal();
-  loadInviteCodeStatus();
 }
 
 async function generateResetCode() {
