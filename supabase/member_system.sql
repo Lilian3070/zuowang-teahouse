@@ -44,7 +44,7 @@ create table if not exists invite_codes (
   code text primary key,
   member_id uuid references members(id) on delete cascade,
   is_used boolean not null default false,
-  used_by uuid references auth.users(id),
+  used_by uuid references auth.users(id) on delete set null,
   created_at timestamptz default now()
 );
 
