@@ -320,6 +320,8 @@
       <input type="text" id="regAccount" autocomplete="off" required>
       <label for="regPassword">设置密码</label>
       <input type="password" id="regPassword" autocomplete="new-password" required minlength="6">
+      <label for="regPasswordConfirm">确认密码</label>
+      <input type="password" id="regPasswordConfirm" autocomplete="new-password" required minlength="6">
       <button type="submit" class="submit-btn">注册</button>
       <p class="account-error" id="acctRegisterError"></p>
     </form>
@@ -330,6 +332,8 @@
       <input type="text" id="forgotCode" autocomplete="off" required>
       <label for="forgotPassword">设置新密码</label>
       <input type="password" id="forgotPassword" autocomplete="new-password" required minlength="6">
+      <label for="forgotPasswordConfirm">确认新密码</label>
+      <input type="password" id="forgotPasswordConfirm" autocomplete="new-password" required minlength="6">
       <button type="submit" class="submit-btn">重置密码</button>
       <p class="account-error" id="acctForgotError"></p>
       <p class="account-hint" style="margin-top:14px"><a href="#" onclick="switchAccountTab('login'); return false;">← 返回登录</a></p>
@@ -338,6 +342,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=21"></script>
+<script src="script.js?v=22"></script>
 </body>
 </html>

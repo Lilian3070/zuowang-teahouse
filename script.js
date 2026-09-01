@@ -171,8 +171,10 @@ async function doAccountRegister(event) {
   const code = document.getElementById('regCode').value.trim();
   const account = document.getElementById('regAccount').value.trim();
   const password = document.getElementById('regPassword').value;
+  const passwordConfirm = document.getElementById('regPasswordConfirm').value;
   const errEl = document.getElementById('acctRegisterError');
   errEl.textContent = '';
+  if (password !== passwordConfirm) { errEl.textContent = '两次密码不一致'; return false; }
   const { data: signUpData, error: signUpError } = await db.auth.signUp({ email: accountToAuthEmail(account), password });
   if (signUpError) { errEl.textContent = signUpError.message.includes('already') ? '该账号已注册' : '注册失败：' + signUpError.message; return false; }
   if (!signUpData.session) {
@@ -188,7 +190,10 @@ async function doForgotPassword(event) {
   event.preventDefault();
   const code = document.getElementById('forgotCode').value.trim();
   const password = document.getElementById('forgotPassword').value;
+  const passwordConfirm = document.getElementById('forgotPasswordConfirm').value;
   const errEl = document.getElementById('acctForgotError');
+  errEl.textContent = '';
+  if (password !== passwordConfirm) { errEl.textContent = '两次密码不一致'; return false; }
   const { error } = await db.rpc('reset_password_with_code', { reset_code: code, new_password: password });
   if (error) { errEl.textContent = error.message || '密钥无效或已被使用'; return false; }
   switchAccountTab('login');
@@ -227,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshAccountNav();
   document.getElementById('accountModalClose').addEventListener('click', closeAccountModal);
   document.getElementById('accountModalOverlay').addEventListener('click', closeAccountModal);
-  ['acctLoginPassword', 'regPassword', 'forgotPassword'].forEach(addPasswordToggle);
+  ['acctLoginPassword', 'regPassword', 'regPasswordConfirm', 'forgotPassword', 'forgotPasswordConfirm'].forEach(addPasswordToggle);
 });
 
 document.addEventListener('DOMContentLoaded', () => {
