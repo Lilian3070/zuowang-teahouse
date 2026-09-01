@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="styles.css?v=23">
 <style>
   body { min-height: 100vh; }
-  .member-page { max-width: 640px; margin: 0 auto; padding: 100px 24px 80px; }
   .member-top-bar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 100;
     display: flex; align-items: center; justify-content: space-between;
@@ -19,8 +18,22 @@
     cursor: pointer; margin-left: 16px;
   }
   .member-top-bar-actions button:hover { color: var(--seal); }
-  .member-section { margin-bottom: 40px; }
-  .member-section h2 { font-size: 1.15rem; margin: 0 0 16px; }
+
+  .member-shell { display: flex; padding-top: 60px; min-height: 100vh; }
+  .member-sidebar {
+    width: 200px; flex-shrink: 0; padding: 32px 0;
+    border-right: 1px solid var(--line);
+  }
+  .side-item {
+    display: block; width: 100%; text-align: left;
+    padding: 11px 16px 11px 28px; margin: 2px 0;
+    background: none; border: none; font-size: 0.95rem;
+    color: var(--ink-soft); cursor: pointer; transition: all 0.15s;
+  }
+  .side-item:hover { color: var(--ink); background: var(--paper-deep); }
+  .side-item.active { color: var(--seal); font-weight: 600; background: var(--paper-deep); }
+  .member-main { flex: 1; max-width: 640px; padding: 40px 32px 80px; }
+  .member-tab-panel h2 { font-size: 1.15rem; margin: 0 0 16px; }
   .member-row {
     display: flex; justify-content: space-between; align-items: baseline;
     padding: 14px 0; border-bottom: 1px solid var(--line);
@@ -31,6 +44,20 @@
   .empty-hint { color: var(--ink-soft); font-size: 0.9rem; }
   .gate-box { text-align: center; padding: 120px 24px; }
   .gate-box p { color: var(--ink-soft); margin-bottom: 20px; }
+
+  @media (max-width: 700px) {
+    .member-shell { flex-direction: column; }
+    .member-sidebar {
+      width: 100%; border-right: none; border-bottom: 1px solid var(--line);
+      padding: 14px 16px; display: flex; gap: 8px; overflow-x: auto;
+    }
+    .side-item {
+      width: auto; flex-shrink: 0; padding: 7px 16px; border-radius: 20px;
+      border: 1px solid var(--line); margin: 0;
+    }
+    .side-item.active { border-color: var(--seal); }
+    .member-main { padding: 28px 20px 60px; max-width: none; }
+  }
 </style>
 </head>
 <body>
@@ -48,36 +75,45 @@
   <a href="index.html" class="submit-btn" style="display:inline-block;width:auto;padding:12px 28px;text-decoration:none">回主页登录</a>
 </div>
 
-<div class="member-page" id="memberPage" style="display:none">
-  <div class="member-section">
-    <h2>个人信息</h2>
-    <p class="empty-hint" style="margin:-8px 0 16px">姓名、电话必填，其余选填，只有你自己能看到和修改。</p>
-    <form class="booking-form" id="profileForm" onsubmit="return saveProfile(event)">
-      <label for="profName">姓名</label>
-      <input type="text" id="profName" required>
-      <label for="profPhone">电话</label>
-      <input type="text" id="profPhone" required>
-      <label for="profEmail">邮箱（选填）</label>
-      <input type="email" id="profEmail">
-      <label for="profAddress">住址（选填）</label>
-      <input type="text" id="profAddress">
-      <label for="profAge">年龄（选填）</label>
-      <input type="number" id="profAge" min="0" max="120">
-      <button type="submit" class="submit-btn">保存</button>
-      <p class="account-error" id="profileStatus"></p>
-    </form>
+<div class="member-shell" id="memberPage" style="display:none">
+  <div class="member-sidebar">
+    <button class="side-item active" data-tab="profile" onclick="switchMemberTab('profile')">个人资料</button>
+    <button class="side-item" data-tab="qinren" onclick="switchMemberTab('qinren')">琴人中心</button>
+    <button class="side-item" data-tab="booking" onclick="switchMemberTab('booking')">包厢预约</button>
+    <button class="side-item" data-tab="purchase" onclick="switchMemberTab('purchase')">消费记录</button>
   </div>
-  <div class="member-section">
-    <h2>我的预约申请</h2>
-    <div id="bookingRequestList"><p class="empty-hint">加载中...</p></div>
-  </div>
-  <div class="member-section">
-    <h2>我的课时套餐</h2>
-    <div id="packageList"><p class="empty-hint">加载中...</p></div>
-  </div>
-  <div class="member-section">
-    <h2>我的消费记录</h2>
-    <div id="purchaseList"><p class="empty-hint">加载中...</p></div>
+  <div class="member-main">
+    <div class="member-tab-panel" id="tab-profile">
+      <h2>个人资料</h2>
+      <p class="empty-hint" style="margin:-8px 0 16px">姓名、电话必填，其余选填，只有你自己能看到和修改。</p>
+      <form class="booking-form" id="profileForm" onsubmit="return saveProfile(event)">
+        <label for="profName">姓名</label>
+        <input type="text" id="profName" required>
+        <label for="profPhone">电话</label>
+        <input type="text" id="profPhone" required>
+        <label for="profEmail">邮箱（选填）</label>
+        <input type="email" id="profEmail">
+        <label for="profAddress">住址（选填）</label>
+        <input type="text" id="profAddress">
+        <label for="profAge">年龄（选填）</label>
+        <input type="number" id="profAge" min="0" max="120">
+        <button type="submit" class="submit-btn">保存</button>
+        <p class="account-error" id="profileStatus"></p>
+      </form>
+    </div>
+    <div class="member-tab-panel" id="tab-qinren" style="display:none">
+      <h2>琴人中心</h2>
+      <p class="empty-hint" style="margin:-8px 0 16px">课时套餐余额，约课功能筹备中。</p>
+      <div id="packageList"><p class="empty-hint">加载中...</p></div>
+    </div>
+    <div class="member-tab-panel" id="tab-booking" style="display:none">
+      <h2>包厢预约</h2>
+      <div id="bookingRequestList"><p class="empty-hint">加载中...</p></div>
+    </div>
+    <div class="member-tab-panel" id="tab-purchase" style="display:none">
+      <h2>消费记录</h2>
+      <div id="purchaseList"><p class="empty-hint">加载中...</p></div>
+    </div>
   </div>
 </div>
 
@@ -126,6 +162,13 @@ async function doMemberLogout() {
   location.href = 'index.html';
 }
 
+function switchMemberTab(tab) {
+  document.querySelectorAll('.side-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.member-tab-panel').forEach(el => {
+    el.style.display = el.id === 'tab-' + tab ? 'block' : 'none';
+  });
+}
+
 let currentMemberId = null;
 
 async function saveProfile(event) {
@@ -154,7 +197,7 @@ async function init() {
   currentMemberId = profile.member_id;
 
   document.getElementById('gateBox').style.display = 'none';
-  document.getElementById('memberPage').style.display = 'block';
+  document.getElementById('memberPage').style.display = 'flex';
   startSessionWatch();
 
   const [{ data: memberRow }, { data: packages }, { data: purchases }, { data: bookings }] = await Promise.all([
