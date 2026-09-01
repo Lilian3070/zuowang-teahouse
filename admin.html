@@ -851,8 +851,7 @@
         <textarea id="memberDetailNote" placeholder="其他备注信息..."></textarea>
       </div>
       <div id="memberSelfInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:12px"></div>
-      <div class="modal-actions" style="margin-top:12px;align-items:center">
-        <span id="deleteMemberHint" style="display:none;font-size:12px;color:var(--ink-muted)">已注册的会员不能删除，只能删除代建档但还没注册的</span>
+      <div class="modal-actions" style="margin-top:12px">
         <button class="btn-delete" id="btnDeleteMember" onclick="deleteMember()">删除该会员</button>
         <button class="btn-save" onclick="saveMemberBasic()">保存基本信息</button>
       </div>
@@ -2290,7 +2289,6 @@ async function loadInviteCodeStatus() {
   // 已注册的会员（有真实登录账号、课时/消费/预约都是她本人在用的数据）不允许删除，
   // 避免误删连带把客人自己账号里能看到的东西一起清没了；只有代建档还没注册的空壳档案能删
   document.getElementById('btnDeleteMember').style.display = profile ? 'none' : '';
-  document.getElementById('deleteMemberHint').style.display = profile ? '' : 'none';
 
   // 只查未使用的：密钥一旦被用掉就没有再显示的必要，用完自动从这里消失
   const [{ data: invites }, { data: resets }] = await Promise.all([
