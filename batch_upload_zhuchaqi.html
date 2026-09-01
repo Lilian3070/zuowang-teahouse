@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>批量上传 - 泡茶主器</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+  h2 { color: #333; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  input[type=email], input[type=password] { width: 100%; padding: 8px; margin: 6px 0 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+  button { background: #8B6914; color: white; border: none; padding: 10px 24px; border-radius: 4px; cursor: pointer; font-size: 15px; }
+  button:hover { background: #6d5210; }
+  button:disabled { background: #aaa; cursor: not-allowed; }
+  .product-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .product-row:last-child { border-bottom: none; }
+  .product-name { font-weight: bold; width: 60px; }
+  .product-info { flex: 1; color: #666; font-size: 13px; }
+  .status { font-size: 13px; width: 80px; text-align: right; }
+  .status.ok { color: green; }
+  .status.err { color: red; }
+  .status.pending { color: #999; }
+  #log { background: #222; color: #0f0; padding: 12px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; margin-top: 12px; }
+  #loginSection { }
+  #uploadSection { display: none; }
+  .file-pick { font-size: 12px; }
+  input[type=file] { font-size: 12px; }
+  .folder-note { background: #fff8e1; border-left: 3px solid #f9a825; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; border-radius: 0 4px 4px 0; }
+</style>
+</head>
+<body>
+
+<h2>泡茶主器 · 批量上传工具</h2>
+
+<div class="card" id="loginSection">
+  <h3 style="margin-top:0">请先登录</h3>
+  <input type="email" id="email" placeholder="管理员邮箱">
+  <input type="password" id="pwd" placeholder="密码">
+  <div id="loginErr" style="color:red;margin-bottom:8px;font-size:13px;"></div>
+  <button onclick="doLogin()">登录</button>
+</div>
+
+<div id="uploadSection">
+  <div class="card">
+    <h3 style="margin-top:0">第一步：选择图片文件夹里的8张图</h3>
+    <div class="folder-note">
+      请到这个文件夹选择图片：<br>
+      <strong>坐忘茗舍网站 → 茶器美学 → 商品</strong><br>
+      全选8张 mmexport 开头的图片（按 Ctrl+A 全选，不要选龙蛋）
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">第二步：确认商品信息</h3>
+    <div id="productList"></div>
+  </div>
+
+  <div class="card">
+    <button id="uploadBtn" onclick="startUpload()" disabled>开始上传全部商品</button>
+    <div id="log" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://wmatsdnpbpcltuoynyrh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_gw7gfFtSHHJR6SbDUpCTwA_HNcktgEl';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const PRODUCTS = [
+  { name: '西施', desc: '原矿紫泥传统手制\n约 180cc', price: 1280 },
+  { name: '石瓢', desc: '底槽清老泥通灵\n约 220cc', price: 1680 },
+  { name: '仿古', desc: '降坡泥温润古朴\n约 240cc', price: 1480 },
+  { name: '井栏', desc: '朱泥细光内敛\n约 160cc', price: 980 },
+  { name: '德钟', desc: '清水泥古法手造\n约 260cc', price: 1380 },
+  { name: '汉扁', desc: '紫茄泥砂感隐现\n约 200cc', price: 1180 },
+  { name: '虚扁', desc: '本山绿泥薄胎\n约 150cc', price: 1080 },
+  { name: '掇球', desc: '红皮龙筋骨道劲\n约 280cc', price: 1880 },
+];
+
+let selectedFiles = [];
+
+// 渲染商品列表
+const list = document.getElementById('productList');
+PRODUCTS.forEach((p, i) => {
+  list.innerHTML += `
+    <div class="product-row" id="row-${i}">
+      <div class="product-name">${p.name}</div>
+      <div class="product-info">${p.desc.replace(/\n/,'<br>')} · <strong>¥${p.price}</strong></div>
+      <div class="status pending" id="status-${i}">待上传</div>
+    </div>`;
+});
+
+document.getElementById('fileInput').addEventListener('change', function() {
+  // 过滤掉龙蛋，按文件名排序
+  selectedFiles = Array.from(this.files)
+    .filter(f => f.name !== '龙蛋.jpg')
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (selectedFiles.length === 8) {
+    document.getElementById('uploadBtn').disabled = false;
+    document.getElementById('uploadBtn').textContent = `开始上传全部 ${selectedFiles.length} 个商品`;
+  } else {
+    document.getElementById('uploadBtn').disabled = true;
+    document.getElementById('uploadBtn').textContent = `选了 ${selectedFiles.length} 张，需要选8张`;
+  }
+});
+
+async function doLogin() {
+  const email = document.getElementById('email').value.trim();
+  const pwd = document.getElementById('pwd').value;
+  const { error } = await db.auth.signInWithPassword({ email, password: pwd });
+  if (error) { document.getElementById('loginErr').textContent = '邮箱或密码错误'; return; }
+  document.getElementById('loginSection').style.display = 'none';
+  document.getElementById('uploadSection').style.display = 'block';
+}
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function compressImage(file) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, 'image/jpeg', 0.82);
+    };
+    img.src = url;
+  });
+}
+
+async function startUpload() {
+  document.getElementById('uploadBtn').disabled = true;
+  document.getElementById('uploadBtn').textContent = '上传中...';
+
+  for (let i = 0; i < PRODUCTS.length; i++) {
+    const p = PRODUCTS[i];
+    const file = selectedFiles[i];
+    const statusEl = document.getElementById(`status-${i}`);
+    statusEl.textContent = '上传中…';
+    statusEl.className = 'status pending';
+
+    try {
+      log(`[${p.name}] 压缩图片...`);
+      const blob = await compressImage(file);
+      const filename = `zhuchaqi_${p.name}_${Date.now()}.jpg`;
+
+      log(`[${p.name}] 上传到 Storage...`);
+      const { error: upErr } = await db.storage.from('product-images').upload(filename, blob, { contentType: 'image/jpeg' });
+      if (upErr) throw new Error('Storage: ' + upErr.message);
+
+      const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(filename);
+
+      log(`[${p.name}] 写入数据库...`);
+      const { error: dbErr } = await db.from('products').insert({
+        category_key: 'zhuchaqi',
+        name: p.name,
+        description: p.desc,
+        price: p.price,
+        image_url: publicUrl,
+        is_visible: true,
+        sort_order: i + 1
+      });
+      if (dbErr) throw new Error('DB: ' + dbErr.message);
+
+      statusEl.textContent = '✓ 完成';
+      statusEl.className = 'status ok';
+      log(`[${p.name}] ✓ 成功`);
+    } catch(e) {
+      statusEl.textContent = '✗ 失败';
+      statusEl.className = 'status err';
+      log(`[${p.name}] ✗ ${e.message}`);
+    }
+  }
+
+  document.getElementById('uploadBtn').textContent = '全部完成！';
+  log('\n所有商品处理完毕，可以关闭此页面。');
+}
+</script>
+</body>
+</html>

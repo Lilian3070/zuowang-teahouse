@@ -148,7 +148,7 @@ grant execute on function reset_password_with_code(text, text) to anon, authenti
 -- 4. 把现有的管理员账号标记为 admin —— 去 Supabase 后台「Authentication → Users」核对邮箱，
 --    把下面的邮箱换成实际登录邮箱后再执行这一段。
 insert into profiles (id, role)
-select id, 'admin' from auth.users where email in ('替换成你的登录邮箱', '替换成主理人的登录邮箱')
+select id, 'admin' from auth.users where email in ('xianli0145@gmail.com', '505369456@qq.com')
 on conflict (id) do update set role = 'admin';
 
 
