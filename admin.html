@@ -937,6 +937,39 @@
   </div>
 </div>
 
+<!-- 通用单行输入弹窗，代替浏览器原生 prompt() -->
+<div class="modal-overlay" id="promptModal">
+  <div class="modal" style="width:380px">
+    <div class="modal-title" id="promptModalTitle">请输入</div>
+    <div class="form-group">
+      <input type="text" id="promptModalInput">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="resolvePrompt(null)">取消</button>
+      <button class="btn-save" onclick="resolvePrompt(document.getElementById('promptModalInput').value)">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建客户档案 -->
+<div class="modal-overlay" id="newMemberModal">
+  <div class="modal" style="width:380px">
+    <div class="modal-title">新建客户档案</div>
+    <div class="form-group">
+      <label>备注昵称</label>
+      <input type="text" id="newMemberNickname" placeholder="她自己注册后会填真实姓名，这里只是方便你自己认人">
+    </div>
+    <div class="form-group">
+      <label>联系方式（选填）</label>
+      <input type="text" id="newMemberPhone" placeholder="手机号 / 微信">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeNewMemberModal()">取消</button>
+      <button class="btn-save" onclick="saveNewMember()">创建</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1978,14 +2011,23 @@ function renderAllMembers(list) {
 
 // 新建一条只有备注昵称（或姓名）的空壳档案，用于给还没注册的老客人先占个位子，
 // 之后在这条档案上生成"注册密钥（绑定这条档案）"给她
-async function openNewBlankMemberPrompt() {
-  const nickname = prompt('给这位客人起个备注昵称（她自己注册后会填真实姓名，这里只是方便你自己认人）：');
-  if (nickname === null) return;
-  const trimmed = nickname.trim();
-  if (!trimmed) { showToast('请填写备注昵称'); return; }
-  const phone = prompt('联系方式（选填，可直接留空）：') || null;
-  const { error } = await db.from('members').insert({ nickname: trimmed, phone: phone ? phone.trim() || null : null });
+function openNewBlankMemberPrompt() {
+  document.getElementById('newMemberNickname').value = '';
+  document.getElementById('newMemberPhone').value = '';
+  document.getElementById('newMemberModal').classList.add('open');
+}
+
+function closeNewMemberModal() {
+  document.getElementById('newMemberModal').classList.remove('open');
+}
+
+async function saveNewMember() {
+  const nickname = document.getElementById('newMemberNickname').value.trim();
+  if (!nickname) { showToast('请填写备注昵称'); return; }
+  const phone = document.getElementById('newMemberPhone').value.trim() || null;
+  const { error } = await db.from('members').insert({ nickname, phone });
   if (error) { showToast('创建失败：' + error.message); return; }
+  closeNewMemberModal();
   showToast('已创建，点进详情可以生成注册密钥给她');
   delete tabProductsCache['allmembers'];
   loadAllMembers();
@@ -2037,7 +2079,7 @@ function renderBookingRequests(list) {
 async function setBookingStatus(id, status) {
   const update = { status };
   if (status === 'confirmed') {
-    const adminNote = prompt('给客人留句回复（选填，比如确认的具体时间）：');
+    const adminNote = await customPrompt('确认预约', '给客人留句回复（选填，比如确认的具体时间）');
     if (adminNote) update.admin_note = adminNote;
   }
   await db.from('booking_requests').update(update).eq('id', id);
@@ -2632,6 +2674,22 @@ function resolveConfirm(result) {
   if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
 }
 
+// 站内风格的单行输入弹窗，代替浏览器原生 prompt()；取消返回 null
+let promptResolve = null;
+function customPrompt(title, placeholder) {
+  document.getElementById('promptModalTitle').textContent = title;
+  const input = document.getElementById('promptModalInput');
+  input.placeholder = placeholder || '';
+  input.value = '';
+  document.getElementById('promptModal').classList.add('open');
+  setTimeout(() => input.focus(), 50);
+  return new Promise(resolve => { promptResolve = resolve; });
+}
+function resolvePrompt(value) {
+  document.getElementById('promptModal').classList.remove('open');
+  if (promptResolve) { promptResolve(value); promptResolve = null; }
+}
+
 // 图片上传区：支持从文件夹拖拽图片进来
 function enableDropUpload(areaEl, inputEl, multiple) {
   if (!areaEl || !inputEl) return;
@@ -3101,7 +3159,7 @@ function handleCatImageSelect(e) {
 
 async function saveCat() {
   const name = document.getElementById('catName').value.trim();
-  if (!name) { alert('请填写分类名称'); return; }
+  if (!name) { showToast('请填写分类名称'); return; }
   const type = tabConfig[currentTab].type;
   let coverUrl = document.getElementById('catImage').value;
   const oldCoverUrl = coverUrl || null;
@@ -3112,7 +3170,7 @@ async function saveCat() {
     const compressed = await compressImage(catImageFile);
     const filename = 'cat_' + Date.now() + '.jpg';
     const { data: upData, error: upErr } = await db.storage.from('product-images').upload(filename, compressed, { contentType: 'image/jpeg' });
-    if (upErr) { alert('图片上传失败：' + upErr.message); return; }
+    if (upErr) { showToast('图片上传失败：' + upErr.message); return; }
     const { data: { publicUrl } } = db.storage.from('product-images').getPublicUrl(upData.path);
     coverUrl = publicUrl;
     newCoverPath = upData.path;
@@ -3135,7 +3193,7 @@ async function saveCat() {
     ({ error } = await db.from('categories').insert(payload));
   }
   if (error) {
-    alert('保存失败：' + error.message);
+    showToast('保存失败：' + error.message);
     if (newCoverPath) db.storage.from('product-images').remove([newCoverPath]);
     return;
   }
@@ -3157,7 +3215,7 @@ async function deleteCat(id, name) {
   if (!(await customConfirm('确认删除分类「' + name + '」？\n\n注意：只删除分类本身，该分类下的商品数据不会被删除。'))) return;
   const cat = categoriesCache.find(c => c.id === id);
   const { error } = await db.from('categories').delete().eq('id', id);
-  if (error) { alert('删除失败：' + error.message); return; }
+  if (error) { showToast('删除失败：' + error.message); return; }
   const coverPath = storagePathFromUrl(cat?.cover_url);
   if (coverPath) db.storage.from('product-images').remove([coverPath]);
   await loadCategories();
