@@ -861,8 +861,8 @@
         <div id="memberAccountInfo" style="font-size:13px;color:var(--ink-muted);margin-bottom:8px"></div>
         <div id="inviteCodeStatus" style="font-size:13px;color:var(--ink-muted);line-height:1.8;margin-bottom:8px"></div>
         <div class="add-inline-form">
-          <button class="btn-add-inline" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
-          <button class="btn-add-inline" onclick="generateResetCode()">生成密码重置密钥</button>
+          <button class="btn-add-inline" id="btnGenInvite" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
+          <button class="btn-add-inline" id="btnGenReset" onclick="generateResetCode()">生成密码重置密钥</button>
         </div>
       </div>
     </div>
@@ -2205,6 +2205,8 @@ async function loadInviteCodeStatus() {
 
   const { data: profile } = await db.from('profiles').select('login_account').eq('member_id', currentMemberId).eq('role', 'member').maybeSingle();
   infoEl.textContent = profile ? `登录账号（邮箱/手机号）：${profile.login_account || '（未记录）'}` : '尚未注册会员账号';
+  document.getElementById('btnGenInvite').style.display = profile ? 'none' : '';
+  document.getElementById('btnGenReset').style.display = profile ? '' : 'none';
 
   const [{ data: invites }, { data: resets }] = await Promise.all([
     db.from('invite_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false }),
