@@ -864,6 +864,10 @@
           <button class="btn-add-inline" id="btnGenInvite" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
           <button class="btn-add-inline" id="btnGenReset" onclick="generateResetCode()">生成密码重置密钥</button>
         </div>
+        <div class="add-inline-form" id="rebindLoginForm" style="display:none;margin-top:8px">
+          <input type="text" id="rebindLoginInput" placeholder="误删档案后，输入TA原来的登录账号（手机号/邮箱）找回">
+          <button class="btn-add-inline" onclick="rebindLogin()">重新绑定</button>
+        </div>
       </div>
     </div>
 
@@ -2207,6 +2211,7 @@ async function loadInviteCodeStatus() {
   infoEl.textContent = profile ? `登录账号（邮箱/手机号）：${profile.login_account || '（未记录）'}` : '尚未注册会员账号';
   document.getElementById('btnGenInvite').style.display = profile ? 'none' : '';
   document.getElementById('btnGenReset').style.display = profile ? '' : 'none';
+  document.getElementById('rebindLoginForm').style.display = profile ? 'none' : 'flex';
 
   // 只查未使用的：密钥一旦被用掉就没有再显示的必要，用完自动从这里消失
   const [{ data: invites }, { data: resets }] = await Promise.all([
@@ -2240,6 +2245,18 @@ async function generateInviteCode() {
   if (error) { showToast('生成失败：' + error.message); return; }
   loadInviteCodeStatus();
   showCodeModal('注册密钥', code, '给客人后，去首页点"登录"→"会员注册"填写，绑定到这条档案。');
+}
+
+async function rebindLogin() {
+  if (!currentMemberId) return;
+  const input = document.getElementById('rebindLoginInput');
+  const account = input.value.trim();
+  if (!account) return;
+  const { error } = await db.rpc('admin_rebind_login', { p_login_account: account, p_member_id: currentMemberId });
+  if (error) { showToast('绑定失败：' + error.message); return; }
+  input.value = '';
+  showToast('已重新绑定');
+  loadInviteCodeStatus();
 }
 
 async function generateResetCode() {
