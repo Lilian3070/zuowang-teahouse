@@ -2208,15 +2208,16 @@ async function loadInviteCodeStatus() {
   document.getElementById('btnGenInvite').style.display = profile ? 'none' : '';
   document.getElementById('btnGenReset').style.display = profile ? '' : 'none';
 
+  // 只查未使用的：密钥一旦被用掉就没有再显示的必要，用完自动从这里消失
   const [{ data: invites }, { data: resets }] = await Promise.all([
-    db.from('invite_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false }),
-    db.from('password_reset_codes').select('*').eq('member_id', currentMemberId).order('created_at', { ascending: false }),
+    db.from('invite_codes').select('*').eq('member_id', currentMemberId).eq('is_used', false).order('created_at', { ascending: false }),
+    db.from('password_reset_codes').select('*').eq('member_id', currentMemberId).eq('is_used', false).order('created_at', { ascending: false }),
   ]);
 
-  const inviteLines = (invites || []).map(c => codeLineHtml(c, 'invite', c.is_used ? '已使用的注册密钥' : '注册密钥（未使用）'));
-  const resetLines = (resets || []).map(c => codeLineHtml(c, 'reset', c.is_used ? '已使用的重置密钥' : '密码重置密钥（未使用）'));
+  const inviteLines = (invites || []).map(c => codeLineHtml(c, 'invite', '注册密钥（未使用）'));
+  const resetLines = (resets || []).map(c => codeLineHtml(c, 'reset', '密码重置密钥（未使用）'));
   const lines = [...inviteLines, ...resetLines];
-  codeEl.innerHTML = lines.length ? lines.join('') : '尚未生成过密钥';
+  codeEl.innerHTML = lines.length ? lines.join('') : '没有待使用的密钥';
 }
 
 function codeLineHtml(c, kind, label) {

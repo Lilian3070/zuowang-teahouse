@@ -48,6 +48,8 @@ begin
   insert into profiles (id, role, member_type, member_id, login_account)
   values (auth.uid(), 'member', 'offline', v_member_id, p_login_account);
 
-  update invite_codes set is_used = true, used_by = auth.uid() where code = invite_code;
+  -- member_id 一起回填，不然后台在新建的会员档案里查这条密钥（按 member_id 查）永远查不到，
+  -- 会一直显示"没有待使用的密钥"，即便这个客人明明是靠这张密钥注册出来的
+  update invite_codes set is_used = true, used_by = auth.uid(), member_id = v_member_id where code = invite_code;
 end;
 $$;
