@@ -925,6 +925,18 @@
   </div>
 </div>
 
+<!-- 通用确认弹窗，代替浏览器原生 confirm() -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="width:380px">
+    <div class="modal-title">确认操作</div>
+    <p id="confirmModalMsg" style="font-size:14px;color:var(--ink);white-space:pre-line;line-height:1.7;margin-bottom:20px"></p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="resolveConfirm(false)">取消</button>
+      <button class="btn-delete" onclick="resolveConfirm(true)">确定</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1656,7 +1668,7 @@ function storagePathFromUrl(url) {
 }
 
 async function deleteProduct(id, name) {
-  if (!confirm(`确定要删除「${name}」吗？`)) return;
+  if (!(await customConfirm(`确定要删除「${name}」吗？`))) return;
   const { data } = await db.from('products').select('image_url, detail_images').eq('id', id).single();
   const { error } = await db.from('products').delete().eq('id', id);
   if (error) { showToast('删除失败：' + error.message); return; }
@@ -1809,7 +1821,7 @@ function setVisiblePoster(id, visible) {
 }
 
 async function deletePoster(id) {
-  if (!confirm('确定删除这张海报吗？')) return;
+  if (!(await customConfirm('确定删除这张海报吗？'))) return;
   const { data } = await db.from('posters').select('image_url').eq('id', id).single();
   const { error } = await db.from('posters').delete().eq('id', id);
   if (error) { showToast('删除失败：' + error.message); return; }
@@ -2034,7 +2046,7 @@ async function setBookingStatus(id, status) {
 }
 
 async function deleteBookingRequest(id) {
-  if (!confirm('确定删除这条预约申请吗？')) return;
+  if (!(await customConfirm('确定删除这条预约申请吗？'))) return;
   await db.from('booking_requests').delete().eq('id', id);
   delete tabProductsCache['bookings'];
   loadBookingRequests();
@@ -2167,7 +2179,7 @@ async function saveNewRecord() {
 
 async function deleteMember() {
   if (!currentMemberId) return;
-  if (!confirm('确定要删除这位会员吗？\n\n她名下的课时套餐、消费记录、预约申请会一并永久删除，删除后无法恢复。\n\n点"确定"删除，点"取消"放弃。')) return;
+  if (!(await customConfirm('确定要删除这位会员吗？\n\n她名下的课时套餐、消费记录、预约申请会一并永久删除，删除后无法恢复。'))) return;
   await db.from('members').delete().eq('id', currentMemberId);
   showToast('已删除');
   closeMemberDetail();
@@ -2381,7 +2393,7 @@ async function deductHour(id) {
 }
 
 async function deletePackage(id) {
-  if (!confirm('确定删除这个课时套餐吗？')) return;
+  if (!(await customConfirm('确定删除这个课时套餐吗？'))) return;
   await db.from('class_packages').delete().eq('id', id);
   await refreshPackages();
 }
@@ -2424,7 +2436,7 @@ async function addPurchase() {
 }
 
 async function deletePurchase(id) {
-  if (!confirm('确定删除这条消费记录吗？')) return;
+  if (!(await customConfirm('确定删除这条消费记录吗？'))) return;
   await db.from('purchases').delete().eq('id', id);
   await refreshPurchases();
 }
@@ -2546,7 +2558,7 @@ async function saveEvent() {
 
 async function deleteEvent() {
   const id = document.getElementById('eventEditId').value;
-  if (!id || !confirm('确定删除这条行程吗？')) return;
+  if (!id || !(await customConfirm('确定删除这条行程吗？'))) return;
   await db.from('schedule_events').delete().eq('id', id);
   showToast('已删除');
   closeEventModal();
@@ -2606,6 +2618,18 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// 站内风格的确认弹窗，代替浏览器原生 confirm()；用法：if (!(await customConfirm('...'))) return;
+let confirmResolve = null;
+function customConfirm(message) {
+  document.getElementById('confirmModalMsg').textContent = message;
+  document.getElementById('confirmModal').classList.add('open');
+  return new Promise(resolve => { confirmResolve = resolve; });
+}
+function resolveConfirm(result) {
+  document.getElementById('confirmModal').classList.remove('open');
+  if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
 }
 
 // 图片上传区：支持从文件夹拖拽图片进来
@@ -3130,7 +3154,7 @@ async function saveCat() {
 }
 
 async function deleteCat(id, name) {
-  if (!confirm('确认删除分类「' + name + '」？\n\n注意：只删除分类本身，该分类下的商品数据不会被删除。')) return;
+  if (!(await customConfirm('确认删除分类「' + name + '」？\n\n注意：只删除分类本身，该分类下的商品数据不会被删除。'))) return;
   const cat = categoriesCache.find(c => c.id === id);
   const { error } = await db.from('categories').delete().eq('id', id);
   if (error) { alert('删除失败：' + error.message); return; }
