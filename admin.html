@@ -607,7 +607,6 @@
           <button class="btn-add" id="btnAddPoster" onclick="openPosterUpload()" style="display:none">+ 上传海报</button>
           <button class="btn-add" id="btnAddMember" style="display:none">+ 添加记录</button>
           <button class="btn-add" id="btnGenBlankKey" style="display:none" onclick="openBlankKeyModal()">生成/查看新客户密钥</button>
-          <button class="btn-add" id="btnRebindLogin" style="display:none" onclick="openRebindModal()">找回误删账号</button>
         </div>
       </div>
 
@@ -864,6 +863,7 @@
         <div class="add-inline-form">
           <button class="btn-add-inline" id="btnGenInvite" onclick="generateInviteCode()">生成注册密钥（绑定这条档案）</button>
           <button class="btn-add-inline" id="btnGenReset" onclick="generateResetCode()">生成密码重置密钥</button>
+          <button class="btn-add-inline" id="btnRebindLogin" onclick="openRebindModal()">找回误删账号（重新绑定）</button>
         </div>
       </div>
     </div>
@@ -907,17 +907,13 @@
   </div>
 </div>
 
-<!-- 误删会员后，找回登录账号 -->
+<!-- 误删会员后，把TA原来的登录账号重新绑定到（新建的）这条档案上 -->
 <div class="modal-overlay" id="rebindModal">
   <div class="modal" style="width:420px">
     <div class="modal-title">找回误删账号</div>
     <p style="font-size:13px;color:var(--ink-muted);margin-bottom:16px">
-      会新建一条会员档案，并把TA原来的登录账号重新绑定过来。旧档案的课时/消费/预约记录如果已经被删，找不回来了。
+      把这位客人原来的登录账号重新绑定到当前这条档案上。旧档案的课时/消费/预约记录如果已经被删，找不回来了。
     </p>
-    <div class="form-group">
-      <label>姓名</label>
-      <input type="text" id="rebindName" placeholder="这位会员的姓名">
-    </div>
     <div class="form-group">
       <label>TA注册时用的手机号或邮箱</label>
       <input type="text" id="rebindAccount" placeholder="填手机号或邮箱，跟当初注册的完全一致">
@@ -1053,7 +1049,6 @@ async function loadProducts(forceRefresh = false) {
   const hasCached = !!tabProductsCache[currentTab];
   if (!hasCached) document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
   document.getElementById('btnGenBlankKey').style.display = 'none';
-  document.getElementById('btnRebindLogin').style.display = 'none';
 
   if (cfg.type === 'allmembers') {
     document.getElementById('btnAdd').style.display = 'none';
@@ -1065,7 +1060,6 @@ async function loadProducts(forceRefresh = false) {
     btnMember.textContent = '+ 新建客户档案';
     btnMember.onclick = () => openNewBlankMemberPrompt();
     document.getElementById('btnGenBlankKey').style.display = '';
-    document.getElementById('btnRebindLogin').style.display = '';
     document.getElementById('filterBar').innerHTML = '<input type="text" class="member-search" id="memberSearch" placeholder="搜索姓名/备注昵称..." oninput="loadAllMembers()">';
     await loadAllMembers();
     return;
@@ -2232,6 +2226,7 @@ async function loadInviteCodeStatus() {
   infoEl.textContent = profile ? `登录账号（邮箱/手机号）：${profile.login_account || '（未记录）'}` : '尚未注册会员账号';
   document.getElementById('btnGenInvite').style.display = profile ? 'none' : '';
   document.getElementById('btnGenReset').style.display = profile ? '' : 'none';
+  document.getElementById('btnRebindLogin').style.display = profile ? 'none' : '';
 
   // 只查未使用的：密钥一旦被用掉就没有再显示的必要，用完自动从这里消失
   const [{ data: invites }, { data: resets }] = await Promise.all([
@@ -2268,7 +2263,7 @@ async function generateInviteCode() {
 }
 
 function openRebindModal() {
-  document.getElementById('rebindName').value = '';
+  if (!currentMemberId) return;
   document.getElementById('rebindAccount').value = '';
   document.getElementById('rebindModal').classList.add('open');
 }
@@ -2278,23 +2273,14 @@ function closeRebindModal() {
 }
 
 async function saveRebind() {
-  const name = document.getElementById('rebindName').value.trim();
   const account = document.getElementById('rebindAccount').value.trim();
-  if (!name || !account) { showToast('姓名和账号都要填'); return; }
+  if (!account) { showToast('请填写账号'); return; }
 
-  const field = account.includes('@') ? 'email' : 'phone';
-  const { data: member, error: createError } = await db.from('members').insert({ name, [field]: account }).select().single();
-  if (createError || !member) { showToast('创建档案失败：' + (createError ? createError.message : '')); return; }
-
-  const { error: rebindError } = await db.rpc('admin_rebind_login', { p_login_account: account, p_member_id: member.id });
-  if (rebindError) {
-    showToast('已建档案，但绑定登录失败：' + rebindError.message);
-    return;
-  }
+  const { error } = await db.rpc('admin_rebind_login', { p_login_account: account, p_member_id: currentMemberId });
+  if (error) { showToast('绑定失败：' + error.message); return; }
   showToast('已找回，重新绑定成功');
   closeRebindModal();
-  delete tabProductsCache['allmembers'];
-  loadAllMembers();
+  loadInviteCodeStatus();
 }
 
 async function generateResetCode() {
