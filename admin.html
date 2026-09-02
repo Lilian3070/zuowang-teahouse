@@ -59,6 +59,31 @@
     transition: border-color 0.2s;
   }
   .form-group input:focus { border-color: var(--gold); }
+  /* 站内自制中文日期选择器，代替浏览器原生 <input type="date"> 的英文控件 */
+  .date-picker { position: relative; }
+  .date-picker-display {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 15px; background: var(--bg); color: var(--ink); text-align: left; cursor: pointer;
+  }
+  .date-picker-display:focus { border-color: var(--gold); outline: none; }
+  .date-picker-panel {
+    display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+    background: white; border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+    width: 260px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  .date-picker-panel.open { display: block; }
+  .date-picker-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-weight: 600; font-size: 14px; }
+  .date-picker-header button { background: none; border: none; font-size: 18px; color: var(--gold); cursor: pointer; padding: 2px 10px; border-radius: 6px; }
+  .date-picker-header button:hover { background: var(--gold-soft); }
+  .date-picker-weekdays, .date-picker-days { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+  .date-picker-weekdays span { font-size: 12px; color: var(--ink-muted); padding: 4px 0; }
+  .date-picker-days button {
+    border: none; background: none; padding: 6px 0; margin: 1px 0; border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--ink);
+  }
+  .date-picker-days button:hover:not(:disabled) { background: var(--gold-soft); }
+  .date-picker-days button.today { font-weight: 700; color: var(--gold); }
+  .date-picker-days button.selected { background: var(--gold); color: white; }
+  .date-picker-days button.other-month { color: var(--ink-muted); opacity: 0.35; cursor: default; }
   .btn-primary {
     width: 100%;
     padding: 12px;
@@ -938,7 +963,18 @@
     <div class="modal-title">确认扣一节课时</div>
     <div class="form-group">
       <label>上课日期</label>
-      <input type="date" id="deductDate">
+      <div class="date-picker">
+        <button type="button" class="date-picker-display" id="deductDateDisplay" onclick="toggleDeductCalendar(event)"></button>
+        <div class="date-picker-panel" id="deductCalendarPanel">
+          <div class="date-picker-header">
+            <button type="button" onclick="shiftDeductMonth(-1)">‹</button>
+            <span id="deductCalTitle"></span>
+            <button type="button" onclick="shiftDeductMonth(1)">›</button>
+          </div>
+          <div class="date-picker-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div class="date-picker-days" id="deductCalDays"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeDeductModal()">取消</button>
@@ -2433,21 +2469,72 @@ async function addClassPackage() {
 }
 
 // 点"扣一节"先弹窗选上课日期确认，避免手滑误扣；日期+操作时间只存进 session_log 给主理人自己追踪，不给客人看
+// 日期选择器是站内自制的中文日历（不用浏览器原生 <input type="date">，原生控件在部分浏览器下点两次也关不掉、还是英文）
 let deductPackageId = null;
+let deductSelectedDate = null; // Date 对象
+let deductCalMonth = null;     // 当前日历面板显示的月份（当月 1 号）
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function fmtDateYMD(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function fmtDateDisplay(d) { return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`; }
+
 function openDeductModal(id) {
   deductPackageId = id;
-  const now = new Date();
-  const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0'), d = String(now.getDate()).padStart(2, '0');
-  document.getElementById('deductDate').value = `${y}-${m}-${d}`;
+  deductSelectedDate = new Date();
+  deductCalMonth = new Date(deductSelectedDate.getFullYear(), deductSelectedDate.getMonth(), 1);
+  document.getElementById('deductDateDisplay').textContent = fmtDateDisplay(deductSelectedDate);
+  document.getElementById('deductCalendarPanel').classList.remove('open');
+  renderDeductCalendar();
   document.getElementById('deductModal').classList.add('open');
 }
 function closeDeductModal() {
   document.getElementById('deductModal').classList.remove('open');
+  document.getElementById('deductCalendarPanel').classList.remove('open');
   deductPackageId = null;
 }
+function toggleDeductCalendar(e) {
+  e.stopPropagation();
+  document.getElementById('deductCalendarPanel').classList.toggle('open');
+}
+function shiftDeductMonth(delta) {
+  deductCalMonth = new Date(deductCalMonth.getFullYear(), deductCalMonth.getMonth() + delta, 1);
+  renderDeductCalendar();
+}
+function renderDeductCalendar() {
+  const y = deductCalMonth.getFullYear(), m = deductCalMonth.getMonth();
+  document.getElementById('deductCalTitle').textContent = `${y}年${m + 1}月`;
+  const firstDay = new Date(y, m, 1);
+  const startOffset = (firstDay.getDay() + 6) % 7; // 周一开头，需要补的上月天数
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prevMonthDays = new Date(y, m, 0).getDate();
+  const todayStr = fmtDateYMD(new Date());
+  const selStr = deductSelectedDate ? fmtDateYMD(deductSelectedDate) : '';
+  let html = '';
+  for (let i = startOffset; i > 0; i--) {
+    html += `<button type="button" class="other-month" disabled>${prevMonthDays - i + 1}</button>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dStr = fmtDateYMD(new Date(y, m, d));
+    const cls = [dStr === todayStr ? 'today' : '', dStr === selStr ? 'selected' : ''].filter(Boolean).join(' ');
+    html += `<button type="button" class="${cls}" onclick="pickDeductDate(${y},${m},${d})">${d}</button>`;
+  }
+  document.getElementById('deductCalDays').innerHTML = html;
+}
+function pickDeductDate(y, m, d) {
+  deductSelectedDate = new Date(y, m, d);
+  document.getElementById('deductDateDisplay').textContent = fmtDateDisplay(deductSelectedDate);
+  document.getElementById('deductCalendarPanel').classList.remove('open');
+  renderDeductCalendar();
+}
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('deductCalendarPanel');
+  if (panel && panel.classList.contains('open') && !e.target.closest('.date-picker')) {
+    panel.classList.remove('open');
+  }
+});
 async function confirmDeductHour() {
-  const classDate = document.getElementById('deductDate').value;
-  if (!classDate) { showToast('请选择上课日期'); return; }
+  if (!deductSelectedDate) { showToast('请选择上课日期'); return; }
+  const classDate = fmtDateYMD(deductSelectedDate);
   const id = deductPackageId;
   closeDeductModal();
   await deductHour(id, classDate);
