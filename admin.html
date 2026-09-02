@@ -93,6 +93,15 @@
   }
   .dt-time-grid button:hover { background: var(--gold-soft); }
   .dt-time-grid button.selected { background: var(--gold); color: white; border-color: var(--gold); }
+  /* 行程占用资源选择：琴/茶/两者都占，跟周视图里每天左右分栏、图标一一对应 */
+  .resource-picker { display: flex; gap: 8px; }
+  .resource-chip {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+    font-size: 13px; color: var(--ink); cursor: pointer;
+  }
+  .resource-chip:hover { border-color: var(--gold); }
+  .resource-chip.selected { border-color: var(--gold); background: var(--gold-soft); font-weight: 600; }
   .btn-primary {
     width: 100%;
     padding: 12px;
@@ -568,27 +577,34 @@
   /* 周视图 */
   .cal-week-wrap { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .cal-week-timecol { width: 64px; flex-shrink: 0; border-right: 1px solid var(--border); }
-  .cal-week-timecol-head { height: 44px; border-bottom: 1px solid var(--border); }
+  .cal-week-timecol-head { height: 58px; border-bottom: 1px solid var(--border); }
   .cal-week-timelabel { font-size: 11px; color: var(--ink-muted); text-align: right; padding-right: 8px; transform: translateY(-6px); }
   .cal-week-days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); }
   .cal-week-daycol { border-left: 1px solid var(--border); position: relative; }
   .cal-week-daycol:first-child { border-left: none; }
   .cal-week-dayhead {
-    height: 44px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted);
+    height: 58px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted); gap: 3px;
   }
   .cal-week-dayhead.today { color: var(--gold); font-weight: 700; }
   .cal-week-dayhead b { font-size: 14px; color: var(--ink); }
   .cal-week-dayhead.today b { color: var(--gold); }
+  /* 表头琴/茶图标，跟下面每天左右两栏对齐：左边琴、右边茶，不写字全靠图标 */
+  .cal-week-res-icons { display: flex; width: 100%; justify-content: space-around; align-items: center; }
+  .cal-week-res-icons svg { display: block; }
   .cal-week-slots { position: relative; }
+  .cal-week-divider { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px dashed var(--border); }
   .cal-week-hourline { border-top: 1px solid var(--border); box-sizing: border-box; cursor: pointer; }
   .cal-week-hourline.half { border-top-style: dashed; border-top-color: var(--ink-muted); opacity: 0.4; }
   .cal-week-hourline:hover { background: var(--bg); }
   .cal-week-timelabel.half { font-size: 10px; opacity: 0.7; }
   .cal-week-event {
     position: absolute; left: 3px; right: 3px; border-radius: 4px; padding: 3px 6px;
-    font-size: 11px; overflow: hidden; cursor: pointer; line-height: 1.4;
+    font-size: 11px; overflow: hidden; cursor: pointer; line-height: 1.4; z-index: 2;
   }
+  /* 琴占左半栏、茶占右半栏，两者都占的通栏不变（跟表头图标、中间分割线对应） */
+  .cal-week-event.res-guqin { left: 3px; right: calc(50% + 2px); }
+  .cal-week-event.res-tea { left: calc(50% + 2px); right: 3px; }
   .cal-week-expand-row { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 0; }
   .cal-week-expand-btn {
     background: none; border: none; color: var(--ink-muted); font-size: 12px; cursor: pointer; padding: 4px 8px;
@@ -1053,6 +1069,20 @@
     <div class="form-group">
       <label>关联会员（选填）</label>
       <select id="eventMemberSelect"></select>
+    </div>
+    <div class="form-group">
+      <label>占用资源</label>
+      <div class="resource-picker" id="eventResourcePicker">
+        <button type="button" class="resource-chip" data-resource="guqin" onclick="pickEventResource('guqin')">
+          <svg viewBox="0 0 32 32" width="18" height="18"><path d="M27,4 C29,4.8 29.8,6.8 29,8.5 C27.8,11 22,16.5 16,21.5 C12,24.8 8.5,27 6,28.5 C7,26.3 9,23.3 12,20 C17,14.5 22,9 24.3,6.3 C25,5.3 26,4.5 27,4 Z" fill="none" stroke="#9B4A3E" stroke-width="2.2" stroke-linejoin="round"/><path d="M24.5,6 L27.5,3.7" stroke="#9B4A3E" stroke-width="2.4" stroke-linecap="round"/><path d="M25.5,8.3 L7.3,27" stroke="#9B4A3E" stroke-width="0.9"/><path d="M24,7 L6.3,26" stroke="#9B4A3E" stroke-width="0.9"/><path d="M22.3,6.2 L5.3,24.8" stroke="#9B4A3E" stroke-width="0.9"/></svg>
+          <span>琴</span>
+        </button>
+        <button type="button" class="resource-chip" data-resource="tea" onclick="pickEventResource('tea')">
+          <svg viewBox="0 0 32 32" width="18" height="18"><ellipse cx="16" cy="27" rx="11" ry="2.3" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M9,15 C9,20.3 11.3,23.8 16,23.8 C20.7,23.8 23,20.3 23,15" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><ellipse cx="16" cy="15" rx="7" ry="1.7" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8.4,12.6 10,13.2 11.7,12.8" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8,7 10.3,5 13.3,5 C18,5 21.7,9 22.3,14.6" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><circle cx="12.6" cy="4.3" r="1.05" fill="none" stroke="#2E5C8C" stroke-width="2.2"/></svg>
+          <span>茶</span>
+        </button>
+        <button type="button" class="resource-chip" data-resource="both" onclick="pickEventResource('both')"><span>两者都占</span></button>
+      </div>
     </div>
     <div class="form-group">
       <label>开始时间</label>
@@ -2794,6 +2824,10 @@ let calWeekExtraEarly = 0; // 手动点"显示更早时段"往前多展开的小
 let calWeekExtraLate = 0;  // 手动点"显示更晚时段"往后多展开的小时数
 const CAL_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
+// 琴（伏羲式古琴简笔画，红色）/ 茶（青花瓷盖碗简笔画，盖子微开）图标，周视图分栏和"添加行程"资源选择共用
+const ICON_GUQIN = `<svg viewBox="0 0 32 32" width="15" height="15"><path d="M27,4 C29,4.8 29.8,6.8 29,8.5 C27.8,11 22,16.5 16,21.5 C12,24.8 8.5,27 6,28.5 C7,26.3 9,23.3 12,20 C17,14.5 22,9 24.3,6.3 C25,5.3 26,4.5 27,4 Z" fill="none" stroke="#9B4A3E" stroke-width="2.2" stroke-linejoin="round"/><path d="M24.5,6 L27.5,3.7" stroke="#9B4A3E" stroke-width="2.4" stroke-linecap="round"/><path d="M25.5,8.3 L7.3,27" stroke="#9B4A3E" stroke-width="0.9"/><path d="M24,7 L6.3,26" stroke="#9B4A3E" stroke-width="0.9"/><path d="M22.3,6.2 L5.3,24.8" stroke="#9B4A3E" stroke-width="0.9"/></svg>`;
+const ICON_GAIWAN = `<svg viewBox="0 0 32 32" width="15" height="15"><ellipse cx="16" cy="27" rx="11" ry="2.3" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M9,15 C9,20.3 11.3,23.8 16,23.8 C20.7,23.8 23,20.3 23,15" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><ellipse cx="16" cy="15" rx="7" ry="1.7" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8.4,12.6 10,13.2 11.7,12.8" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8,7 10.3,5 13.3,5 C18,5 21.7,9 22.3,14.6" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><circle cx="12.6" cy="4.3" r="1.05" fill="none" stroke="#2E5C8C" stroke-width="2.2"/></svg>`;
+
 function formatSlotLabel(date) {
   return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
@@ -2818,7 +2852,7 @@ async function renderCalendar(forceRefresh = false) {
     events = (rows || []).map(e => {
       const m = memberMap.get(e.member_id);
       const label = m ? (m.nickname || m.name) : null;
-      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: new Date(e.start_at), end: new Date(e.end_at), hasMember: !!e.member_id };
+      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: new Date(e.start_at), end: new Date(e.end_at), hasMember: !!e.member_id, resource: e.resource || 'both' };
     });
     tabProductsCache['schedule'] = events;
   }
@@ -2948,12 +2982,18 @@ function renderCalWeek(events) {
       const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
       const top = (sH - gridStart) * pxPerHour;
       const height = Math.max((eH - sH) * pxPerHour, 20);
-      return `<div class="cal-week-event${e.hasMember ? '' : ' personal'}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
+      // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
+      const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ' res-both';
+      return `<div class="cal-week-event${e.hasMember ? '' : ' personal'}${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
     }).join('');
     daysHtml += `
       <div class="cal-week-daycol">
-        <div class="cal-week-dayhead${isToday ? ' today' : ''}"><span>周${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b></div>
+        <div class="cal-week-dayhead${isToday ? ' today' : ''}">
+          <span>周${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b>
+          <div class="cal-week-res-icons"><span class="res-icon-guqin">${ICON_GUQIN}</span><span class="res-icon-tea">${ICON_GAIWAN}</span></div>
+        </div>
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)">
+          <div class="cal-week-divider"></div>
           ${hourLines}
           ${eventsHtml}
         </div>
@@ -2989,15 +3029,18 @@ function calResetWeekExpand(dir) {
   renderCalendar();
 }
 
-// 点周视图空白处：按点击位置换算成最近的半小时，预填时间段，方便当备忘录快速加
+// 点周视图空白处：按点击位置换算成最近的半小时，预填时间段，方便当备忘录快速加；
+// 点左半栏默认选"琴"、右半栏默认选"茶"，跟表头图标一致，省一步手动选
 function calWeekSlotClick(evt, el) {
   const rect = el.getBoundingClientRect();
   const offsetY = evt.clientY - rect.top;
+  const offsetX = evt.clientX - rect.left;
+  const defaultResource = offsetX < rect.width / 2 ? 'guqin' : 'tea';
   const snapped = Math.max(0, Math.floor((calWeekGridStart + offsetY / calWeekPxPerHour) * 2) / 2);
   const h = Math.floor(snapped), min = Math.round((snapped % 1) * 60);
   const y = Number(el.dataset.y), m = Number(el.dataset.m), d = Number(el.dataset.d);
   const start = new Date(y, m, d, h, min);
-  openAddEventModal(null, start, new Date(start.getTime() + 60 * 60 * 1000));
+  openAddEventModal(null, start, new Date(start.getTime() + 60 * 60 * 1000), defaultResource);
 }
 
 // 年视图：12 个月缩略图，有行程的日子标个小圆点，点某天直接跳到那个月
@@ -3149,12 +3192,23 @@ document.addEventListener('click', (e) => {
   });
 });
 
-async function openAddEventModal(memberId, startDate, endDate) {
+// 行程占用哪条资源线（琴/茶/两者都占），跟周视图里每天的左右分栏一一对应
+let eventResourceValue = null;
+
+function pickEventResource(val) {
+  eventResourceValue = val;
+  document.querySelectorAll('#eventResourcePicker .resource-chip').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.resource === val);
+  });
+}
+
+async function openAddEventModal(memberId, startDate, endDate, defaultResource) {
   document.getElementById('eventModalTitle').textContent = '添加行程';
   document.getElementById('eventEditId').value = '';
   document.getElementById('eventDeleteBtn').style.display = 'none';
   document.getElementById('eventTitle').value = '';
   document.getElementById('eventNote').value = '';
+  pickEventResource(defaultResource || null);
   dtPickerInit('eventStart', startDate);
   dtPickerInit('eventEnd', endDate);
   await populateEventMemberSelect(memberId);
@@ -3169,6 +3223,7 @@ async function openEditEventModal(id) {
   document.getElementById('eventDeleteBtn').style.display = '';
   document.getElementById('eventTitle').value = data.title;
   document.getElementById('eventNote').value = data.note || '';
+  pickEventResource(data.resource || 'both');
   dtPickerInit('eventStart', data.start_at);
   dtPickerInit('eventEnd', data.end_at);
   await populateEventMemberSelect(data.member_id);
@@ -3195,9 +3250,11 @@ async function saveEvent() {
   const startDate = dtPickerGetValue('eventStart');
   const endDate = dtPickerGetValue('eventEnd');
   if (!title || !startDate || !endDate) { showToast('请填写标题和起止时间'); return; }
+  if (!eventResourceValue) { showToast('请选择占用琴还是茶'); return; }
   const payload = {
     title,
     member_id: memberId,
+    resource: eventResourceValue,
     start_at: startDate.toISOString(),
     end_at: endDate.toISOString(),
     note: document.getElementById('eventNote').value.trim() || null,
