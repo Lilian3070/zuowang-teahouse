@@ -2283,39 +2283,45 @@ async function loadInviteCodeStatus() {
 }
 
 function codeLineHtml(c, kind, label) {
-  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+  return `<div id="codeline-${kind}-${c.code}" style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
     <span>${label}：<strong>${c.code}</strong></span>
     <button class="btn-mini-delete" onclick="deleteCode('${kind}', '${c.code}')">删除</button>
   </div>`;
 }
 
+// 乐观更新：界面立刻把这一行移掉，数据库删除放到后台；失败了再整体重新加载纠正回来
 async function deleteCode(kind, code) {
   const table = kind === 'invite' ? 'invite_codes' : 'password_reset_codes';
+  const lineEl = document.getElementById(`codeline-${kind}-${code}`);
+  if (lineEl) lineEl.remove();
+  const listEl = document.getElementById('inviteCodeStatus');
+  if (listEl && !listEl.children.length) listEl.textContent = '没有待使用的密钥';
   const { error } = await db.from(table).delete().eq('code', code);
-  if (error) { showToast('删除失败：' + error.message); return; }
-  loadInviteCodeStatus();
+  if (error) { showToast('删除失败：' + error.message); loadInviteCodeStatus(); }
 }
 
+// 同样是乐观更新：密钥本身在本地就能生成好，不用等数据库写完才弹窗——
+// 弹窗立刻出现，删旧密钥/插新密钥放到后台默默完成
 async function generateInviteCode() {
   if (!currentMemberId) return;
   const code = genInviteCode();
+  showCodeModal('注册密钥', code, '给客人后，去首页点"登录"→"会员注册"填写，绑定到这条档案。');
   // 生成新的之前，先把这条档案名下还没用的旧注册密钥作废删掉，保证同一时间只有一张有效
   await db.from('invite_codes').delete().eq('member_id', currentMemberId).eq('is_used', false);
   const { error } = await db.from('invite_codes').insert({ code, member_id: currentMemberId });
-  if (error) { showToast('生成失败：' + error.message); return; }
+  if (error) { showToast('生成失败：' + error.message); closeCodeDisplayModal(); return; }
   loadInviteCodeStatus();
-  showCodeModal('注册密钥', code, '给客人后，去首页点"登录"→"会员注册"填写，绑定到这条档案。');
 }
 
 async function generateResetCode() {
   if (!currentMemberId) return;
   const code = genInviteCode();
+  showCodeModal('密码重置密钥', code, '给客人后，去首页"忘记密码"填写重设密码。');
   // 同上，旧的未使用重置密钥先作废，避免旧密钥还留着能用，造成混淆
   await db.from('password_reset_codes').delete().eq('member_id', currentMemberId).eq('is_used', false);
   const { error } = await db.from('password_reset_codes').insert({ code, member_id: currentMemberId });
-  if (error) { showToast('生成失败：' + error.message); return; }
+  if (error) { showToast('生成失败：' + error.message); closeCodeDisplayModal(); return; }
   loadInviteCodeStatus();
-  showCodeModal('密码重置密钥', code, '给客人后，去首页"忘记密码"填写重设密码。');
 }
 
 function showCodeModal(title, code, hint) {
