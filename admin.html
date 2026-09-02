@@ -2298,6 +2298,8 @@ async function deleteCode(kind, id) {
 async function generateInviteCode() {
   if (!currentMemberId) return;
   const code = genInviteCode();
+  // 生成新的之前，先把这条档案名下还没用的旧注册密钥作废删掉，保证同一时间只有一张有效
+  await db.from('invite_codes').delete().eq('member_id', currentMemberId).eq('is_used', false);
   const { error } = await db.from('invite_codes').insert({ code, member_id: currentMemberId });
   if (error) { showToast('生成失败：' + error.message); return; }
   loadInviteCodeStatus();
@@ -2307,6 +2309,8 @@ async function generateInviteCode() {
 async function generateResetCode() {
   if (!currentMemberId) return;
   const code = genInviteCode();
+  // 同上，旧的未使用重置密钥先作废，避免旧密钥还留着能用，造成混淆
+  await db.from('password_reset_codes').delete().eq('member_id', currentMemberId).eq('is_used', false);
   const { error } = await db.from('password_reset_codes').insert({ code, member_id: currentMemberId });
   if (error) { showToast('生成失败：' + error.message); return; }
   loadInviteCodeStatus();
