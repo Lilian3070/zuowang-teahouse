@@ -932,6 +932,21 @@
   </div>
 </div>
 
+<!-- 扣课时前确认弹窗：选上课日期，防误点误扣；日期只记录给主理人自己追踪，不显示给客人 -->
+<div class="modal-overlay" id="deductModal">
+  <div class="modal" style="width:380px">
+    <div class="modal-title">确认扣一节课时</div>
+    <div class="form-group">
+      <label>上课日期</label>
+      <input type="date" id="deductDate">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeDeductModal()">取消</button>
+      <button class="btn-save" onclick="confirmDeductHour()">确认扣除</button>
+    </div>
+  </div>
+</div>
+
 <!-- 新建客户档案 -->
 <div class="modal-overlay" id="newMemberModal">
   <div class="modal" style="width:380px">
@@ -2381,13 +2396,18 @@ function renderPackages(packages) {
   }
   el.innerHTML = packages.map(p => {
     const remaining = p.total_hours - p.used_hours;
+    const log = Array.isArray(p.session_log) ? p.session_log : [];
+    const logLine = log.length
+      ? `<div class="pkg-hours" style="color:var(--ink-muted)">上课记录：${log.slice().reverse().map(s => s.date).join('、')}</div>`
+      : '';
     return `
     <div class="package-row" data-id="${p.id}">
       <div class="pkg-info">
         <div class="pkg-name">${p.package_name}</div>
         <div class="pkg-hours">已用 ${p.used_hours} / 共 ${p.total_hours} 节 · 剩余 ${remaining} 节${p.price ? ' · ¥' + p.price : ''}</div>
+        ${logLine}
       </div>
-      <button class="btn-deduct" ${remaining <= 0 ? 'disabled' : ''} onclick="deductHour('${p.id}')">扣一节</button>
+      <button class="btn-deduct" ${remaining <= 0 ? 'disabled' : ''} onclick="openDeductModal('${p.id}')">扣一节</button>
       <button class="btn-mini-delete" onclick="deletePackage('${p.id}')">删除</button>
     </div>`;
   }).join('');
@@ -2412,10 +2432,33 @@ async function addClassPackage() {
   showToast('已添加');
 }
 
-async function deductHour(id) {
+// 点"扣一节"先弹窗选上课日期确认，避免手滑误扣；日期+操作时间只存进 session_log 给主理人自己追踪，不给客人看
+let deductPackageId = null;
+function openDeductModal(id) {
+  deductPackageId = id;
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0'), d = String(now.getDate()).padStart(2, '0');
+  document.getElementById('deductDate').value = `${y}-${m}-${d}`;
+  document.getElementById('deductModal').classList.add('open');
+}
+function closeDeductModal() {
+  document.getElementById('deductModal').classList.remove('open');
+  deductPackageId = null;
+}
+async function confirmDeductHour() {
+  const classDate = document.getElementById('deductDate').value;
+  if (!classDate) { showToast('请选择上课日期'); return; }
+  const id = deductPackageId;
+  closeDeductModal();
+  await deductHour(id, classDate);
+}
+
+async function deductHour(id, classDate) {
   const { data } = await db.from('class_packages').select('*').eq('id', id).single();
   if (!data || data.used_hours >= data.total_hours) return;
-  await db.from('class_packages').update({ used_hours: data.used_hours + 1 }).eq('id', id);
+  const log = Array.isArray(data.session_log) ? data.session_log : [];
+  log.push({ date: classDate, logged_at: new Date().toISOString() });
+  await db.from('class_packages').update({ used_hours: data.used_hours + 1, session_log: log }).eq('id', id);
   await refreshPackages();
 }
 
