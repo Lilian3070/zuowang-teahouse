@@ -102,6 +102,7 @@
   }
   .resource-chip:hover { border-color: var(--gold); }
   .resource-chip.selected { border-color: var(--gold); background: var(--gold-soft); font-weight: 600; }
+  .resource-chip .res-badge { width: 20px; height: 20px; font-size: 12px; }
   .btn-primary {
     width: 100%;
     padding: 12px;
@@ -545,13 +546,26 @@
   .cal-view-btn:hover { border-color: var(--gold); color: var(--gold); }
   .cal-view-btn.active { background: var(--gold); border-color: var(--gold); color: white; }
 
-  /* 事件颜色：关联了会员的用金色，纯个人行程/备忘录用青灰色，跟站点主色呼应 */
+  /* 事件颜色：按占用资源分——琴=红、茶=青花绿(sage)、两者都占=金配"和"字，周/月视图共用同一套 */
   .cal-event-chip, .cal-week-event {
     background: var(--gold-soft); color: var(--gold); border-left: 3px solid var(--gold);
   }
-  .cal-event-chip.personal, .cal-week-event.personal {
+  .cal-event-chip.res-guqin, .cal-week-event.res-guqin {
+    background: var(--red-soft); color: var(--red); border-left: 3px solid var(--red);
+  }
+  .cal-event-chip.res-tea, .cal-week-event.res-tea {
     background: var(--surface); color: var(--sage); border-left: 3px solid var(--sage);
   }
+  /* 圆形线条框 + 汉字的资源标记：琴/茶/和，日历表头、"添加行程"资源选择、"两者都占"事件条都用这个 */
+  .res-badge {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 16px; height: 16px; border-radius: 50%; border: 1.4px solid currentColor;
+    font-size: 10px; line-height: 1; font-weight: 600;
+    font-family: "STZhongsong", "Songti SC", "SimSun", serif;
+  }
+  .res-badge.guqin { color: var(--red); }
+  .res-badge.tea { color: var(--sage); }
+  .res-badge.both { color: var(--gold); }
 
   /* 月视图 */
   .cal-month-weekdays, .cal-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
@@ -591,7 +605,6 @@
   .cal-week-dayhead.today b { color: var(--gold); }
   /* 表头琴/茶图标，跟下面每天左右两栏对齐：左边琴、右边茶，不写字全靠图标 */
   .cal-week-res-icons { display: flex; width: 100%; justify-content: space-around; align-items: center; }
-  .cal-week-res-icons svg { display: block; }
   .cal-week-slots { position: relative; }
   .cal-week-divider { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px dashed var(--border); }
   .cal-week-hourline { border-top: 1px solid var(--border); box-sizing: border-box; cursor: pointer; }
@@ -1074,14 +1087,17 @@
       <label>占用资源</label>
       <div class="resource-picker" id="eventResourcePicker">
         <button type="button" class="resource-chip" data-resource="guqin" onclick="pickEventResource('guqin')">
-          <svg viewBox="0 0 32 32" width="18" height="18"><path d="M27,4 C29,4.8 29.8,6.8 29,8.5 C27.8,11 22,16.5 16,21.5 C12,24.8 8.5,27 6,28.5 C7,26.3 9,23.3 12,20 C17,14.5 22,9 24.3,6.3 C25,5.3 26,4.5 27,4 Z" fill="none" stroke="#9B4A3E" stroke-width="2.2" stroke-linejoin="round"/><path d="M24.5,6 L27.5,3.7" stroke="#9B4A3E" stroke-width="2.4" stroke-linecap="round"/><path d="M25.5,8.3 L7.3,27" stroke="#9B4A3E" stroke-width="0.9"/><path d="M24,7 L6.3,26" stroke="#9B4A3E" stroke-width="0.9"/><path d="M22.3,6.2 L5.3,24.8" stroke="#9B4A3E" stroke-width="0.9"/></svg>
+          <span class="res-badge guqin">琴</span>
           <span>琴</span>
         </button>
         <button type="button" class="resource-chip" data-resource="tea" onclick="pickEventResource('tea')">
-          <svg viewBox="0 0 32 32" width="18" height="18"><ellipse cx="16" cy="27" rx="11" ry="2.3" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M9,15 C9,20.3 11.3,23.8 16,23.8 C20.7,23.8 23,20.3 23,15" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><ellipse cx="16" cy="15" rx="7" ry="1.7" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8.4,12.6 10,13.2 11.7,12.8" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8,7 10.3,5 13.3,5 C18,5 21.7,9 22.3,14.6" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><circle cx="12.6" cy="4.3" r="1.05" fill="none" stroke="#2E5C8C" stroke-width="2.2"/></svg>
+          <span class="res-badge tea">茶</span>
           <span>茶</span>
         </button>
-        <button type="button" class="resource-chip" data-resource="both" onclick="pickEventResource('both')"><span>两者都占</span></button>
+        <button type="button" class="resource-chip" data-resource="both" onclick="pickEventResource('both')">
+          <span class="res-badge both">和</span>
+          <span>两者都占</span>
+        </button>
       </div>
     </div>
     <div class="form-group">
@@ -2824,9 +2840,10 @@ let calWeekExtraEarly = 0; // 手动点"显示更早时段"往前多展开的小
 let calWeekExtraLate = 0;  // 手动点"显示更晚时段"往后多展开的小时数
 const CAL_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
-// 琴（伏羲式古琴简笔画，红色）/ 茶（青花瓷盖碗简笔画，盖子微开）图标，周视图分栏和"添加行程"资源选择共用
-const ICON_GUQIN = `<svg viewBox="0 0 32 32" width="15" height="15"><path d="M27,4 C29,4.8 29.8,6.8 29,8.5 C27.8,11 22,16.5 16,21.5 C12,24.8 8.5,27 6,28.5 C7,26.3 9,23.3 12,20 C17,14.5 22,9 24.3,6.3 C25,5.3 26,4.5 27,4 Z" fill="none" stroke="#9B4A3E" stroke-width="2.2" stroke-linejoin="round"/><path d="M24.5,6 L27.5,3.7" stroke="#9B4A3E" stroke-width="2.4" stroke-linecap="round"/><path d="M25.5,8.3 L7.3,27" stroke="#9B4A3E" stroke-width="0.9"/><path d="M24,7 L6.3,26" stroke="#9B4A3E" stroke-width="0.9"/><path d="M22.3,6.2 L5.3,24.8" stroke="#9B4A3E" stroke-width="0.9"/></svg>`;
-const ICON_GAIWAN = `<svg viewBox="0 0 32 32" width="15" height="15"><ellipse cx="16" cy="27" rx="11" ry="2.3" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M9,15 C9,20.3 11.3,23.8 16,23.8 C20.7,23.8 23,20.3 23,15" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><ellipse cx="16" cy="15" rx="7" ry="1.7" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8.4,12.6 10,13.2 11.7,12.8" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><path d="M8,11 C8,7 10.3,5 13.3,5 C18,5 21.7,9 22.3,14.6" fill="none" stroke="#2E5C8C" stroke-width="2.2"/><circle cx="12.6" cy="4.3" r="1.05" fill="none" stroke="#2E5C8C" stroke-width="2.2"/></svg>`;
+// 琴/茶/和：圆形线条框 + 汉字的资源标记，日历表头、"添加行程"资源选择、事件条共用（配色见 .res-badge CSS）
+const RES_BADGE_GUQIN = `<span class="res-badge guqin">琴</span>`;
+const RES_BADGE_TEA = `<span class="res-badge tea">茶</span>`;
+const RES_BADGE_BOTH = `<span class="res-badge both">和</span>`;
 
 function formatSlotLabel(date) {
   return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -2922,7 +2939,7 @@ function renderCalMonth(events) {
     const dayEvents = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
     const maxShow = 3;
     const chips = dayEvents.slice(0, maxShow).map(e =>
-      `<div class="cal-event-chip${e.hasMember ? '' : ' personal'}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`
+      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.resource === 'both' ? RES_BADGE_BOTH + ' ' : ''}${e.title}</div>`
     ).join('');
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calAnchor=new Date(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()});calSetView('week')">还有 ${dayEvents.length - maxShow} 条</div>`
@@ -2983,14 +3000,15 @@ function renderCalWeek(events) {
       const top = (sH - gridStart) * pxPerHour;
       const height = Math.max((eH - sH) * pxPerHour, 20);
       // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
-      const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ' res-both';
-      return `<div class="cal-week-event${e.hasMember ? '' : ' personal'}${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
+      const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
+      const badge = e.resource === 'both' ? RES_BADGE_BOTH + ' ' : '';
+      return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${badge}${e.title}</div>`;
     }).join('');
     daysHtml += `
       <div class="cal-week-daycol">
         <div class="cal-week-dayhead${isToday ? ' today' : ''}">
           <span>周${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b>
-          <div class="cal-week-res-icons"><span class="res-icon-guqin">${ICON_GUQIN}</span><span class="res-icon-tea">${ICON_GAIWAN}</span></div>
+          <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
         </div>
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)">
           <div class="cal-week-divider"></div>
