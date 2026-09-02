@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 管理后台</title>
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="assets/vendor/fullcalendar@6.1.15.global.min.js"></script>
-<script src="assets/vendor/fullcalendar-locale-zh-cn@6.1.15.global.min.js"></script>
 <style>
   :root {
     --bg: #F7F3EC;
@@ -507,10 +505,92 @@
     border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
   }
 
-  /* 行程日历 */
+  /* 行程日历：自己做的年/月/周三视图，不再套用 FullCalendar */
   #calendarEl {
     background: white; border: 1px solid var(--border); border-radius: 10px; padding: 16px;
   }
+  .cal-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .cal-toolbar-left { display: flex; align-items: center; gap: 6px; }
+  .cal-nav-btn, .cal-today-btn {
+    border: 1px solid var(--border); background: white; color: var(--ink); border-radius: 6px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .cal-nav-btn:hover, .cal-today-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .cal-title { font-size: 17px; font-weight: 700; color: var(--ink); margin: 0 4px; }
+  .cal-toolbar-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .cal-view-btn {
+    border: 1px solid var(--border); background: white; color: var(--ink-muted); border-radius: 6px;
+    padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  .cal-view-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .cal-view-btn.active { background: var(--gold); border-color: var(--gold); color: white; }
+
+  /* 事件颜色：关联了会员的用金色，纯个人行程/备忘录用青灰色，跟站点主色呼应 */
+  .cal-event-chip, .cal-week-event {
+    background: var(--gold-soft); color: var(--gold); border-left: 3px solid var(--gold);
+  }
+  .cal-event-chip.personal, .cal-week-event.personal {
+    background: var(--surface); color: var(--sage); border-left: 3px solid var(--sage);
+  }
+
+  /* 月视图 */
+  .cal-month-weekdays, .cal-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-month-weekdays span { text-align: center; font-size: 12px; color: var(--ink-muted); padding: 6px 0; }
+  .cal-month-cell {
+    min-height: 92px; border: 1px solid var(--border); border-top: none; border-left: none;
+    padding: 6px; cursor: pointer; transition: background .15s;
+  }
+  .cal-month-grid { border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+  .cal-month-cell:hover { background: var(--bg); }
+  .cal-month-cell.other-month { color: var(--ink-muted); opacity: 0.45; }
+  .cal-month-daynum { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .cal-month-cell.today .cal-month-daynum {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--gold); color: white;
+  }
+  .cal-event-chip {
+    font-size: 11px; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+  }
+  .cal-month-more { font-size: 11px; color: var(--ink-muted); cursor: pointer; }
+
+  /* 周视图 */
+  .cal-week-wrap { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .cal-week-timecol { width: 64px; flex-shrink: 0; border-right: 1px solid var(--border); }
+  .cal-week-timecol-head { height: 44px; border-bottom: 1px solid var(--border); }
+  .cal-week-timelabel { font-size: 11px; color: var(--ink-muted); text-align: right; padding-right: 8px; transform: translateY(-6px); }
+  .cal-week-days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-week-daycol { border-left: 1px solid var(--border); position: relative; }
+  .cal-week-daycol:first-child { border-left: none; }
+  .cal-week-dayhead {
+    height: 44px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted);
+  }
+  .cal-week-dayhead.today { color: var(--gold); font-weight: 700; }
+  .cal-week-dayhead b { font-size: 14px; color: var(--ink); }
+  .cal-week-dayhead.today b { color: var(--gold); }
+  .cal-week-slots { position: relative; }
+  .cal-week-hourline { border-top: 1px solid var(--border); box-sizing: border-box; cursor: pointer; }
+  .cal-week-hourline:hover { background: var(--bg); }
+  .cal-week-event {
+    position: absolute; left: 3px; right: 3px; border-radius: 4px; padding: 3px 6px;
+    font-size: 11px; overflow: hidden; cursor: pointer; line-height: 1.4;
+  }
+
+  /* 年视图 */
+  .cal-year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .cal-year-month { border: 1px solid var(--border); border-radius: 8px; padding: 10px; cursor: pointer; }
+  .cal-year-month:hover { border-color: var(--gold); }
+  .cal-year-month-title { font-size: 13px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+  .cal-year-mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-year-day { font-size: 10px; text-align: center; padding: 3px 0; border-radius: 3px; position: relative; color: var(--ink-muted); }
+  .cal-year-day.other-month { opacity: 0.3; }
+  .cal-year-day.today { background: var(--gold); color: white; font-weight: 700; }
+  .cal-year-day.has-event::after {
+    content: ''; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
+    width: 3px; height: 3px; border-radius: 50%; background: var(--sage);
+  }
+  .cal-year-day.today.has-event::after { background: white; }
 
   @media (max-width: 680px) {
     /* 顶栏 */
@@ -553,9 +633,13 @@
 
     /* 行程日历 */
     #calendarEl { padding: 8px; }
-    #calendarEl .fc-toolbar { flex-direction: column; gap: 8px; }
-    #calendarEl .fc-toolbar-title { font-size: 16px; }
-    #calendarEl .fc-button { padding: 4px 8px; font-size: 12px; }
+    .cal-toolbar { flex-direction: column; align-items: stretch; }
+    .cal-toolbar-left { justify-content: center; }
+    .cal-title { text-align: center; }
+    .cal-toolbar-right { justify-content: center; }
+    .cal-year-grid { grid-template-columns: repeat(2, 1fr); }
+    .cal-month-cell { min-height: 64px; padding: 4px; }
+    .cal-week-timecol { width: 44px; }
   }
 
   /* 分类管理面板 */
@@ -2656,7 +2740,12 @@ async function deletePurchase(id) {
 
 // ── 行程安排 ──────────────────────────────────────────
 
-let calendarInstance = null;
+// ── 行程日历：自己做的年/月/周三视图（不再套用 FullCalendar，方便以后按需求自由改版式/加花纹） ──
+let calView = 'month';
+let calAnchor = new Date();
+let calWeekGridStart = 8.5;
+let calWeekPxPerHour = 48;
+const CAL_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
 function formatSlotLabel(date) {
   const h = date.getHours();
@@ -2666,6 +2755,14 @@ function formatSlotLabel(date) {
   if (h12 === 0) h12 = 12;
   return m === 0 ? `${period}${h12}点` : `${period}${h12}点${m}分`;
 }
+
+function calMondayIndex(d) { return (d.getDay() + 6) % 7; }
+function calStartOfWeek(d) {
+  const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  r.setDate(r.getDate() - calMondayIndex(r));
+  return r;
+}
+function calSameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
 async function renderCalendar(forceRefresh = false) {
   let events = tabProductsCache['schedule'];
@@ -2679,28 +2776,198 @@ async function renderCalendar(forceRefresh = false) {
     events = (rows || []).map(e => {
       const m = memberMap.get(e.member_id);
       const label = m ? (m.nickname || m.name) : null;
-      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: e.start_at, end: e.end_at };
+      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: new Date(e.start_at), end: new Date(e.end_at), hasMember: !!e.member_id };
     });
     tabProductsCache['schedule'] = events;
   }
 
   const el = document.getElementById('calendarEl');
   if (!el) return;
-  if (calendarInstance) { calendarInstance.destroy(); calendarInstance = null; }
-  calendarInstance = new FullCalendar.Calendar(el, {
-    locale: 'zh-cn',
-    height: 'auto',
-    headerToolbar: { left: 'prev,next today', center: 'title', right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay' },
-    buttonText: { today: '今天', multiMonthYear: '年', dayGridMonth: '月', timeGridWeek: '周', timeGridDay: '日', list: '列表' },
-    allDayText: '全天',
-    slotLabelContent: (arg) => formatSlotLabel(arg.date),
-    initialView: 'dayGridMonth',
-    events,
-    selectable: true,
-    select: (info) => { openAddEventModal(null, info.start, info.end); calendarInstance.unselect(); },
-    eventClick: (info) => openEditEventModal(info.event.id),
+  el.innerHTML = `
+    <div class="cal-toolbar">
+      <div class="cal-toolbar-left">
+        <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+        <button class="cal-today-btn" onclick="calGoToday()">今天</button>
+        <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+        <span class="cal-title" id="calTitle"></span>
+      </div>
+      <div class="cal-toolbar-right">
+        <button class="cal-view-btn" data-view="year" onclick="calSetView('year')">年</button>
+        <button class="cal-view-btn" data-view="month" onclick="calSetView('month')">月</button>
+        <button class="cal-view-btn" data-view="week" onclick="calSetView('week')">周</button>
+        <button class="btn-add-inline" onclick="openAddEventModal(null)">+ 添加行程</button>
+      </div>
+    </div>
+    <div class="cal-body" id="calBody"></div>
+  `;
+  document.querySelectorAll('.cal-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === calView));
+  if (calView === 'year') renderCalYear(events);
+  else if (calView === 'week') renderCalWeek(events);
+  else renderCalMonth(events);
+}
+
+function calSetView(v) { calView = v; renderCalendar(); }
+function calGoToday() { calAnchor = new Date(); renderCalendar(); }
+function calNav(dir) {
+  if (calView === 'year') calAnchor = new Date(calAnchor.getFullYear() + dir, calAnchor.getMonth(), 1);
+  else if (calView === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + dir, 1);
+  else calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), calAnchor.getDate() + dir * 7);
+  renderCalendar();
+}
+function calAddOnDay(y, m, d) {
+  openAddEventModal(null, new Date(y, m, d, 9, 0), new Date(y, m, d, 10, 0));
+}
+
+// 月视图：一格一天，超过 3 条行程折叠成"还有 N 条"，点空白处默认建 9-10 点的行程
+function renderCalMonth(events) {
+  const y = calAnchor.getFullYear(), m = calAnchor.getMonth();
+  document.getElementById('calTitle').textContent = `${y}年${m + 1}月`;
+  const today = new Date();
+  const firstDay = new Date(y, m, 1);
+  const startOffset = calMondayIndex(firstDay);
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prevMonthDays = new Date(y, m, 0).getDate();
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  const eventsByDay = new Map();
+  events.forEach(e => {
+    const key = `${e.start.getFullYear()}-${e.start.getMonth()}-${e.start.getDate()}`;
+    if (!eventsByDay.has(key)) eventsByDay.set(key, []);
+    eventsByDay.get(key).push(e);
   });
-  calendarInstance.render();
+  let cellsHtml = '';
+  for (let i = 0; i < totalCells; i++) {
+    let cellY = y, cellM = m, cellD, otherMonth = false;
+    if (i < startOffset) { cellD = prevMonthDays - startOffset + i + 1; cellM = m - 1; otherMonth = true; }
+    else if (i < startOffset + daysInMonth) { cellD = i - startOffset + 1; }
+    else { cellD = i - startOffset - daysInMonth + 1; cellM = m + 1; otherMonth = true; }
+    const cellDate = new Date(cellY, cellM, cellD);
+    const isToday = calSameDay(cellDate, today);
+    const key = `${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`;
+    const dayEvents = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
+    const maxShow = 3;
+    const chips = dayEvents.slice(0, maxShow).map(e =>
+      `<div class="cal-event-chip${e.hasMember ? '' : ' personal'}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`
+    ).join('');
+    const more = dayEvents.length > maxShow
+      ? `<div class="cal-month-more" onclick="event.stopPropagation();calAnchor=new Date(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()});calSetView('week')">还有 ${dayEvents.length - maxShow} 条</div>`
+      : '';
+    cellsHtml += `
+      <div class="cal-month-cell${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}" onclick="calAddOnDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
+        <div class="cal-month-daynum">${cellD}</div>
+        ${chips}${more}
+      </div>`;
+  }
+  document.getElementById('calBody').innerHTML = `
+    <div class="cal-month-weekdays">${CAL_WEEKDAYS.map(w => `<span>${w}</span>`).join('')}</div>
+    <div class="cal-month-grid">${cellsHtml}</div>
+  `;
+}
+
+// 周视图：默认只画营业主时段 8:30-23:30，哪天行程超出这个范围会自动往外扩，不会把行程截断看不见
+function renderCalWeek(events) {
+  const weekStart = calStartOfWeek(calAnchor);
+  const weekEndExclusive = new Date(weekStart); weekEndExclusive.setDate(weekEndExclusive.getDate() + 7);
+  const weekEndLabel = new Date(weekStart); weekEndLabel.setDate(weekEndLabel.getDate() + 6);
+  document.getElementById('calTitle').textContent = `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月${weekStart.getDate()}日 - ${weekEndLabel.getMonth() + 1}月${weekEndLabel.getDate()}日`;
+
+  const days = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(weekStart); d.setDate(d.getDate() + i); days.push(d); }
+  const weekEvents = events.filter(e => e.start < weekEndExclusive && e.end > weekStart);
+
+  let gridStart = 8.5, gridEnd = 23.5;
+  weekEvents.forEach(e => {
+    const sH = e.start.getHours() + e.start.getMinutes() / 60;
+    const eH = e.end.getHours() + e.end.getMinutes() / 60;
+    if (sH < gridStart) gridStart = Math.floor(sH);
+    if (eH > gridEnd) gridEnd = Math.ceil(eH);
+  });
+  calWeekGridStart = gridStart;
+  const pxPerHour = calWeekPxPerHour;
+  const bodyHeight = (gridEnd - gridStart) * pxPerHour;
+
+  let hourLines = '';
+  const timeLabels = [];
+  for (let h = Math.ceil(gridStart); h <= Math.floor(gridEnd); h++) {
+    const top = (h - gridStart) * pxPerHour;
+    hourLines += `<div class="cal-week-hourline" style="position:absolute;top:${top}px;left:0;right:0;height:${pxPerHour}px"></div>`;
+    const d = new Date(); d.setHours(h, 0, 0, 0);
+    timeLabels.push(`<div class="cal-week-timelabel" style="position:absolute;top:${top}px;right:0">${formatSlotLabel(d)}</div>`);
+  }
+
+  const today = new Date();
+  let daysHtml = '';
+  days.forEach(day => {
+    const isToday = calSameDay(day, today);
+    const dayEvents = weekEvents.filter(e => calSameDay(e.start, day) || (e.start < day && e.end > day));
+    const eventsHtml = dayEvents.map(e => {
+      const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
+      const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
+      const top = (sH - gridStart) * pxPerHour;
+      const height = Math.max((eH - sH) * pxPerHour, 20);
+      return `<div class="cal-week-event${e.hasMember ? '' : ' personal'}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
+    }).join('');
+    daysHtml += `
+      <div class="cal-week-daycol">
+        <div class="cal-week-dayhead${isToday ? ' today' : ''}"><span>周${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b></div>
+        <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)">
+          ${hourLines}
+          ${eventsHtml}
+        </div>
+      </div>`;
+  });
+
+  document.getElementById('calBody').innerHTML = `
+    <div class="cal-week-wrap">
+      <div class="cal-week-timecol">
+        <div class="cal-week-timecol-head"></div>
+        <div style="position:relative;height:${bodyHeight}px">${timeLabels.join('')}</div>
+      </div>
+      <div class="cal-week-days">${daysHtml}</div>
+    </div>
+  `;
+}
+
+// 点周视图空白处：按点击位置换算成最近的整点，预填时间段，方便当备忘录快速加
+function calWeekSlotClick(evt, el) {
+  const rect = el.getBoundingClientRect();
+  const offsetY = evt.clientY - rect.top;
+  const hour = Math.max(0, Math.floor(calWeekGridStart + offsetY / calWeekPxPerHour));
+  const y = Number(el.dataset.y), m = Number(el.dataset.m), d = Number(el.dataset.d);
+  openAddEventModal(null, new Date(y, m, d, hour, 0), new Date(y, m, d, hour + 1, 0));
+}
+
+// 年视图：12 个月缩略图，有行程的日子标个小圆点，点某天直接跳到那个月
+function renderCalYear(events) {
+  const y = calAnchor.getFullYear();
+  document.getElementById('calTitle').textContent = `${y}年`;
+  const today = new Date();
+  const eventDaySet = new Set(events.map(e => `${e.start.getFullYear()}-${e.start.getMonth()}-${e.start.getDate()}`));
+  let monthsHtml = '';
+  for (let m = 0; m < 12; m++) {
+    const firstDay = new Date(y, m, 1);
+    const startOffset = calMondayIndex(firstDay);
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const prevMonthDays = new Date(y, m, 0).getDate();
+    const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+    let daysHtml = '';
+    for (let i = 0; i < totalCells; i++) {
+      let cellY = y, cellM = m, cellD, otherMonth = false;
+      if (i < startOffset) { cellD = prevMonthDays - startOffset + i + 1; cellM = m - 1; otherMonth = true; }
+      else if (i < startOffset + daysInMonth) { cellD = i - startOffset + 1; }
+      else { cellD = i - startOffset - daysInMonth + 1; cellM = m + 1; otherMonth = true; }
+      const cellDate = new Date(cellY, cellM, cellD);
+      // 相邻月的填充格子（比如八月末尾垫出来的 9 月 1 号）不算"今天"/"有行程"，避免同一天在两张迷你月历里都被标出来
+      const isToday = !otherMonth && calSameDay(cellDate, today);
+      const hasEvent = !otherMonth && eventDaySet.has(`${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`);
+      daysHtml += `<div class="cal-year-day${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}${hasEvent ? ' has-event' : ''}">${cellD}</div>`;
+    }
+    monthsHtml += `
+      <div class="cal-year-month" onclick="calAnchor=new Date(${y},${m},1);calSetView('month')">
+        <div class="cal-year-month-title">${m + 1}月</div>
+        <div class="cal-year-mini-grid">${daysHtml}</div>
+      </div>`;
+  }
+  document.getElementById('calBody').innerHTML = `<div class="cal-year-grid">${monthsHtml}</div>`;
 }
 
 function toDatetimeLocal(dateOrStr) {
