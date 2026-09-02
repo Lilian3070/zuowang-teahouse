@@ -571,11 +571,19 @@
   .cal-week-dayhead.today b { color: var(--gold); }
   .cal-week-slots { position: relative; }
   .cal-week-hourline { border-top: 1px solid var(--border); box-sizing: border-box; cursor: pointer; }
+  .cal-week-hourline.half { border-top-style: dashed; border-top-color: var(--border); opacity: 0.55; }
   .cal-week-hourline:hover { background: var(--bg); }
+  .cal-week-timelabel.half { font-size: 10px; opacity: 0.7; }
   .cal-week-event {
     position: absolute; left: 3px; right: 3px; border-radius: 4px; padding: 3px 6px;
     font-size: 11px; overflow: hidden; cursor: pointer; line-height: 1.4;
   }
+  .cal-week-expand-row { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px 0; }
+  .cal-week-expand-btn {
+    background: none; border: none; color: var(--ink-muted); font-size: 12px; cursor: pointer; padding: 4px 8px;
+  }
+  .cal-week-expand-btn:hover { color: var(--gold); }
+  .cal-week-expand-reset { background: none; border: none; color: var(--gold); font-size: 11px; cursor: pointer; text-decoration: underline; padding: 4px 8px; }
 
   /* 年视图 */
   .cal-year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -2745,15 +2753,12 @@ let calView = 'month';
 let calAnchor = new Date();
 let calWeekGridStart = 8.5;
 let calWeekPxPerHour = 48;
+let calWeekExtraEarly = 0; // 手动点"显示更早时段"往前多展开的小时数
+let calWeekExtraLate = 0;  // 手动点"显示更晚时段"往后多展开的小时数
 const CAL_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
 function formatSlotLabel(date) {
-  const h = date.getHours();
-  const m = date.getMinutes();
-  const period = h < 12 ? '上午' : '下午';
-  let h12 = h % 12;
-  if (h12 === 0) h12 = 12;
-  return m === 0 ? `${period}${h12}点` : `${period}${h12}点${m}分`;
+  return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 function calMondayIndex(d) { return (d.getDay() + 6) % 7; }
@@ -2874,24 +2879,26 @@ function renderCalWeek(events) {
   for (let i = 0; i < 7; i++) { const d = new Date(weekStart); d.setDate(d.getDate() + i); days.push(d); }
   const weekEvents = events.filter(e => e.start < weekEndExclusive && e.end > weekStart);
 
-  let gridStart = 8.5, gridEnd = 23.5;
+  let gridStart = Math.max(0, 8.5 - calWeekExtraEarly), gridEnd = Math.min(24, 23.5 + calWeekExtraLate);
   weekEvents.forEach(e => {
     const sH = e.start.getHours() + e.start.getMinutes() / 60;
     const eH = e.end.getHours() + e.end.getMinutes() / 60;
-    if (sH < gridStart) gridStart = Math.floor(sH);
-    if (eH > gridEnd) gridEnd = Math.ceil(eH);
+    if (sH < gridStart) gridStart = Math.floor(sH * 2) / 2;
+    if (eH > gridEnd) gridEnd = Math.ceil(eH * 2) / 2;
   });
   calWeekGridStart = gridStart;
   const pxPerHour = calWeekPxPerHour;
   const bodyHeight = (gridEnd - gridStart) * pxPerHour;
 
+  // 每半小时画一条线：整点线实一点，半点线淡一点、虚线，一眼能分清但不会太花
   let hourLines = '';
   const timeLabels = [];
-  for (let h = Math.ceil(gridStart); h <= Math.floor(gridEnd); h++) {
-    const top = (h - gridStart) * pxPerHour;
-    hourLines += `<div class="cal-week-hourline" style="position:absolute;top:${top}px;left:0;right:0;height:${pxPerHour}px"></div>`;
-    const d = new Date(); d.setHours(h, 0, 0, 0);
-    timeLabels.push(`<div class="cal-week-timelabel" style="position:absolute;top:${top}px;right:0">${formatSlotLabel(d)}</div>`);
+  for (let t = Math.ceil(gridStart * 2) / 2; t <= gridEnd + 0.001; t += 0.5) {
+    const top = (t - gridStart) * pxPerHour;
+    const isHour = Math.round(t * 2) % 2 === 0;
+    hourLines += `<div class="cal-week-hourline${isHour ? '' : ' half'}" style="position:absolute;top:${top}px;left:0;right:0;height:${pxPerHour / 2}px"></div>`;
+    const d = new Date(); d.setHours(Math.floor(t), (t % 1) * 60, 0, 0);
+    timeLabels.push(`<div class="cal-week-timelabel${isHour ? '' : ' half'}" style="position:absolute;top:${top}px;right:0">${formatSlotLabel(d)}</div>`);
   }
 
   const today = new Date();
@@ -2917,6 +2924,10 @@ function renderCalWeek(events) {
   });
 
   document.getElementById('calBody').innerHTML = `
+    <div class="cal-week-expand-row">
+      <button class="cal-week-expand-btn" onclick="calExpandWeek('early')">▲ 显示更早时段</button>
+      ${calWeekExtraEarly > 0 ? `<button class="cal-week-expand-reset" onclick="calResetWeekExpand('early')">收起</button>` : ''}
+    </div>
     <div class="cal-week-wrap">
       <div class="cal-week-timecol">
         <div class="cal-week-timecol-head"></div>
@@ -2924,16 +2935,32 @@ function renderCalWeek(events) {
       </div>
       <div class="cal-week-days">${daysHtml}</div>
     </div>
+    <div class="cal-week-expand-row">
+      <button class="cal-week-expand-btn" onclick="calExpandWeek('late')">▼ 显示更晚时段</button>
+      ${calWeekExtraLate > 0 ? `<button class="cal-week-expand-reset" onclick="calResetWeekExpand('late')">收起</button>` : ''}
+    </div>
   `;
 }
 
-// 点周视图空白处：按点击位置换算成最近的整点，预填时间段，方便当备忘录快速加
+// 上/下"补时间段"：手动往前/往后各扩一小时，点太多超出 0 点/24 点也没用（渲染时会被夹住）
+function calExpandWeek(dir) {
+  if (dir === 'early') calWeekExtraEarly += 1; else calWeekExtraLate += 1;
+  renderCalendar();
+}
+function calResetWeekExpand(dir) {
+  if (dir === 'early') calWeekExtraEarly = 0; else calWeekExtraLate = 0;
+  renderCalendar();
+}
+
+// 点周视图空白处：按点击位置换算成最近的半小时，预填时间段，方便当备忘录快速加
 function calWeekSlotClick(evt, el) {
   const rect = el.getBoundingClientRect();
   const offsetY = evt.clientY - rect.top;
-  const hour = Math.max(0, Math.floor(calWeekGridStart + offsetY / calWeekPxPerHour));
+  const snapped = Math.max(0, Math.floor((calWeekGridStart + offsetY / calWeekPxPerHour) * 2) / 2);
+  const h = Math.floor(snapped), min = Math.round((snapped % 1) * 60);
   const y = Number(el.dataset.y), m = Number(el.dataset.m), d = Number(el.dataset.d);
-  openAddEventModal(null, new Date(y, m, d, hour, 0), new Date(y, m, d, hour + 1, 0));
+  const start = new Date(y, m, d, h, min);
+  openAddEventModal(null, start, new Date(start.getTime() + 60 * 60 * 1000));
 }
 
 // 年视图：12 个月缩略图，有行程的日子标个小圆点，点某天直接跳到那个月
