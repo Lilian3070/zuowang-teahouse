@@ -1974,8 +1974,8 @@ function renderAllMembers(list) {
   el.innerHTML = list.map(m => {
     const name = displayMemberName(m);
     const statusTag = m.registered
-      ? '<span style="color:var(--pine, #3f4a3a)">已注册</span>'
-      : '<span style="color:var(--ink-muted)">代建档 · 未注册</span>';
+      ? '<span style="color:var(--sage);font-weight:600">已注册</span>'
+      : '<span style="color:var(--red);font-weight:600">未注册</span>';
     return `
     <div class="member-row" data-id="${m.id}">
       <div class="member-avatar">${name.slice(0, 1)}</div>
