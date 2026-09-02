@@ -2285,13 +2285,14 @@ async function loadInviteCodeStatus() {
 function codeLineHtml(c, kind, label) {
   return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
     <span>${label}：<strong>${c.code}</strong></span>
-    <button class="btn-mini-delete" onclick="deleteCode('${kind}', '${c.id}')">删除</button>
+    <button class="btn-mini-delete" onclick="deleteCode('${kind}', '${c.code}')">删除</button>
   </div>`;
 }
 
-async function deleteCode(kind, id) {
+async function deleteCode(kind, code) {
   const table = kind === 'invite' ? 'invite_codes' : 'password_reset_codes';
-  await db.from(table).delete().eq('id', id);
+  const { error } = await db.from(table).delete().eq('code', code);
+  if (error) { showToast('删除失败：' + error.message); return; }
   loadInviteCodeStatus();
 }
 
