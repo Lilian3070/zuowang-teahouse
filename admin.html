@@ -814,6 +814,52 @@
   </div>
 </div>
 
+<!-- 会员详情里"+ 添加套餐"弹窗：会员已经确定是谁，不用再选一遍，跟外面的 addRecordModal 是两条独立路径 -->
+<div class="modal-overlay" id="addPackageModal" style="z-index:1001">
+  <div class="modal" style="width:380px">
+    <div class="modal-title">添加课时套餐</div>
+    <div class="form-group">
+      <label>套餐名</label>
+      <input type="text" id="newPkgName" placeholder="套餐名，例：12课时入门小班">
+    </div>
+    <div class="form-group">
+      <label>总课时</label>
+      <input type="number" id="newPkgHours" placeholder="例：12">
+    </div>
+    <div class="form-group">
+      <label>价格（选填）</label>
+      <input type="text" id="newPkgPrice" placeholder="例：1680">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAddPackageModal()">取消</button>
+      <button class="btn-save" onclick="addClassPackage()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 会员详情里"+ 添加消费"弹窗 -->
+<div class="modal-overlay" id="addPurchaseModal" style="z-index:1001">
+  <div class="modal" style="width:380px">
+    <div class="modal-title">添加消费记录</div>
+    <div class="form-group">
+      <label>购买项目</label>
+      <input type="text" id="newPurItem" placeholder="购买项目，例：正山堂骏眉红茶">
+    </div>
+    <div class="form-group">
+      <label>金额（选填）</label>
+      <input type="text" id="newPurAmount" placeholder="例：580">
+    </div>
+    <div class="form-group">
+      <label>日期（选填，默认今天）</label>
+      <input type="date" id="newPurDate">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAddPurchaseModal()">取消</button>
+      <button class="btn-save" onclick="addPurchase()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 会员详情模态框：琴茶往来（预约/课时/消费）放前面，知音详情（姓名/联系方式等资料）
      放后面——资料这块改动了会真的写库，往来记录只是查看居多，怕手滑改到资料，故意把
      资料那页往后放一步 -->
@@ -839,10 +885,7 @@
         <h4>课时记录</h4>
         <div id="packageList"></div>
         <div class="add-inline-form">
-          <input type="text" id="newPkgName" placeholder="套餐名，例：12课时入门小班" style="flex:2">
-          <input type="number" id="newPkgHours" placeholder="总课时" style="width:90px">
-          <input type="text" id="newPkgPrice" placeholder="价格（选填）" style="width:110px">
-          <button class="btn-add-inline" onclick="addClassPackage()">+ 添加套餐</button>
+          <button class="btn-add-inline" onclick="openAddPackageModal()">+ 添加套餐</button>
         </div>
       </div>
 
@@ -850,10 +893,7 @@
         <h4>消费记录</h4>
         <div id="purchaseList"></div>
         <div class="add-inline-form">
-          <input type="text" id="newPurItem" placeholder="购买项目，例：正山堂骏眉红茶" style="flex:2">
-          <input type="text" id="newPurAmount" placeholder="金额（选填）" style="width:110px">
-          <input type="date" id="newPurDate" style="width:150px">
-          <button class="btn-add-inline" onclick="addPurchase()">+ 添加消费</button>
+          <button class="btn-add-inline" onclick="openAddPurchaseModal()">+ 添加消费</button>
         </div>
       </div>
     </div>
@@ -2454,6 +2494,16 @@ async function refreshPackages() {
   renderPackages(data || []);
 }
 
+function openAddPackageModal() {
+  document.getElementById('newPkgName').value = '';
+  document.getElementById('newPkgHours').value = '';
+  document.getElementById('newPkgPrice').value = '';
+  document.getElementById('addPackageModal').classList.add('open');
+}
+function closeAddPackageModal() {
+  document.getElementById('addPackageModal').classList.remove('open');
+}
+
 async function addClassPackage() {
   if (!currentMemberId) return;
   const name = document.getElementById('newPkgName').value.trim();
@@ -2461,9 +2511,7 @@ async function addClassPackage() {
   const price = document.getElementById('newPkgPrice').value.trim();
   if (!name || !hours) { showToast('请填写套餐名和总课时'); return; }
   await db.from('class_packages').insert({ member_id: currentMemberId, package_name: name, total_hours: hours, price: price || null });
-  document.getElementById('newPkgName').value = '';
-  document.getElementById('newPkgHours').value = '';
-  document.getElementById('newPkgPrice').value = '';
+  closeAddPackageModal();
   await refreshPackages();
   showToast('已添加');
 }
@@ -2578,6 +2626,16 @@ async function refreshPurchases() {
   renderPurchases(data || []);
 }
 
+function openAddPurchaseModal() {
+  document.getElementById('newPurItem').value = '';
+  document.getElementById('newPurAmount').value = '';
+  document.getElementById('newPurDate').value = '';
+  document.getElementById('addPurchaseModal').classList.add('open');
+}
+function closeAddPurchaseModal() {
+  document.getElementById('addPurchaseModal').classList.remove('open');
+}
+
 async function addPurchase() {
   if (!currentMemberId) return;
   const item = document.getElementById('newPurItem').value.trim();
@@ -2585,9 +2643,7 @@ async function addPurchase() {
   const date = document.getElementById('newPurDate').value || null;
   if (!item) { showToast('请填写购买项目'); return; }
   await db.from('purchases').insert({ member_id: currentMemberId, item, amount: amount || null, purchased_at: date });
-  document.getElementById('newPurItem').value = '';
-  document.getElementById('newPurAmount').value = '';
-  document.getElementById('newPurDate').value = '';
+  closeAddPurchaseModal();
   await refreshPurchases();
   showToast('已添加');
 }
