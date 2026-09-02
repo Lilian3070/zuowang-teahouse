@@ -84,9 +84,9 @@
   .date-picker-days button.other-month { color: var(--ink-muted); opacity: 0.35; cursor: default; }
   .date-picker-display.placeholder { color: var(--ink-muted); }
   /* 日期+时间选择器（datetime picker）在日历面板下面加一格半小时时间表，跟日期一起自制，不用原生 datetime-local */
-  .dt-picker-panel { width: 280px; max-height: 360px; overflow-y: auto; }
+  .dt-picker-panel { width: 300px; max-height: 360px; overflow-y: auto; }
   .dt-time-label { font-size: 12px; color: var(--ink-muted); margin: 10px 0 6px; padding-top: 8px; border-top: 1px solid var(--border); }
-  .dt-time-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .dt-time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
   .dt-time-grid button {
     border: 1px solid var(--border); background: none; padding: 6px 0; border-radius: 6px;
     font-size: 12px; cursor: pointer; color: var(--ink);
@@ -3051,12 +3051,19 @@ function dtPickerInit(fieldId, initialDate) {
   dtPickerUpdateDisplay(fieldId);
 }
 
+function fmtTimeAmPm(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  const period = h < 12 ? '上午' : '下午';
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return `${period}${h12}:${pad2(m)}`;
+}
+
 function dtPickerUpdateDisplay(fieldId) {
   const s = dtPickerState[fieldId];
   const btn = document.getElementById(`${fieldId}Display`);
   if (!s.date || s.minutes == null) { btn.textContent = '请选择日期和时间'; btn.classList.add('placeholder'); return; }
   btn.classList.remove('placeholder');
-  btn.textContent = `${fmtDateDisplay(s.date)} ${Math.floor(s.minutes / 60)}:${pad2(s.minutes % 60)}`;
+  btn.textContent = `${fmtDateDisplay(s.date)} ${fmtTimeAmPm(s.minutes)}`;
 }
 
 function dtPickerGetValue(fieldId) {
@@ -3116,7 +3123,7 @@ function renderDtTimeGrid(fieldId) {
   let html = '';
   for (let mins = 0; mins < 24 * 60; mins += 30) {
     const cls = s.minutes === mins ? 'selected' : '';
-    html += `<button type="button" class="${cls}" onclick="pickDtTime('${fieldId}',${mins})">${Math.floor(mins / 60)}:${pad2(mins % 60)}</button>`;
+    html += `<button type="button" class="${cls}" onclick="pickDtTime('${fieldId}',${mins})">${fmtTimeAmPm(mins)}</button>`;
   }
   const grid = document.getElementById(`${fieldId}TimeGrid`);
   grid.innerHTML = html;
