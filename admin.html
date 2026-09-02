@@ -1921,7 +1921,7 @@ function displayMemberName(m) {
 // 名字后面括号带联系方式，省下第二行空间显示其他信息
 function nameWithPhone(m) {
   const name = displayMemberName(m);
-  return m.phone ? `${name}（${m.phone}）` : name;
+  return m.phone ? `${name}<span style="font-weight:400">（${m.phone}）</span>` : name;
 }
 
 function renderMemberList(list, type) {
