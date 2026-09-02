@@ -1876,7 +1876,7 @@ async function loadMembers(forceRefresh = false) {
     // 独立查询规避这个问题，两边各自的管理员权限都是确认有效的。
     const [{ data: records, error: recordsErr }, { data: members, error: membersErr }] = await Promise.all([
       memberType === 'class'
-        ? db.from('class_packages').select('member_id, total_hours, used_hours').order('created_at')
+        ? db.from('class_packages').select('member_id, package_name, total_hours, used_hours').order('created_at')
         : db.from('purchases').select('member_id, amount').order('purchased_at', { ascending: false }),
       db.from('members').select('id, name, nickname, phone'),
     ]);
@@ -1893,10 +1893,11 @@ async function loadMembers(forceRefresh = false) {
   if (memberType === 'class') {
     rawData.forEach(r => {
       if (!r.members) return;
-      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, nickname: r.members.nickname, phone: r.members.phone, remaining: 0, packages: 0 });
+      if (!map.has(r.member_id)) map.set(r.member_id, { id: r.member_id, name: r.members.name, nickname: r.members.nickname, phone: r.members.phone, remaining: 0, ongoingNames: [] });
       const entry = map.get(r.member_id);
-      entry.remaining += (r.total_hours - r.used_hours);
-      entry.packages += 1;
+      const left = r.total_hours - r.used_hours;
+      entry.remaining += left;
+      if (left > 0) entry.ongoingNames.push(r.package_name);
     });
   } else {
     rawData.forEach(r => {
@@ -1926,7 +1927,7 @@ function renderMemberList(list, type) {
   }
   el.innerHTML = list.map(m => {
     const summary = type === 'class'
-      ? `剩余课时 ${m.remaining} 节 · ${m.packages} 个套餐`
+      ? `剩余课时 ${m.remaining} 节 · ${m.ongoingNames.length ? m.ongoingNames.join('、') : '套餐已用完'}`
       : `累计消费 ¥${m.total} · ${m.count} 笔`;
     const name = displayMemberName(m);
     return `
