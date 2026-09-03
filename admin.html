@@ -1490,8 +1490,12 @@ function setFilter(key) {
   loadProducts();
 }
 
-// 商品 / 海报 / 会员 / 行程 统一加载入口
+// 商品 / 海报 / 会员 / 行程 统一加载入口。
+// 里面好几个分支都要等一次数据库查询才能画内容，如果等的过程中用户已经切到别的栏目
+// （比如页面刚加载完，"精选茗茶"那次查询还没回来，就手快点了"日程日历"），这个函数
+// 后面才等到结果，不能再写进页面了——不然会出现"点开日历，内容却卡成上一个栏目"的怪现象
 async function loadProducts(forceRefresh = false) {
+  const myTab = currentTab;
   const cfg = tabConfig[currentTab];
   const hasCached = !!tabProductsCache[currentTab];
   if (!hasCached) document.getElementById('productList').innerHTML = '<div class="loading">加载中...</div>';
@@ -1559,6 +1563,7 @@ async function loadProducts(forceRefresh = false) {
     let posters = tabProductsCache[currentTab];
     if (!posters || forceRefresh) {
       const { data } = await db.from('posters').select('*').eq('section', cfg.section).order('sort_order').order('created_at');
+      if (currentTab !== myTab) return; // 等结果的时候用户已经切走了，这批数据不该再画出来
       posters = data || [];
       tabProductsCache[currentTab] = posters;
     }
@@ -1576,6 +1581,7 @@ async function loadProducts(forceRefresh = false) {
   let allProducts = tabProductsCache[currentTab];
   if (!allProducts || forceRefresh) {
     const { data } = await db.from('products').select('*, categories(name)').in('category_key', cats.length ? cats : ['__none__']).order('is_visible', { ascending: false }).order('sort_order');
+    if (currentTab !== myTab) return; // 等结果的时候用户已经切走了，这批数据不该再画出来
     allProducts = data || [];
     tabProductsCache[currentTab] = allProducts;
   } else {
@@ -2285,6 +2291,7 @@ let currentMemberId = null;
 
 // 会员列表：琴人档案只显示有课时套餐的人，茗客档案只显示有消费记录的人
 async function loadMembers(forceRefresh = false) {
+  const myTab = currentTab;
   const cfg = tabConfig[currentTab];
   const memberType = cfg.memberType;
   const search = document.getElementById('memberSearch');
@@ -2305,6 +2312,7 @@ async function loadMembers(forceRefresh = false) {
       showToast('加载失败：' + ((recordsErr || membersErr).message || '未知错误'));
       console.error('loadMembers error', recordsErr, membersErr);
     }
+    if (currentTab !== myTab) return; // 等结果的时候用户已经切走了，这批数据不该再画出来
     const memberMap = new Map((members || []).map(m => [m.id, m]));
     rawData = (records || []).map(r => ({ ...r, members: memberMap.get(r.member_id) || null }));
     tabProductsCache[currentTab] = rawData;
@@ -2374,6 +2382,7 @@ function renderMemberList(list, type) {
 // ── 全部客户资料：不依赖课时套餐/消费记录，直接列 members 表全部记录，
 // 顺便标出谁已经注册账号（在 profiles 表里有对应行），谁还只是主理人建的空壳档案 ──
 async function loadAllMembers(forceRefresh = false) {
+  const myTab = currentTab;
   const search = document.getElementById('memberSearch');
   const keyword = (search ? search.value.trim() : '').toLowerCase();
 
@@ -2383,6 +2392,7 @@ async function loadAllMembers(forceRefresh = false) {
       db.from('members').select('*').order('created_at', { ascending: false }),
       db.from('profiles').select('member_id').eq('role', 'member'),
     ]);
+    if (currentTab !== myTab) return; // 等结果的时候用户已经切走了，这批数据不该再画出来
     const registeredIds = new Set((profiles || []).map(p => p.member_id));
     cache = (members || []).map(m => ({ ...m, registered: registeredIds.has(m.id) }));
     tabProductsCache['allmembers'] = cache;
@@ -2445,6 +2455,7 @@ async function saveNewMember() {
 // ── 茶席预约申请 ──────────────────────────────────────────
 // 跟会员列表同理，跟 members 分开单独查再前端拼，避免内嵌 join 在 RLS 下漏数据
 async function loadBookingRequests(forceRefresh = false) {
+  const myTab = currentTab;
   let list = tabProductsCache['bookings'];
   if (!list || forceRefresh) {
     const [{ data: requests, error }, { data: members }] = await Promise.all([
@@ -2452,6 +2463,7 @@ async function loadBookingRequests(forceRefresh = false) {
       db.from('members').select('id, name, nickname, phone'),
     ]);
     if (error) { showToast('加载失败：' + error.message); }
+    if (currentTab !== myTab) return; // 等结果的时候用户已经切走了，这批数据不该再画出来
     const memberMap = new Map((members || []).map(m => [m.id, m]));
     list = (requests || []).map(r => ({ ...r, member: memberMap.get(r.member_id) || null }));
     tabProductsCache['bookings'] = list;
