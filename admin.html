@@ -83,10 +83,17 @@
   .date-picker-days button.selected { background: var(--gold); color: white; }
   .date-picker-days button.other-month { color: var(--ink-muted); opacity: 0.35; cursor: default; }
   .date-picker-display.placeholder { color: var(--ink-muted); }
-  /* 日期+时间选择器（datetime picker）在日历面板下面加一格半小时时间表，跟日期一起自制，不用原生 datetime-local */
-  .dt-picker-panel { width: 300px; max-height: 360px; overflow-y: auto; }
-  .dt-time-label { font-size: 12px; color: var(--ink-muted); margin: 10px 0 6px; padding-top: 8px; border-top: 1px solid var(--border); }
-  .dt-time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  /* 日期+时间选择器：日期和时间是两个各自独立的下拉，不用原生 datetime-local */
+  .dt-split-row { display: flex; gap: 8px; }
+  .dt-split-row .date-picker { flex: 1; min-width: 0; }
+  .dt-time-panel { width: 190px; max-height: 320px; overflow-y: auto; }
+  /* 时间面板默认只显示营业主时段 8:30-23:30，上下两个按钮展开更早/更晚时间，跟周视图周历的展开逻辑一致 */
+  .dt-time-expand-row { text-align: center; padding: 2px 0; }
+  .dt-time-expand-btn {
+    background: none; border: none; color: var(--ink-muted); font-size: 11px; cursor: pointer; padding: 3px 6px;
+  }
+  .dt-time-expand-btn:hover { color: var(--gold); }
+  .dt-time-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
   .dt-time-grid button {
     border: 1px solid var(--border); background: none; padding: 6px 0; border-radius: 6px;
     font-size: 12px; cursor: pointer; color: var(--ink);
@@ -1107,35 +1114,51 @@
     </div>
     <div class="form-group">
       <label>开始时间</label>
-      <div class="date-picker">
-        <button type="button" class="date-picker-display" id="eventStartDisplay" onclick="toggleDtPicker('eventStart', event)"></button>
-        <div class="date-picker-panel dt-picker-panel" id="eventStartPanel">
-          <div class="date-picker-header">
-            <button type="button" onclick="shiftDtMonth('eventStart', -1)">‹</button>
-            <span id="eventStartCalTitle"></span>
-            <button type="button" onclick="shiftDtMonth('eventStart', 1)">›</button>
+      <div class="dt-split-row">
+        <div class="date-picker">
+          <button type="button" class="date-picker-display" id="eventStartDateDisplay" onclick="toggleDtPanel('eventStart', 'date', event)"></button>
+          <div class="date-picker-panel" id="eventStartDatePanel">
+            <div class="date-picker-header">
+              <button type="button" onclick="shiftDtMonth('eventStart', -1)">‹</button>
+              <span id="eventStartCalTitle"></span>
+              <button type="button" onclick="shiftDtMonth('eventStart', 1)">›</button>
+            </div>
+            <div class="date-picker-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            <div class="date-picker-days" id="eventStartCalDays"></div>
           </div>
-          <div class="date-picker-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-          <div class="date-picker-days" id="eventStartCalDays"></div>
-          <div class="dt-time-label">时间</div>
-          <div class="dt-time-grid" id="eventStartTimeGrid"></div>
+        </div>
+        <div class="date-picker">
+          <button type="button" class="date-picker-display" id="eventStartTimeDisplay" onclick="toggleDtPanel('eventStart', 'time', event)"></button>
+          <div class="date-picker-panel dt-time-panel" id="eventStartTimePanel">
+            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventStart','early')">▲ 更早时间</button></div>
+            <div class="dt-time-grid" id="eventStartTimeGrid"></div>
+            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventStart','late')">▼ 更晚时间</button></div>
+          </div>
         </div>
       </div>
     </div>
     <div class="form-group">
       <label>结束时间</label>
-      <div class="date-picker">
-        <button type="button" class="date-picker-display" id="eventEndDisplay" onclick="toggleDtPicker('eventEnd', event)"></button>
-        <div class="date-picker-panel dt-picker-panel" id="eventEndPanel">
-          <div class="date-picker-header">
-            <button type="button" onclick="shiftDtMonth('eventEnd', -1)">‹</button>
-            <span id="eventEndCalTitle"></span>
-            <button type="button" onclick="shiftDtMonth('eventEnd', 1)">›</button>
+      <div class="dt-split-row">
+        <div class="date-picker">
+          <button type="button" class="date-picker-display" id="eventEndDateDisplay" onclick="toggleDtPanel('eventEnd', 'date', event)"></button>
+          <div class="date-picker-panel" id="eventEndDatePanel">
+            <div class="date-picker-header">
+              <button type="button" onclick="shiftDtMonth('eventEnd', -1)">‹</button>
+              <span id="eventEndCalTitle"></span>
+              <button type="button" onclick="shiftDtMonth('eventEnd', 1)">›</button>
+            </div>
+            <div class="date-picker-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            <div class="date-picker-days" id="eventEndCalDays"></div>
           </div>
-          <div class="date-picker-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-          <div class="date-picker-days" id="eventEndCalDays"></div>
-          <div class="dt-time-label">时间</div>
-          <div class="dt-time-grid" id="eventEndTimeGrid"></div>
+        </div>
+        <div class="date-picker">
+          <button type="button" class="date-picker-display" id="eventEndTimeDisplay" onclick="toggleDtPanel('eventEnd', 'time', event)"></button>
+          <div class="date-picker-panel dt-time-panel" id="eventEndTimePanel">
+            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventEnd','early')">▲ 更早时间</button></div>
+            <div class="dt-time-grid" id="eventEndTimeGrid"></div>
+            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventEnd','late')">▼ 更晚时间</button></div>
+          </div>
         </div>
       </div>
     </div>
@@ -3114,19 +3137,25 @@ function renderCalYear(events) {
 }
 
 // ── 站内自制的日期+时间选择器，代替 <input type="datetime-local">（原生控件点开时间轮盘不好收、还是系统默认样式）──
-// 通用组件，按 fieldId 驱动：调用方只需要在 HTML 里放好同名 id 的 display 按钮/面板/日历/时间格（参照 eventStart/eventEnd 的写法），
+// 通用组件，按 fieldId 驱动：日期和时间是两个各自独立的下拉（参照 eventStart/eventEnd 的写法），
 // 今后任何地方要选"日期+时间"都复用这一套，不要再插 datetime-local
-const dtPickerState = {}; // { [fieldId]: { date: Date|null, minutes: number|null, calMonth: Date } }
+const DT_TIME_DEFAULT_START = 8 * 60 + 30;  // 默认时间范围下限：8:30，跟周视图周历默认营业时段一致
+const DT_TIME_DEFAULT_END = 23 * 60 + 30;   // 默认时间范围上限：23:30
+const dtPickerState = {}; // { [fieldId]: { date, minutes, calMonth, timeExtraEarly, timeExtraLate } }
 
 function dtPickerInit(fieldId, initialDate) {
   const d = initialDate ? new Date(initialDate) : null;
   const monthBase = d || new Date();
+  const minutes = d ? d.getHours() * 60 + d.getMinutes() : null;
   dtPickerState[fieldId] = {
     date: d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null,
-    minutes: d ? d.getHours() * 60 + d.getMinutes() : null,
+    minutes,
     calMonth: new Date(monthBase.getFullYear(), monthBase.getMonth(), 1),
+    // 编辑老行程时，如果时间本来就在默认范围之外，自动展开到能看见它，不用用户自己再点"更早/更晚"
+    timeExtraEarly: minutes != null && minutes < DT_TIME_DEFAULT_START ? Math.ceil((DT_TIME_DEFAULT_START - minutes) / 60) : 0,
+    timeExtraLate: minutes != null && minutes > DT_TIME_DEFAULT_END ? Math.ceil((minutes - DT_TIME_DEFAULT_END) / 60) : 0,
   };
-  document.getElementById(`${fieldId}Panel`).classList.remove('open');
+  closeDtPanels(fieldId);
   dtPickerUpdateDisplay(fieldId);
 }
 
@@ -3139,10 +3168,12 @@ function fmtTimeAmPm(mins) {
 
 function dtPickerUpdateDisplay(fieldId) {
   const s = dtPickerState[fieldId];
-  const btn = document.getElementById(`${fieldId}Display`);
-  if (!s.date || s.minutes == null) { btn.textContent = '请选择日期和时间'; btn.classList.add('placeholder'); return; }
-  btn.classList.remove('placeholder');
-  btn.textContent = `${fmtDateDisplay(s.date)} ${fmtTimeAmPm(s.minutes)}`;
+  const dateBtn = document.getElementById(`${fieldId}DateDisplay`);
+  const timeBtn = document.getElementById(`${fieldId}TimeDisplay`);
+  if (!s.date) { dateBtn.textContent = '选择日期'; dateBtn.classList.add('placeholder'); }
+  else { dateBtn.classList.remove('placeholder'); dateBtn.textContent = fmtDateDisplay(s.date); }
+  if (s.minutes == null) { timeBtn.textContent = '选择时间'; timeBtn.classList.add('placeholder'); }
+  else { timeBtn.classList.remove('placeholder'); timeBtn.textContent = fmtTimeAmPm(s.minutes); }
 }
 
 function dtPickerGetValue(fieldId) {
@@ -3151,16 +3182,19 @@ function dtPickerGetValue(fieldId) {
   return new Date(s.date.getFullYear(), s.date.getMonth(), s.date.getDate(), Math.floor(s.minutes / 60), s.minutes % 60);
 }
 
-function toggleDtPicker(fieldId, e) {
+function closeDtPanels(fieldId) {
+  document.getElementById(`${fieldId}DatePanel`).classList.remove('open');
+  document.getElementById(`${fieldId}TimePanel`).classList.remove('open');
+}
+
+function toggleDtPanel(fieldId, kind, e) {
   e.stopPropagation();
-  const panel = document.getElementById(`${fieldId}Panel`);
+  const panel = document.getElementById(`${fieldId}${kind === 'date' ? 'Date' : 'Time'}Panel`);
   const willOpen = !panel.classList.contains('open');
-  document.querySelectorAll('.dt-picker-panel.open').forEach(p => p.classList.remove('open'));
-  if (willOpen) {
-    panel.classList.add('open');
-    renderDtCalendar(fieldId);
-    renderDtTimeGrid(fieldId);
-  }
+  document.querySelectorAll('.date-picker-panel.open').forEach(p => p.classList.remove('open'));
+  if (!willOpen) return;
+  panel.classList.add('open');
+  if (kind === 'date') renderDtCalendar(fieldId); else renderDtTimeGrid(fieldId);
 }
 
 function shiftDtMonth(fieldId, delta) {
@@ -3192,15 +3226,23 @@ function renderDtCalendar(fieldId) {
 function pickDtDate(fieldId, y, m, d) {
   const s = dtPickerState[fieldId];
   s.date = new Date(y, m, d);
-  renderDtCalendar(fieldId);
   dtPickerUpdateDisplay(fieldId);
-  if (s.minutes != null) closeDtPicker(fieldId); // 日期时间都选完了才自动收起，避免选完日期就收起、时间还没选
+  document.getElementById(`${fieldId}DatePanel`).classList.remove('open');
+}
+
+// 时间面板默认只显示 8:30-23:30，"更早/更晚"按钮各展开一小时，超出 0 点/24 点也没用（渲染时会被夹住）
+function expandDtTime(fieldId, dir) {
+  const s = dtPickerState[fieldId];
+  if (dir === 'early') s.timeExtraEarly += 1; else s.timeExtraLate += 1;
+  renderDtTimeGrid(fieldId);
 }
 
 function renderDtTimeGrid(fieldId) {
   const s = dtPickerState[fieldId];
+  const start = Math.max(0, DT_TIME_DEFAULT_START - s.timeExtraEarly * 60);
+  const end = Math.min(24 * 60, DT_TIME_DEFAULT_END + s.timeExtraLate * 60);
   let html = '';
-  for (let mins = 0; mins < 24 * 60; mins += 30) {
+  for (let mins = start; mins <= end; mins += 30) {
     const cls = s.minutes === mins ? 'selected' : '';
     html += `<button type="button" class="${cls}" onclick="pickDtTime('${fieldId}',${mins})">${fmtTimeAmPm(mins)}</button>`;
   }
@@ -3213,17 +3255,12 @@ function renderDtTimeGrid(fieldId) {
 function pickDtTime(fieldId, mins) {
   const s = dtPickerState[fieldId];
   s.minutes = mins;
-  renderDtTimeGrid(fieldId);
   dtPickerUpdateDisplay(fieldId);
-  if (s.date) closeDtPicker(fieldId);
-}
-
-function closeDtPicker(fieldId) {
-  document.getElementById(`${fieldId}Panel`).classList.remove('open');
+  document.getElementById(`${fieldId}TimePanel`).classList.remove('open');
 }
 
 document.addEventListener('click', (e) => {
-  document.querySelectorAll('.dt-picker-panel.open').forEach(panel => {
+  document.querySelectorAll('.date-picker-panel.open').forEach(panel => {
     if (!panel.closest('.date-picker')?.contains(e.target)) panel.classList.remove('open');
   });
 });
@@ -3275,8 +3312,8 @@ async function populateEventMemberSelect(selectedId) {
 
 function closeEventModal() {
   document.getElementById('eventModal').classList.remove('open');
-  closeDtPicker('eventStart');
-  closeDtPicker('eventEnd');
+  closeDtPanels('eventStart');
+  closeDtPanels('eventEnd');
 }
 
 async function saveEvent() {
