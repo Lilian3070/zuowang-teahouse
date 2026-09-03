@@ -98,8 +98,9 @@
     border: 1px solid var(--border); background: none; padding: 6px 0; border-radius: 6px;
     font-size: 12px; cursor: pointer; color: var(--ink);
   }
-  .dt-time-grid button:hover { background: var(--gold-soft); }
+  .dt-time-grid button:hover:not(:disabled) { background: var(--gold-soft); }
   .dt-time-grid button.selected { background: var(--gold); color: white; border-color: var(--gold); }
+  .dt-time-grid button:disabled { opacity: 0.35; cursor: not-allowed; background: var(--bg); text-decoration: line-through; }
   /* 行程占用资源选择：琴/茶/两者都占，跟周视图里每天左右分栏、图标一一对应 */
   .resource-picker { display: flex; gap: 8px; }
   .resource-chip {
@@ -1132,7 +1133,7 @@
           <div class="date-picker-panel dt-time-panel" id="eventStartTimePanel">
             <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventStart','early')">▲ 更早时间</button></div>
             <div class="dt-time-grid" id="eventStartTimeGrid"></div>
-            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventStart','late')">▼ 更晚时间</button></div>
+            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" id="eventStartTimeLateBtn" onclick="event.stopPropagation();expandDtTime('eventStart','late')">▼ 更晚时间</button></div>
           </div>
         </div>
       </div>
@@ -1157,7 +1158,7 @@
           <div class="date-picker-panel dt-time-panel" id="eventEndTimePanel">
             <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventEnd','early')">▲ 更早时间</button></div>
             <div class="dt-time-grid" id="eventEndTimeGrid"></div>
-            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" onclick="event.stopPropagation();expandDtTime('eventEnd','late')">▼ 更晚时间</button></div>
+            <div class="dt-time-expand-row"><button type="button" class="dt-time-expand-btn" id="eventEndTimeLateBtn" onclick="event.stopPropagation();expandDtTime('eventEnd','late')">▼ 更晚时间</button></div>
           </div>
         </div>
       </div>
@@ -3228,6 +3229,7 @@ function pickDtDate(fieldId, y, m, d) {
   s.date = new Date(y, m, d);
   dtPickerUpdateDisplay(fieldId);
   document.getElementById(`${fieldId}DatePanel`).classList.remove('open');
+  if (fieldId === 'eventStart') updateEventTimeConstraints();
 }
 
 // 时间面板默认只显示 8:30-23:30，"更早/更晚"按钮各展开一小时，超出 0 点/24 点也没用（渲染时会被夹住）
@@ -3237,19 +3239,26 @@ function expandDtTime(fieldId, dir) {
   renderDtTimeGrid(fieldId);
 }
 
+// s.maxMinute / s.isDisabledMinute 是可选的外部约束（比如"添加行程"根据已有行程算出的
+// 冲突时段），不设置就是纯粹的默认范围+展开，组件本身不关心这些约束从哪来
 function renderDtTimeGrid(fieldId) {
   const s = dtPickerState[fieldId];
   const start = Math.max(0, DT_TIME_DEFAULT_START - s.timeExtraEarly * 60);
-  const end = Math.min(24 * 60, DT_TIME_DEFAULT_END + s.timeExtraLate * 60);
+  let end = Math.min(24 * 60, DT_TIME_DEFAULT_END + s.timeExtraLate * 60);
+  if (typeof s.maxMinute === 'number') end = Math.min(end, s.maxMinute);
   let html = '';
   for (let mins = start; mins <= end; mins += 30) {
-    const cls = s.minutes === mins ? 'selected' : '';
-    html += `<button type="button" class="${cls}" onclick="pickDtTime('${fieldId}',${mins})">${fmtTimeAmPm(mins)}</button>`;
+    const disabled = typeof s.isDisabledMinute === 'function' && s.isDisabledMinute(mins);
+    const cls = [s.minutes === mins ? 'selected' : '', disabled ? 'disabled' : ''].filter(Boolean).join(' ');
+    html += `<button type="button" class="${cls}" ${disabled ? 'disabled' : ''} onclick="pickDtTime('${fieldId}',${mins})">${fmtTimeAmPm(mins)}</button>`;
   }
   const grid = document.getElementById(`${fieldId}TimeGrid`);
   grid.innerHTML = html;
   const sel = grid.querySelector('.selected');
   if (sel) sel.scrollIntoView({ block: 'center' });
+  // 有冲突时段卡着上限的时候，"更晚时间"按钮点了也没用（永远卡在冲突起点），干脆藏起来
+  const lateBtn = document.getElementById(`${fieldId}TimeLateBtn`);
+  if (lateBtn) lateBtn.style.display = typeof s.maxMinute === 'number' ? 'none' : '';
 }
 
 function pickDtTime(fieldId, mins) {
@@ -3257,6 +3266,7 @@ function pickDtTime(fieldId, mins) {
   s.minutes = mins;
   dtPickerUpdateDisplay(fieldId);
   document.getElementById(`${fieldId}TimePanel`).classList.remove('open');
+  if (fieldId === 'eventStart') updateEventTimeConstraints();
 }
 
 document.addEventListener('click', (e) => {
@@ -3273,6 +3283,45 @@ function pickEventResource(val) {
   document.querySelectorAll('#eventResourcePicker .resource-chip').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.resource === val);
   });
+  updateEventTimeConstraints();
+}
+
+// 算某一天、某条资源线上已经被占用的时间段（同一天 + 资源线有交集才算冲突，
+// both 会同时占两条线，所以只要任一方是 both 或双方资源相同就算冲突）；
+// excludeId 是正在编辑的这条行程自己，不跟自己比较
+function getScheduleConflicts(dateObj, resource, excludeId) {
+  if (!dateObj || !resource) return [];
+  const events = tabProductsCache['schedule'] || [];
+  const intervals = events
+    .filter(e => e.id !== excludeId && calSameDay(e.start, dateObj) && (resource === 'both' || e.resource === 'both' || e.resource === resource))
+    .map(e => ({
+      start: e.start.getHours() * 60 + e.start.getMinutes(),
+      end: e.end.getHours() * 60 + e.end.getMinutes(),
+    }))
+    .sort((a, b) => a.start - b.start);
+  return intervals;
+}
+
+// "添加行程"里日期/资源/开始时间任何一个变了，都要重新算一遍开始时间哪些格子不能选、
+// 结束时间最多能选到哪——不是通用日期时间选择器组件自己的逻辑，是这个表单专属的业务规则
+function updateEventTimeConstraints() {
+  const startState = dtPickerState['eventStart'];
+  const endState = dtPickerState['eventEnd'];
+  if (!startState || !endState) return;
+  const editId = document.getElementById('eventEditId').value || null;
+  const conflicts = getScheduleConflicts(startState.date, eventResourceValue, editId);
+
+  startState.maxMinute = null;
+  startState.isDisabledMinute = (mins) => conflicts.some(iv => mins >= iv.start && mins < iv.end);
+
+  const startMinutes = startState.minutes;
+  const nextConflict = startMinutes == null ? null : conflicts.find(iv => iv.start >= startMinutes);
+  endState.maxMinute = nextConflict ? nextConflict.start : null;
+  endState.isDisabledMinute = (mins) => startMinutes != null && mins <= startMinutes;
+
+  // 约束变了的时候，如果时间面板正开着，当场重画一遍，不用户关了再开才看到新的可选范围
+  if (document.getElementById('eventStartTimePanel').classList.contains('open')) renderDtTimeGrid('eventStart');
+  if (document.getElementById('eventEndTimePanel').classList.contains('open')) renderDtTimeGrid('eventEnd');
 }
 
 async function openAddEventModal(memberId, startDate, endDate, defaultResource) {
@@ -3284,6 +3333,7 @@ async function openAddEventModal(memberId, startDate, endDate, defaultResource) 
   pickEventResource(defaultResource || null);
   dtPickerInit('eventStart', startDate);
   dtPickerInit('eventEnd', endDate);
+  updateEventTimeConstraints();
   await populateEventMemberSelect(memberId);
   document.getElementById('eventModal').classList.add('open');
 }
@@ -3299,6 +3349,7 @@ async function openEditEventModal(id) {
   pickEventResource(data.resource || 'both');
   dtPickerInit('eventStart', data.start_at);
   dtPickerInit('eventEnd', data.end_at);
+  updateEventTimeConstraints();
   await populateEventMemberSelect(data.member_id);
   document.getElementById('eventModal').classList.add('open');
 }
