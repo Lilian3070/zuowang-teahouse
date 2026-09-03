@@ -3055,11 +3055,12 @@ function calNav(dir) {
   else calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), calAnchor.getDate() + dir * 7);
   renderCalendar();
 }
-function calAddOnDay(y, m, d) {
-  openAddEventModal(null, new Date(y, m, d, 9, 0), new Date(y, m, d, 10, 0));
+function calGoToWeekOfDay(y, m, d) {
+  calAnchor = new Date(y, m, d);
+  calSetView('week');
 }
 
-// 月视图：一格一天，超过 3 条行程折叠成"还有 N 条"，点空白处默认建 9-10 点的行程
+// 月视图：一格一天，超过 3 条行程折叠成"还有 N 条"，点某天跳到周视图方便按时段安排行程
 function renderCalMonth(events) {
   const y = calAnchor.getFullYear(), m = calAnchor.getMonth();
   document.getElementById('calTitle').textContent = `${y}年${m + 1}月`;
@@ -3090,11 +3091,11 @@ function renderCalMonth(events) {
       `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.resource === 'both' ? RES_BADGE_BOTH + ' ' : ''}${e.title}</div>`
     ).join('');
     const more = dayEvents.length > maxShow
-      ? `<div class="cal-month-more" onclick="event.stopPropagation();calAnchor=new Date(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()});calSetView('week')">还有 ${dayEvents.length - maxShow} 条</div>`
+      ? `<div class="cal-month-more" onclick="event.stopPropagation();calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">还有 ${dayEvents.length - maxShow} 条</div>`
       : '';
     const lunarInfo = getLunarLabel(cellDate);
     cellsHtml += `
-      <div class="cal-month-cell${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}" onclick="calAddOnDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
+      <div class="cal-month-cell${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}" onclick="calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
         <div class="cal-month-daynum">${cellD}</div>
         <div class="cal-month-lunar${lunarInfo.special ? ' special' : ''}">${lunarInfo.text}</div>
         ${chips}${more}
