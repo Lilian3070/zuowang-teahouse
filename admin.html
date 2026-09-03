@@ -651,7 +651,7 @@
   .cal-week-timelabel.half { font-size: 10px; opacity: 0.7; }
   .cal-week-event {
     position: absolute; left: 3px; right: 3px; border-radius: 4px; padding: 3px 6px;
-    font-size: 11px; overflow: hidden; cursor: pointer; line-height: 1.4; z-index: 2;
+    font-size: 11px; overflow: hidden; cursor: pointer; line-height: 1.4; z-index: 2; text-align: center;
   }
   /* 琴占左半栏、茶占右半栏，两者都占的通栏不变（跟表头图标、中间分割线对应） */
   .cal-week-event.res-guqin { left: 3px; right: calc(50% + 2px); }
@@ -752,10 +752,29 @@
     .cal-toolbar-right { justify-content: center; }
     .cal-year-grid { grid-template-columns: repeat(2, 1fr); }
     .cal-month-cell { min-height: 64px; padding: 4px; }
-    .cal-week-timecol { width: 58px; }
+    .cal-week-timecol { width: 44px; }
     /* 窄屏放不下"星期一"这种 3 字，缩小字号避免换行挤破格子 */
     .cal-month-weekdays span { font-size: 11px; }
     .cal-week-dayhead span { font-size: 11px; }
+
+    /* 时间轴标签"上午10:00"太长，改成"上午"/"10:00"两行，横向只占数字的宽度 */
+    .cal-week-timelabel { padding-right: 4px; transform: translateY(-12px); display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+    .cal-week-timelabel-period { font-size: 9px; }
+    .cal-week-timelabel-time { font-size: 10px; }
+    .cal-week-timelabel.half .cal-week-timelabel-period, .cal-week-timelabel.half .cal-week-timelabel-time { font-size: 9px; opacity: 0.7; }
+
+    /* 表头星期/日期/农历改成明确的三行，不再挤在一起自己乱换行 */
+    .cal-week-dayhead { height: 56px; gap: 1px; }
+    .cal-week-dayhead b { display: flex; flex-direction: column; align-items: center; font-weight: 600; }
+    .cal-week-dayhead-date { font-size: 10px; }
+    .cal-week-lunar { font-size: 9px; }
+    .cal-week-timecol-head { height: 86px; }
+
+    /* 表头琴/茶图标手机上不用加粗描边，细一点、小一点，省地方也不抢眼 */
+    .cal-week-res-icons .res-badge { width: 16px; height: 16px; border-width: 1px; }
+
+    /* 已排的行程字很容易在窄栏里被挤成竖排还切一半，居中显示能看得清楚一点 */
+    .cal-week-event { font-size: 10px; padding: 2px 3px; line-height: 1.25; }
   }
 
   /* 分类管理面板 */
@@ -3005,6 +3024,13 @@ function formatSlotLabel(date) {
   return `${periodWordForHour(h)}${h12}:${String(m).padStart(2, '0')}`;
 }
 
+// 跟 formatSlotLabel 一样，但拆成"上午"/"10:00"两段，方便手机上分两行显示，省横向空间
+function formatSlotLabelParts(date) {
+  const h = date.getHours(), m = date.getMinutes();
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return { period: periodWordForHour(h), time: `${h12}:${String(m).padStart(2, '0')}` };
+}
+
 // 农历/节日/节气标签：优先显示阳历节日（元旦/劳动节等），其次农历节日（春节/中秋等），
 // 再其次节气，都没有就显示农历日期（初一显示"X月"）。special=true 表示是节日/节气，
 // 不是普通农历日期，用来在样式上突出显示。lunar.js（assets/vendor/lunar.js）没加载成功时
@@ -3162,7 +3188,8 @@ function renderCalWeek(events) {
     const isHour = Math.round(t * 2) % 2 === 0;
     hourLines += `<div class="cal-week-hourline${isHour ? '' : ' half'}" style="position:absolute;top:${top}px;left:0;right:0;height:${pxPerHour / 2}px"></div>`;
     const d = new Date(); d.setHours(Math.floor(t), (t % 1) * 60, 0, 0);
-    timeLabels.push(`<div class="cal-week-timelabel${isHour ? '' : ' half'}" style="position:absolute;top:${top}px;right:0">${formatSlotLabel(d)}</div>`);
+    const parts = formatSlotLabelParts(d);
+    timeLabels.push(`<div class="cal-week-timelabel${isHour ? '' : ' half'}" style="position:absolute;top:${top}px;right:0"><span class="cal-week-timelabel-period">${parts.period}</span><span class="cal-week-timelabel-time">${parts.time}</span></div>`);
   }
 
   const today = new Date();
@@ -3184,7 +3211,7 @@ function renderCalWeek(events) {
     daysHtml += `
       <div class="cal-week-daycol">
         <div class="cal-week-dayhead${isToday ? ' today' : ''}">
-          <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()} <span class="cal-week-lunar${weekLunarInfo.special ? ' special' : ''}">${weekLunarInfo.text}</span></b>
+          <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b><span class="cal-week-dayhead-date">${day.getMonth() + 1}/${day.getDate()}</span> <span class="cal-week-lunar${weekLunarInfo.special ? ' special' : ''}">${weekLunarInfo.text}</span></b>
         </div>
         <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)" onmousedown="calWeekDragStart(event, this)" ontouchstart="calWeekDragStart(event, this)">
