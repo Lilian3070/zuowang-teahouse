@@ -3025,7 +3025,6 @@ const CAL_WEEKDAYS = ['星期一', '星期二', '星期三', '星期四', '星�
 // 靠 CSS 在窄屏时切换显示（见 .res-badge-bold/.res-badge-thin），桌面端还是用原来加粗的
 const RES_BADGE_GUQIN = `<span class="res-badge guqin"><img class="res-badge-bold" src="assets/icon-guqin.png" alt="琴"><img class="res-badge-thin" src="assets/icon-guqin-thin.png" alt="琴"></span>`;
 const RES_BADGE_TEA = `<span class="res-badge tea"><img class="res-badge-bold" src="assets/icon-tea.png" alt="茶"><img class="res-badge-thin" src="assets/icon-tea-thin.png" alt="茶"></span>`;
-const RES_BADGE_BOTH = `<span class="res-badge both"><img class="res-badge-bold" src="assets/icon-he.png" alt="和"><img class="res-badge-thin" src="assets/icon-he-thin.png" alt="和"></span>`;
 
 // 早上/上午/中午/下午/晚上/凌晨——中文口语里常用的时段词，比纯 24 小时数字更容易一眼找到时间，
 // 周视图时间轴和"添加行程"时间选择共用同一套判断
@@ -3159,7 +3158,7 @@ function renderCalMonth(events) {
     const dayEvents = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
     const maxShow = 3;
     const chips = dayEvents.slice(0, maxShow).map(e =>
-      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.resource === 'both' ? RES_BADGE_BOTH + ' ' : ''}${e.title}</div>`
+      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`
     ).join('');
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">还有 ${dayEvents.length - maxShow} 条</div>`
@@ -3224,8 +3223,7 @@ function renderCalWeek(events) {
       const height = Math.max((eH - sH) * pxPerHour, 20);
       // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
       const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
-      const badge = e.resource === 'both' ? RES_BADGE_BOTH + ' ' : '';
-      return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${badge}${e.title}</div>`;
+      return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
     }).join('');
     const weekLunarInfo = getLunarLabel(day);
     daysHtml += `
