@@ -102,7 +102,9 @@
   }
   .resource-chip:hover { border-color: var(--gold); }
   .resource-chip.selected { border-color: var(--gold); background: var(--gold-soft); font-weight: 600; }
-  .resource-chip .res-badge { width: 20px; height: 20px; font-size: 12px; }
+  .resource-chip .res-badge { width: 30px; height: 30px; }
+  /* 事件条里的"和"标记要缩小，不然比文字行高还夸张 */
+  .cal-week-event .res-badge, .cal-event-chip .res-badge { width: 13px; height: 13px; vertical-align: -2px; margin-right: 2px; }
   .btn-primary {
     width: 100%;
     padding: 12px;
@@ -556,13 +558,12 @@
   .cal-event-chip.res-tea, .cal-week-event.res-tea {
     background: var(--surface); color: var(--sage); border-left: 3px solid var(--sage);
   }
-  /* 圆形线条框 + 汉字的资源标记：琴/茶/和，日历表头、"添加行程"资源选择、"两者都占"事件条都用这个 */
+  /* 圆形线条框 + 手写小篆字的资源标记：琴/茶/和，日历表头、"添加行程"资源选择、"两者都占"事件条都用这个 */
   .res-badge {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-    width: 16px; height: 16px; border-radius: 50%; border: 1.4px solid currentColor;
-    font-size: 10px; line-height: 1; font-weight: 600;
-    font-family: "STZhongsong", "Songti SC", "SimSun", serif;
+    width: 22px; height: 22px; border-radius: 50%; border: 1.4px solid currentColor; overflow: hidden;
   }
+  .res-badge img { width: 68%; height: 68%; object-fit: contain; display: block; }
   .res-badge.guqin { color: var(--red); }
   .res-badge.tea { color: var(--sage); }
   .res-badge.both { color: var(--gold); }
@@ -591,13 +592,13 @@
   /* 周视图 */
   .cal-week-wrap { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .cal-week-timecol { width: 64px; flex-shrink: 0; border-right: 1px solid var(--border); }
-  .cal-week-timecol-head { height: 58px; border-bottom: 1px solid var(--border); }
+  .cal-week-timecol-head { height: 66px; border-bottom: 1px solid var(--border); }
   .cal-week-timelabel { font-size: 11px; color: var(--ink-muted); text-align: right; padding-right: 8px; transform: translateY(-6px); }
   .cal-week-days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); }
   .cal-week-daycol { border-left: 1px solid var(--border); position: relative; }
   .cal-week-daycol:first-child { border-left: none; }
   .cal-week-dayhead {
-    height: 58px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column;
+    height: 66px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column;
     align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted); gap: 3px;
   }
   .cal-week-dayhead.today { color: var(--gold); font-weight: 700; }
@@ -1087,15 +1088,15 @@
       <label>占用资源</label>
       <div class="resource-picker" id="eventResourcePicker">
         <button type="button" class="resource-chip" data-resource="guqin" onclick="pickEventResource('guqin')">
-          <span class="res-badge guqin">琴</span>
+          <span class="res-badge guqin"><img src="assets/icon-guqin.png" alt="琴"></span>
           <span>琴</span>
         </button>
         <button type="button" class="resource-chip" data-resource="tea" onclick="pickEventResource('tea')">
-          <span class="res-badge tea">茶</span>
+          <span class="res-badge tea"><img src="assets/icon-tea.png" alt="茶"></span>
           <span>茶</span>
         </button>
         <button type="button" class="resource-chip" data-resource="both" onclick="pickEventResource('both')">
-          <span class="res-badge both">和</span>
+          <span class="res-badge both"><img src="assets/icon-he.png" alt="和"></span>
           <span>两者都占</span>
         </button>
       </div>
@@ -2840,10 +2841,11 @@ let calWeekExtraEarly = 0; // 手动点"显示更早时段"往前多展开的小
 let calWeekExtraLate = 0;  // 手动点"显示更晚时段"往后多展开的小时数
 const CAL_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
-// 琴/茶/和：圆形线条框 + 汉字的资源标记，日历表头、"添加行程"资源选择、事件条共用（配色见 .res-badge CSS）
-const RES_BADGE_GUQIN = `<span class="res-badge guqin">琴</span>`;
-const RES_BADGE_TEA = `<span class="res-badge tea">茶</span>`;
-const RES_BADGE_BOTH = `<span class="res-badge both">和</span>`;
+// 琴/茶/和：圆形线条框 + 主理人手写小篆字（抠图自 assets/icon-guqin.png 等，白底转透明+上色），
+// 日历表头、"添加行程"资源选择、事件条共用（配色见 .res-badge CSS）
+const RES_BADGE_GUQIN = `<span class="res-badge guqin"><img src="assets/icon-guqin.png" alt="琴"></span>`;
+const RES_BADGE_TEA = `<span class="res-badge tea"><img src="assets/icon-tea.png" alt="茶"></span>`;
+const RES_BADGE_BOTH = `<span class="res-badge both"><img src="assets/icon-he.png" alt="和"></span>`;
 
 function formatSlotLabel(date) {
   return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
