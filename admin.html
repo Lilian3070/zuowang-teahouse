@@ -604,7 +604,7 @@
 
   /* 周视图 */
   .cal-week-wrap { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .cal-week-timecol { width: 64px; flex-shrink: 0; border-right: 1px solid var(--border); }
+  .cal-week-timecol { width: 78px; flex-shrink: 0; border-right: 1px solid var(--border); }
   .cal-week-timecol-head { height: 66px; border-bottom: 1px solid var(--border); }
   .cal-week-timelabel { font-size: 11px; color: var(--ink-muted); text-align: right; padding-right: 8px; transform: translateY(-6px); }
   .cal-week-days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); }
@@ -704,7 +704,7 @@
     .cal-toolbar-right { justify-content: center; }
     .cal-year-grid { grid-template-columns: repeat(2, 1fr); }
     .cal-month-cell { min-height: 64px; padding: 4px; }
-    .cal-week-timecol { width: 44px; }
+    .cal-week-timecol { width: 58px; }
     /* 窄屏放不下"星期一"这种 3 字，缩小字号避免换行挤破格子 */
     .cal-month-weekdays span { font-size: 11px; }
     .cal-week-dayhead span { font-size: 11px; }
@@ -2894,8 +2894,21 @@ const RES_BADGE_GUQIN = `<span class="res-badge guqin"><img src="assets/icon-guq
 const RES_BADGE_TEA = `<span class="res-badge tea"><img src="assets/icon-tea.png" alt="茶"></span>`;
 const RES_BADGE_BOTH = `<span class="res-badge both"><img src="assets/icon-he.png" alt="和"></span>`;
 
+// 早上/上午/中午/下午/晚上/凌晨——中文口语里常用的时段词，比纯 24 小时数字更容易一眼找到时间，
+// 周视图时间轴和"添加行程"时间选择共用同一套判断
+function periodWordForHour(h) {
+  if (h < 5) return '凌晨';
+  if (h < 9) return '早上';
+  if (h < 12) return '上午';
+  if (h < 13) return '中午';
+  if (h < 18) return '下午';
+  return '晚上';
+}
+
 function formatSlotLabel(date) {
-  return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const h = date.getHours(), m = date.getMinutes();
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return `${periodWordForHour(h)}${h12}:${String(m).padStart(2, '0')}`;
 }
 
 function calMondayIndex(d) { return (d.getDay() + 6) % 7; }
@@ -3167,11 +3180,10 @@ function dtPickerInit(fieldId, initialDate) {
   dtPickerUpdateDisplay(fieldId);
 }
 
-function fmtTimeAmPm(mins) {
+function fmtTimePeriod(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
-  const period = h < 12 ? '上午' : '下午';
   let h12 = h % 12; if (h12 === 0) h12 = 12;
-  return `${period}${h12}:${pad2(m)}`;
+  return `${periodWordForHour(h)}${h12}:${pad2(m)}`;
 }
 
 function dtPickerUpdateDisplay(fieldId) {
@@ -3181,7 +3193,7 @@ function dtPickerUpdateDisplay(fieldId) {
   if (!s.date) { dateBtn.textContent = '选择日期'; dateBtn.classList.add('placeholder'); }
   else { dateBtn.classList.remove('placeholder'); dateBtn.textContent = fmtDateDisplay(s.date); }
   if (s.minutes == null) { timeBtn.textContent = '选择时间'; timeBtn.classList.add('placeholder'); }
-  else { timeBtn.classList.remove('placeholder'); timeBtn.textContent = fmtTimeAmPm(s.minutes); }
+  else { timeBtn.classList.remove('placeholder'); timeBtn.textContent = fmtTimePeriod(s.minutes); }
 }
 
 function dtPickerGetValue(fieldId) {
@@ -3257,7 +3269,7 @@ function renderDtTimeGrid(fieldId) {
   for (let mins = start; mins <= end; mins += 30) {
     const disabled = typeof s.isDisabledMinute === 'function' && s.isDisabledMinute(mins);
     const cls = [s.minutes === mins ? 'selected' : '', disabled ? 'disabled' : ''].filter(Boolean).join(' ');
-    html += `<button type="button" class="${cls}" ${disabled ? 'disabled' : ''} onclick="pickDtTime('${fieldId}',${mins})">${fmtTimeAmPm(mins)}</button>`;
+    html += `<button type="button" class="${cls}" ${disabled ? 'disabled' : ''} onclick="pickDtTime('${fieldId}',${mins})">${fmtTimePeriod(mins)}</button>`;
   }
   const grid = document.getElementById(`${fieldId}TimeGrid`);
   grid.innerHTML = html;
