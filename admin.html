@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 管理后台</title>
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
+<script src="assets/vendor/lunar.js"></script>
 <style>
   :root {
     --bg: #F7F3EC;
@@ -591,7 +592,9 @@
   .cal-month-grid { border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
   .cal-month-cell:hover { background: var(--bg); }
   .cal-month-cell.other-month { color: var(--ink-muted); opacity: 0.45; }
-  .cal-month-daynum { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .cal-month-daynum { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .cal-month-lunar { font-size: 10px; color: var(--ink-muted); margin-bottom: 4px; }
+  .cal-month-lunar.special { color: var(--gold); font-weight: 600; }
   .cal-month-cell.today .cal-month-daynum {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: 50%; background: var(--gold); color: white;
@@ -619,6 +622,8 @@
   .cal-week-dayhead.today { color: var(--gold); font-weight: 700; }
   .cal-week-dayhead span { font-size: 15px; font-weight: 700; }
   .cal-week-dayhead b { font-size: 14px; color: var(--ink); }
+  .cal-week-lunar { font-size: 10px; font-weight: 400; color: var(--ink-muted); }
+  .cal-week-lunar.special { color: var(--gold); font-weight: 600; }
   .cal-week-dayhead.today b { color: var(--gold); }
   /* 表头琴/茶图标，跟下面每天左右两栏对齐：左边琴、右边茶，不写字全靠图标 */
   .cal-week-res-icons { display: flex; width: 100%; justify-content: space-around; align-items: center; }
@@ -2911,6 +2916,23 @@ function formatSlotLabel(date) {
   return `${periodWordForHour(h)}${h12}:${String(m).padStart(2, '0')}`;
 }
 
+// 农历/节日/节气标签：优先显示阳历节日（元旦/劳动节等），其次农历节日（春节/中秋等），
+// 再其次节气，都没有就显示农历日期（初一显示"X月"）。special=true 表示是节日/节气，
+// 不是普通农历日期，用来在样式上突出显示。lunar.js（assets/vendor/lunar.js）没加载成功时
+// 优雅降级返回空，不报错、不影响日历其他功能
+function getLunarLabel(date) {
+  if (typeof Solar === 'undefined') return { text: '', special: false };
+  const solar = Solar.fromYmd(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  const lunar = solar.getLunar();
+  const solarFest = solar.getFestivals();
+  if (solarFest.length) return { text: solarFest[0], special: true };
+  const lunarFest = lunar.getFestivals();
+  if (lunarFest.length) return { text: lunarFest[0], special: true };
+  const jq = lunar.getJieQi();
+  if (jq) return { text: jq, special: true };
+  return { text: lunar.getDay() === 1 ? lunar.getMonthInChinese() + '月' : lunar.getDayInChinese(), special: false };
+}
+
 function calMondayIndex(d) { return (d.getDay() + 6) % 7; }
 function calStartOfWeek(d) {
   const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -3006,9 +3028,11 @@ function renderCalMonth(events) {
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calAnchor=new Date(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()});calSetView('week')">还有 ${dayEvents.length - maxShow} 条</div>`
       : '';
+    const lunarInfo = getLunarLabel(cellDate);
     cellsHtml += `
       <div class="cal-month-cell${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}" onclick="calAddOnDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
         <div class="cal-month-daynum">${cellD}</div>
+        <div class="cal-month-lunar${lunarInfo.special ? ' special' : ''}">${lunarInfo.text}</div>
         ${chips}${more}
       </div>`;
   }
@@ -3066,10 +3090,11 @@ function renderCalWeek(events) {
       const badge = e.resource === 'both' ? RES_BADGE_BOTH + ' ' : '';
       return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${badge}${e.title}</div>`;
     }).join('');
+    const weekLunarInfo = getLunarLabel(day);
     daysHtml += `
       <div class="cal-week-daycol">
         <div class="cal-week-dayhead${isToday ? ' today' : ''}">
-          <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b>
+          <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()} <span class="cal-week-lunar${weekLunarInfo.special ? ' special' : ''}">${weekLunarInfo.text}</span></b>
           <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
         </div>
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)">
