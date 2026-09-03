@@ -663,6 +663,26 @@
   .cal-week-expand-btn:hover { color: var(--gold); }
   .cal-week-expand-reset { background: none; border: none; color: var(--gold); font-size: 11px; cursor: pointer; text-decoration: underline; padding: 4px 8px; }
 
+  /* 拖拽预选时间段的虚框：左半栏=只拖琴（红），右半栏=只拖茶（绿），拖过中线两栏都占=和（金）；
+     开始时间贴框顶部、结束时间贴框底部，只在拖拽过程中出现，松手就消失换成弹窗 */
+  /* 拖拽选时间段要靠 JS 接管手指的上下移动，这个格子本身不能再交给浏览器原生滚动，
+     所以页面在手机上要靠时间轴那一列或格子外的空白处滚动 */
+  .cal-week-slots { touch-action: none; user-select: none; }
+  .cal-week-selectbox {
+    position: absolute; border-radius: 4px; z-index: 5; pointer-events: none; box-sizing: border-box;
+    border: 2px dashed; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 3px 0;
+  }
+  .cal-week-selectbox.res-guqin { left: 3px; right: calc(50% + 2px); border-color: var(--red); background: rgba(155,74,62,0.14); }
+  .cal-week-selectbox.res-tea { left: calc(50% + 2px); right: 3px; border-color: var(--sage); background: rgba(107,140,122,0.14); }
+  .cal-week-selectbox.res-both { left: 3px; right: 3px; border-color: var(--gold); background: rgba(168,137,74,0.16); }
+  .cal-week-selectbox-label {
+    font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18); white-space: nowrap; line-height: 1.6;
+  }
+  .cal-week-selectbox.res-guqin .cal-week-selectbox-label { color: var(--red); }
+  .cal-week-selectbox.res-tea .cal-week-selectbox-label { color: var(--sage); }
+  .cal-week-selectbox.res-both .cal-week-selectbox-label { color: var(--gold); }
+
   /* 年视图 */
   .cal-year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   .cal-year-month { border: 1px solid var(--border); border-radius: 8px; padding: 10px; cursor: pointer; }
@@ -3162,7 +3182,7 @@ function renderCalWeek(events) {
           <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()} <span class="cal-week-lunar${weekLunarInfo.special ? ' special' : ''}">${weekLunarInfo.text}</span></b>
         </div>
         <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
-        <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)">
+        <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)" onmousedown="calWeekDragStart(event, this)" ontouchstart="calWeekDragStart(event, this)">
           <div class="cal-week-divider"></div>
           ${hourLines}
           ${eventsHtml}
@@ -3199,9 +3219,12 @@ function calResetWeekExpand(dir) {
   renderCalendar();
 }
 
-// 点周视图空白处：按点击位置换算成最近的半小时，预填时间段，方便当备忘录快速加；
-// 点左半栏默认选"琴"、右半栏默认选"茶"，跟表头图标一致，省一步手动选
+// 点周视图空白处（没拖拽、单纯点一下）：按点击位置换算成最近的半小时，预填 1 小时，方便当备忘录快速加；
+// 点左半栏默认选"琴"、右半栏默认选"茶"，跟表头图标一致，省一步手动选。
+// 如果刚刚是拖拽选完时间段松手触发的这次 click（浏览器 mouseup 后还是会补发一次 click），
+// 直接跳过，不然会跟拖拽逻辑打架，弹出两个不一样的时间段
 function calWeekSlotClick(evt, el) {
+  if (calWeekSuppressClick) { calWeekSuppressClick = false; return; }
   const rect = el.getBoundingClientRect();
   const offsetY = evt.clientY - rect.top;
   const offsetX = evt.clientX - rect.left;
@@ -3211,6 +3234,100 @@ function calWeekSlotClick(evt, el) {
   const y = Number(el.dataset.y), m = Number(el.dataset.m), d = Number(el.dataset.d);
   const start = new Date(y, m, d, h, min);
   openAddEventModal(null, start, new Date(start.getTime() + 60 * 60 * 1000), defaultResource);
+}
+
+// 周视图拖拽预选时间段：鼠标/手指在某一天格子里按下开始，上下拖动定时间段（半小时吸附），
+// 左右方向决定占用资源——全程只在左半栏就是"琴"（红虚框），全程只在右半栏就是"茶"（绿虚框），
+// 只要中途越过中线到另一边过，就升级成通栏"和"（金虚框），并且不会再变回单栏。
+// 拖拽过程中框内上方显示开始时间、下方显示结束时间；松手后框消失，直接弹出添加行程弹窗，
+// 时间段和资源都已经按拖拽结果预填好，但都还能在弹窗里改，不是写死的
+let calWeekDragState = null;
+let calWeekSuppressClick = false;
+
+function calWeekDragEventXY(evt) {
+  const t = evt.touches && evt.touches[0];
+  return { x: t ? t.clientX : evt.clientX, y: t ? t.clientY : evt.clientY };
+}
+
+function calWeekDragSnap(offsetY, rectHeight) {
+  const clampedY = Math.max(0, Math.min(offsetY, rectHeight));
+  const hour = calWeekGridStart + clampedY / calWeekPxPerHour;
+  return Math.round(hour * 2) / 2;
+}
+
+function calWeekDragStart(evt, el) {
+  if (evt.type === 'mousedown') {
+    if (evt.button !== 0) return;
+    evt.preventDefault();
+  }
+  const { x, y } = calWeekDragEventXY(evt);
+  const rect = el.getBoundingClientRect();
+  const offsetX = x - rect.left;
+  const startSide = offsetX < rect.width / 2 ? 'guqin' : 'tea';
+  const snap = calWeekDragSnap(y - rect.top, rect.height);
+  calWeekDragState = { el, rect, startSide, resource: startSide, startSnap: snap, curSnap: snap, dragged: false };
+  document.addEventListener('mousemove', calWeekDragMove);
+  document.addEventListener('mouseup', calWeekDragEnd);
+  document.addEventListener('touchmove', calWeekDragMove, { passive: false });
+  document.addEventListener('touchend', calWeekDragEnd);
+}
+
+function calWeekDragMove(evt) {
+  const s = calWeekDragState;
+  if (!s) return;
+  evt.preventDefault();
+  const { x, y } = calWeekDragEventXY(evt);
+  const offsetX = x - s.rect.left;
+  const snap = calWeekDragSnap(y - s.rect.top, s.rect.height);
+  if (snap !== s.curSnap) s.dragged = true;
+  s.curSnap = snap;
+  if (offsetX >= 0 && offsetX <= s.rect.width && s.resource !== 'both') {
+    const side = offsetX < s.rect.width / 2 ? 'guqin' : 'tea';
+    if (side !== s.startSide) { s.resource = 'both'; s.dragged = true; }
+  }
+  calWeekDragRender();
+}
+
+function calWeekDragRender() {
+  const s = calWeekDragState;
+  if (!s || !s.dragged) return;
+  let box = s.el.querySelector('.cal-week-selectbox');
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'cal-week-selectbox';
+    box.innerHTML = '<span class="cal-week-selectbox-label"></span><span class="cal-week-selectbox-label"></span>';
+    s.el.appendChild(box);
+  }
+  box.className = 'cal-week-selectbox res-' + s.resource;
+  const lo = Math.min(s.startSnap, s.curSnap);
+  const hi = Math.max(lo + 0.5, Math.max(s.startSnap, s.curSnap));
+  const top = (lo - calWeekGridStart) * calWeekPxPerHour;
+  const height = (hi - lo) * calWeekPxPerHour;
+  box.style.top = top + 'px';
+  box.style.height = height + 'px';
+  const y = Number(s.el.dataset.y), m = Number(s.el.dataset.m), d = Number(s.el.dataset.d);
+  const startDate = new Date(y, m, d, Math.floor(lo), Math.round((lo % 1) * 60));
+  const endDate = new Date(y, m, d, Math.floor(hi), Math.round((hi % 1) * 60));
+  const labels = box.querySelectorAll('.cal-week-selectbox-label');
+  labels[0].textContent = formatSlotLabel(startDate);
+  labels[1].textContent = formatSlotLabel(endDate);
+  s.finalStart = startDate;
+  s.finalEnd = endDate;
+}
+
+function calWeekDragEnd() {
+  const s = calWeekDragState;
+  document.removeEventListener('mousemove', calWeekDragMove);
+  document.removeEventListener('mouseup', calWeekDragEnd);
+  document.removeEventListener('touchmove', calWeekDragMove);
+  document.removeEventListener('touchend', calWeekDragEnd);
+  calWeekDragState = null;
+  if (!s) return;
+  const box = s.el.querySelector('.cal-week-selectbox');
+  if (box) box.remove();
+  if (!s.dragged) return;
+  calWeekSuppressClick = true;
+  openAddEventModal(null, s.finalStart, s.finalEnd, s.resource);
 }
 
 // 年视图：12 个月缩略图，有行程的日子标个小圆点，点某天直接跳到那个月
