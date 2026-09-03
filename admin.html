@@ -2341,14 +2341,16 @@ async function setBookingStatus(id, status) {
     const adminNote = await customPrompt('确认预约', '给客人留句回复（选填，比如确认的具体时间）');
     if (adminNote) update.admin_note = adminNote;
   }
-  await db.from('booking_requests').update(update).eq('id', id);
+  const { error } = await db.from('booking_requests').update(update).eq('id', id);
+  if (error) { showToast('操作失败：' + error.message); return; }
   delete tabProductsCache['bookings'];
   loadBookingRequests();
 }
 
 async function deleteBookingRequest(id) {
   if (!(await customConfirm('确定删除这条预约申请吗？'))) return;
-  await db.from('booking_requests').delete().eq('id', id);
+  const { error } = await db.from('booking_requests').delete().eq('id', id);
+  if (error) { showToast('删除失败：' + error.message); return; }
   delete tabProductsCache['bookings'];
   loadBookingRequests();
 }
@@ -2407,7 +2409,8 @@ async function loadBlankKeyList() {
 }
 
 async function deleteBlankCode(id) {
-  await db.from('invite_codes').delete().eq('id', id);
+  const { error } = await db.from('invite_codes').delete().eq('id', id);
+  if (error) { showToast('删除失败：' + error.message); return; }
   loadBlankKeyList();
 }
 
@@ -2463,13 +2466,15 @@ async function saveNewRecord() {
     const hours = parseFloat(document.getElementById('recordPkgHours').value);
     const price = document.getElementById('recordPkgPrice').value.trim();
     if (!name || !hours) { showToast('请填写套餐名和总课时'); return; }
-    await db.from('class_packages').insert({ member_id: memberId, package_name: name, total_hours: hours, price: price || null });
+    const { error } = await db.from('class_packages').insert({ member_id: memberId, package_name: name, total_hours: hours, price: price || null });
+    if (error) { showToast('添加失败：' + error.message); return; }
   } else {
     const item = document.getElementById('recordPurItem').value.trim();
     const amount = document.getElementById('recordPurAmount').value.trim();
     const date = document.getElementById('recordPurDate').value || null;
     if (!item) { showToast('请填写购买项目'); return; }
-    await db.from('purchases').insert({ member_id: memberId, item, amount: amount || null, purchased_at: date });
+    const { error } = await db.from('purchases').insert({ member_id: memberId, item, amount: amount || null, purchased_at: date });
+    if (error) { showToast('添加失败：' + error.message); return; }
   }
 
   showToast('已添加');
@@ -2485,7 +2490,8 @@ async function deleteMember() {
   const { data: profile } = await db.from('profiles').select('id').eq('member_id', currentMemberId).eq('role', 'member').maybeSingle();
   if (profile) { showToast('已注册的会员不能删除'); return; }
   if (!(await customConfirm('确定要删除这条档案吗？\n\n这是一条还没注册的代建档，删除后无法恢复。'))) return;
-  await db.from('members').delete().eq('id', currentMemberId);
+  const { error } = await db.from('members').delete().eq('id', currentMemberId);
+  if (error) { showToast('删除失败：' + error.message); return; }
   showToast('已删除');
   closeMemberDetail();
 }
@@ -2639,7 +2645,8 @@ async function saveMemberBasic() {
   const nickname = document.getElementById('memberDetailNickname').value.trim() || null;
   const note = document.getElementById('memberDetailNote').value.trim() || null;
   if (!name && !nickname) { showToast('姓名和备注昵称至少填一个，方便列表里认出是谁'); return; }
-  await db.from('members').update({ name, phone, nickname, note }).eq('id', currentMemberId);
+  const { error } = await db.from('members').update({ name, phone, nickname, note }).eq('id', currentMemberId);
+  if (error) { showToast('保存失败：' + error.message); return; }
   showToast('已保存');
 }
 
@@ -2690,7 +2697,8 @@ async function addClassPackage() {
   const hours = parseFloat(document.getElementById('newPkgHours').value);
   const price = document.getElementById('newPkgPrice').value.trim();
   if (!name || !hours) { showToast('请填写套餐名和总课时'); return; }
-  await db.from('class_packages').insert({ member_id: currentMemberId, package_name: name, total_hours: hours, price: price || null });
+  const { error } = await db.from('class_packages').insert({ member_id: currentMemberId, package_name: name, total_hours: hours, price: price || null });
+  if (error) { showToast('添加失败：' + error.message); return; }
   closeAddPackageModal();
   await refreshPackages();
   showToast('已添加');
@@ -2773,13 +2781,15 @@ async function deductHour(id, classDate) {
   if (!data || data.used_hours >= data.total_hours) return;
   const log = Array.isArray(data.session_log) ? data.session_log : [];
   log.push({ date: classDate, logged_at: new Date().toISOString() });
-  await db.from('class_packages').update({ used_hours: data.used_hours + 1, session_log: log }).eq('id', id);
+  const { error } = await db.from('class_packages').update({ used_hours: data.used_hours + 1, session_log: log }).eq('id', id);
+  if (error) { showToast('扣课时失败：' + error.message); return; }
   await refreshPackages();
 }
 
 async function deletePackage(id) {
   if (!(await customConfirm('确定删除这个课时套餐吗？'))) return;
-  await db.from('class_packages').delete().eq('id', id);
+  const { error } = await db.from('class_packages').delete().eq('id', id);
+  if (error) { showToast('删除失败：' + error.message); return; }
   await refreshPackages();
 }
 
@@ -2822,7 +2832,8 @@ async function addPurchase() {
   const amount = document.getElementById('newPurAmount').value.trim();
   const date = document.getElementById('newPurDate').value || null;
   if (!item) { showToast('请填写购买项目'); return; }
-  await db.from('purchases').insert({ member_id: currentMemberId, item, amount: amount || null, purchased_at: date });
+  const { error } = await db.from('purchases').insert({ member_id: currentMemberId, item, amount: amount || null, purchased_at: date });
+  if (error) { showToast('添加失败：' + error.message); return; }
   closeAddPurchaseModal();
   await refreshPurchases();
   showToast('已添加');
@@ -2830,7 +2841,8 @@ async function addPurchase() {
 
 async function deletePurchase(id) {
   if (!(await customConfirm('确定删除这条消费记录吗？'))) return;
-  await db.from('purchases').delete().eq('id', id);
+  const { error } = await db.from('purchases').delete().eq('id', id);
+  if (error) { showToast('删除失败：' + error.message); return; }
   await refreshPurchases();
 }
 
@@ -3283,8 +3295,10 @@ async function saveEvent() {
     end_at: endDate.toISOString(),
     note: document.getElementById('eventNote').value.trim() || null,
   };
-  if (id) await db.from('schedule_events').update(payload).eq('id', id);
-  else await db.from('schedule_events').insert(payload);
+  const { error } = id
+    ? await db.from('schedule_events').update(payload).eq('id', id)
+    : await db.from('schedule_events').insert(payload);
+  if (error) { showToast('保存失败：' + error.message); return; }
   showToast('已保存');
   closeEventModal();
   delete tabProductsCache['schedule'];
@@ -3295,7 +3309,8 @@ async function saveEvent() {
 async function deleteEvent() {
   const id = document.getElementById('eventEditId').value;
   if (!id || !(await customConfirm('确定删除这条行程吗？'))) return;
-  await db.from('schedule_events').delete().eq('id', id);
+  const { error } = await db.from('schedule_events').delete().eq('id', id);
+  if (error) { showToast('删除失败：' + error.message); return; }
   showToast('已删除');
   closeEventModal();
   delete tabProductsCache['schedule'];
