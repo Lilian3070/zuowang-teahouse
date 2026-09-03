@@ -608,7 +608,7 @@
   /* 周视图 */
   .cal-week-wrap { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .cal-week-timecol { width: 78px; flex-shrink: 0; border-right: 1px solid var(--border); }
-  .cal-week-timecol-head { height: 66px; border-bottom: 1px solid var(--border); }
+  .cal-week-timecol-head { height: 74px; border-bottom: 1px solid var(--border); }
   .cal-week-timelabel { font-size: 11px; color: var(--ink-muted); text-align: right; padding-right: 8px; transform: translateY(-6px); }
   .cal-week-days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); }
   .cal-week-daycol { border-left: 1px solid var(--border); position: relative; }
@@ -616,17 +616,20 @@
   /* 每隔一天背景深一点点，纯视觉上把七天错开，颜色本身还是浅色系，不抢行程条的注意力 */
   .cal-week-daycol:nth-child(even) { background: #F8EED7; }
   .cal-week-dayhead {
-    height: 66px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted); gap: 3px;
+    height: 44px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted); gap: 2px;
   }
   .cal-week-dayhead.today { color: var(--gold); font-weight: 700; }
-  .cal-week-dayhead span { font-size: 15px; font-weight: 700; }
-  .cal-week-dayhead b { font-size: 14px; color: var(--ink); }
+  .cal-week-dayhead span { font-size: 13px; font-weight: 700; }
+  .cal-week-dayhead b { font-size: 13px; color: var(--ink); font-weight: 600; }
   .cal-week-lunar { font-size: 10px; font-weight: 400; color: var(--ink-muted); }
   .cal-week-lunar.special { color: var(--gold); font-weight: 600; }
   .cal-week-dayhead.today b { color: var(--gold); }
-  /* 表头琴/茶图标，跟下面每天左右两栏对齐：左边琴、右边茶，不写字全靠图标 */
-  .cal-week-res-icons { display: flex; width: 100%; justify-content: space-around; align-items: center; }
+  /* 表头琴/茶图标独立成一行，跟下面每天左右两栏对齐：左边琴、右边茶，不写字全靠图标 */
+  .cal-week-res-icons {
+    height: 30px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    display: flex; width: 100%; justify-content: space-around; align-items: center;
+  }
   .cal-week-slots { position: relative; }
   .cal-week-divider { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px dashed var(--border); }
   .cal-week-hourline { border-top: 1px solid var(--border); box-sizing: border-box; cursor: pointer; }
@@ -3097,8 +3100,8 @@ function renderCalWeek(events) {
       <div class="cal-week-daycol">
         <div class="cal-week-dayhead${isToday ? ' today' : ''}">
           <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()} <span class="cal-week-lunar${weekLunarInfo.special ? ' special' : ''}">${weekLunarInfo.text}</span></b>
-          <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
         </div>
+        <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)">
           <div class="cal-week-divider"></div>
           ${hourLines}
