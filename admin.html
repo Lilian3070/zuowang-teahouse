@@ -661,6 +661,8 @@
     width: 3px; height: 3px; border-radius: 50%; background: var(--sage);
   }
   .cal-year-day.today.has-event::after { background: white; }
+  .cal-year-day.lunar-special { color: var(--gold); font-weight: 700; }
+  .cal-year-day.today.lunar-special { color: white; }
 
   @media (max-width: 680px) {
     /* 顶栏 */
@@ -3171,7 +3173,9 @@ function renderCalYear(events) {
       // 相邻月的填充格子（比如八月末尾垫出来的 9 月 1 号）不算"今天"/"有行程"，避免同一天在两张迷你月历里都被标出来
       const isToday = !otherMonth && calSameDay(cellDate, today);
       const hasEvent = !otherMonth && eventDaySet.has(`${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`);
-      daysHtml += `<div class="cal-year-day${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}${hasEvent ? ' has-event' : ''}">${cellD}</div>`;
+      const lunarInfo = getLunarLabel(cellDate);
+      const titleAttr = lunarInfo.special ? ` title="${lunarInfo.text}"` : '';
+      daysHtml += `<div class="cal-year-day${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}${hasEvent ? ' has-event' : ''}${lunarInfo.special ? ' lunar-special' : ''}"${titleAttr}>${cellD}</div>`;
     }
     monthsHtml += `
       <div class="cal-year-month" onclick="calAnchor=new Date(${y},${m},1);calSetView('month')">
