@@ -690,6 +690,9 @@
     .cal-year-grid { grid-template-columns: repeat(2, 1fr); }
     .cal-month-cell { min-height: 64px; padding: 4px; }
     .cal-week-timecol { width: 44px; }
+    /* 窄屏放不下"星期一"这种 3 字，缩小字号避免换行挤破格子 */
+    .cal-month-weekdays span { font-size: 11px; }
+    .cal-week-dayhead span { font-size: 11px; }
   }
 
   /* 分类管理面板 */
@@ -2840,7 +2843,7 @@ let calWeekGridStart = 8.5;
 let calWeekPxPerHour = 48;
 let calWeekExtraEarly = 0; // 手动点"显示更早时段"往前多展开的小时数
 let calWeekExtraLate = 0;  // 手动点"显示更晚时段"往后多展开的小时数
-const CAL_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
+const CAL_WEEKDAYS = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
 
 // 琴/茶/和：圆形线条框 + 主理人手写小篆字（抠图自 assets/icon-guqin.png 等，白底转透明+上色），
 // 日历表头、"添加行程"资源选择、事件条共用（配色见 .res-badge CSS）
@@ -3010,7 +3013,7 @@ function renderCalWeek(events) {
     daysHtml += `
       <div class="cal-week-daycol">
         <div class="cal-week-dayhead${isToday ? ' today' : ''}">
-          <span>周${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b>
+          <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b>
           <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
         </div>
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)">
