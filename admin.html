@@ -3322,12 +3322,10 @@ function calWeekDragRender() {
   s.finalEnd = endDate;
 }
 
+// 拖拽只按半小时吸附，时长必然是整点或半点，直接写成"1.5小时"这种最短的形式，不用"1小时30分钟"占地方
 function calWeekFormatDuration(hours) {
-  const totalMin = Math.round(hours * 60);
-  const h = Math.floor(totalMin / 60), m = totalMin % 60;
-  if (h === 0) return `${m}分钟`;
-  if (m === 0) return `${h}小时`;
-  return `${h}小时${m}分钟`;
+  const rounded = Math.round(hours * 2) / 2;
+  return `${rounded}小时`;
 }
 
 function calWeekDragEnd() {
