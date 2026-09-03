@@ -3289,10 +3289,12 @@ function calWeekDragEventXY(evt) {
   return { x: t ? t.clientX : evt.clientX, y: t ? t.clientY : evt.clientY };
 }
 
+// 按住的地方在哪个半小时格子里，就吸附到那一格的开始（跟单点快速加、跟表格线对齐的逻辑一致），
+// 不能用"四舍五入到最近的线"，不然按在格子偏下方的地方，起点会莫名其妙跳到下一行去
 function calWeekDragSnap(offsetY, rectHeight) {
   const clampedY = Math.max(0, Math.min(offsetY, rectHeight));
   const hour = calWeekGridStart + clampedY / calWeekPxPerHour;
-  return Math.round(hour * 2) / 2;
+  return Math.floor(hour * 2) / 2;
 }
 
 function calWeekDragStart(evt, el) {
