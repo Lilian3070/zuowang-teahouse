@@ -566,6 +566,11 @@
   .cal-event-chip.res-tea, .cal-week-event.res-tea {
     background: var(--surface); color: var(--sage); border-left: 3px solid var(--sage);
   }
+  /* 周视图的行程条改用半透明底色，能透出后面的表格线，颜色跟琴/茶/和的色号一致、只是加了透明度；
+     月视图的卡片还是用上面那套不透明底色，不用改 */
+  .cal-week-event { background: rgba(168, 137, 74, 0.22); }
+  .cal-week-event.res-guqin { background: rgba(155, 74, 62, 0.22); }
+  .cal-week-event.res-tea { background: rgba(107, 140, 122, 0.22); }
   /* 圆形线条框 + 手写小篆字的资源标记：琴/茶/和，日历表头、"添加行程"资源选择、"两者都占"事件条都用这个 */
   .res-badge {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -605,6 +610,8 @@
   .cal-week-days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); }
   .cal-week-daycol { border-left: 1px solid var(--border); position: relative; }
   .cal-week-daycol:first-child { border-left: none; }
+  /* 每隔一天背景深一点点，纯视觉上把七天错开，颜色本身还是浅色系，不抢行程条的注意力 */
+  .cal-week-daycol:nth-child(even) { background: rgba(0, 0, 0, 0.028); }
   .cal-week-dayhead {
     height: 66px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column;
     align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted); gap: 3px;
