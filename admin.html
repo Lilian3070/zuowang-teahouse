@@ -594,6 +594,9 @@
   .res-badge.guqin { color: var(--red); }
   .res-badge.tea { color: var(--sage); }
   .res-badge.both { color: var(--gold); }
+  /* 默认（桌面/弹窗）用加粗字，细笔画版本只在窄屏时切换出来，见下面 @media；
+     选择器特意写成 .res-badge img.xxx，优先级要压过前面的 .res-badge img，不然 display 盖不掉 */
+  .res-badge img.res-badge-thin { display: none; }
 
   /* 月视图 */
   .cal-month-weekdays, .cal-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
@@ -772,6 +775,9 @@
 
     /* 表头琴/茶图标手机上不用加粗描边，细一点、小一点，省地方也不抢眼 */
     .cal-week-res-icons .res-badge { width: 16px; height: 16px; border-width: 1px; }
+    /* 窄屏切换成细笔画版本的琴/茶/和字，外框已经变细了，里面的字也不要显得比框还粗 */
+    .res-badge img.res-badge-bold { display: none; }
+    .res-badge img.res-badge-thin { display: block; }
 
     /* 已排的行程字很容易在窄栏里被挤成竖排还切一半，居中显示能看得清楚一点 */
     .cal-week-event { font-size: 10px; padding: 2px 3px; line-height: 1.25; }
@@ -3003,9 +3009,11 @@ const CAL_WEEKDAYS = ['星期一', '星期二', '星期三', '星期四', '星�
 
 // 琴/茶/和：圆形线条框 + 主理人手写小篆字（抠图自 assets/icon-guqin.png 等，白底转透明+上色），
 // 日历表头、"添加行程"资源选择、事件条共用（配色见 .res-badge CSS）
-const RES_BADGE_GUQIN = `<span class="res-badge guqin"><img src="assets/icon-guqin.png" alt="琴"></span>`;
-const RES_BADGE_TEA = `<span class="res-badge tea"><img src="assets/icon-tea.png" alt="茶"></span>`;
-const RES_BADGE_BOTH = `<span class="res-badge both"><img src="assets/icon-he.png" alt="和"></span>`;
+// 手机屏幕窄，图标本来就要缩小，粗笔画在小尺寸下显得更粗更抢眼，所以另外配了一套细笔画版本，
+// 靠 CSS 在窄屏时切换显示（见 .res-badge-bold/.res-badge-thin），桌面端还是用原来加粗的
+const RES_BADGE_GUQIN = `<span class="res-badge guqin"><img class="res-badge-bold" src="assets/icon-guqin.png" alt="琴"><img class="res-badge-thin" src="assets/icon-guqin-thin.png" alt="琴"></span>`;
+const RES_BADGE_TEA = `<span class="res-badge tea"><img class="res-badge-bold" src="assets/icon-tea.png" alt="茶"><img class="res-badge-thin" src="assets/icon-tea-thin.png" alt="茶"></span>`;
+const RES_BADGE_BOTH = `<span class="res-badge both"><img class="res-badge-bold" src="assets/icon-he.png" alt="和"><img class="res-badge-thin" src="assets/icon-he-thin.png" alt="和"></span>`;
 
 // 早上/上午/中午/下午/晚上/凌晨——中文口语里常用的时段词，比纯 24 小时数字更容易一眼找到时间，
 // 周视图时间轴和"添加行程"时间选择共用同一套判断
