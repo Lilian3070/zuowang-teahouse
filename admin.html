@@ -682,6 +682,11 @@
   .cal-week-selectbox.res-guqin .cal-week-selectbox-label { color: var(--red); }
   .cal-week-selectbox.res-tea .cal-week-selectbox-label { color: var(--sage); }
   .cal-week-selectbox.res-both .cal-week-selectbox-label { color: var(--gold); }
+  /* 时长文字放在框正中间，字号更小、没有白底，跟上下两个时间标签区分开 */
+  .cal-week-selectbox-duration { font-size: 10px; font-weight: 600; opacity: 0.8; white-space: nowrap; }
+  .cal-week-selectbox.res-guqin .cal-week-selectbox-duration { color: var(--red); }
+  .cal-week-selectbox.res-tea .cal-week-selectbox-duration { color: var(--sage); }
+  .cal-week-selectbox.res-both .cal-week-selectbox-duration { color: var(--gold); }
 
   /* 年视图 */
   .cal-year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -3295,7 +3300,7 @@ function calWeekDragRender() {
   if (!box) {
     box = document.createElement('div');
     box.className = 'cal-week-selectbox';
-    box.innerHTML = '<span class="cal-week-selectbox-label"></span><span class="cal-week-selectbox-label"></span>';
+    box.innerHTML = '<span class="cal-week-selectbox-label"></span><span class="cal-week-selectbox-duration"></span><span class="cal-week-selectbox-label"></span>';
     s.el.appendChild(box);
   }
   box.className = 'cal-week-selectbox res-' + s.resource;
@@ -3311,8 +3316,18 @@ function calWeekDragRender() {
   const labels = box.querySelectorAll('.cal-week-selectbox-label');
   labels[0].textContent = formatSlotLabel(startDate);
   labels[1].textContent = formatSlotLabel(endDate);
+  // 框太矮（半小时）中间塞不下时长文字，跟上下两个时间标签会叠在一起，就先不显示
+  box.querySelector('.cal-week-selectbox-duration').textContent = height >= 56 ? calWeekFormatDuration(hi - lo) : '';
   s.finalStart = startDate;
   s.finalEnd = endDate;
+}
+
+function calWeekFormatDuration(hours) {
+  const totalMin = Math.round(hours * 60);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  if (h === 0) return `${m}分钟`;
+  if (m === 0) return `${h}小时`;
+  return `${h}小时${m}分钟`;
 }
 
 function calWeekDragEnd() {
