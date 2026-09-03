@@ -668,9 +668,9 @@
 
   /* 拖拽预选时间段的虚框：左半栏=只拖琴（红），右半栏=只拖茶（绿），拖过中线两栏都占=和（金）；
      开始时间贴框顶部、结束时间贴框底部，只在拖拽过程中出现，松手就消失换成弹窗 */
-  /* 拖拽选时间段要靠 JS 接管手指的上下移动，这个格子本身不能再交给浏览器原生滚动，
-     所以页面在手机上要靠时间轴那一列或格子外的空白处滚动 */
-  .cal-week-slots { touch-action: none; user-select: none; }
+  /* 手指随便一划要能正常上下滑页面看时间，所以默认还是交给浏览器原生纵向滚动（pan-y）；
+     只有按住不动够久（见 JS 里的长按判定）才会真正接管手指移动去画选框 */
+  .cal-week-slots { touch-action: pan-y; user-select: none; }
   .cal-week-selectbox {
     position: absolute; border-radius: 4px; z-index: 5; pointer-events: none; box-sizing: border-box;
     border: 2px dashed; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 3px 0;
@@ -3299,12 +3299,49 @@ function calWeekDragStart(evt, el) {
   if (evt.type === 'mousedown') {
     if (evt.button !== 0) return;
     evt.preventDefault();
+    calWeekBeginDrag(el, evt);
+    return;
   }
+  // 手指按下先别急着进入拖拽模式：如果是想上下滑页面看时间，手指很快就会明显移动，
+  // 那种情况直接放行让浏览器自己滚动；只有按住不怎么动、撑过这段等待时间，才算「按住」，
+  // 这时候才真正开始拖拽选时间段，避免一碰格子就跟滑动手势打架
   const { x, y } = calWeekDragEventXY(evt);
+  calWeekPendingPress = { el, x, y };
+  clearTimeout(calWeekPressTimer);
+  calWeekPressTimer = setTimeout(() => {
+    if (!calWeekPendingPress) return;
+    const p = calWeekPendingPress;
+    calWeekPendingPress = null;
+    calWeekBeginDrag(p.el, { clientX: p.x, clientY: p.y });
+  }, 350);
+  document.addEventListener('touchmove', calWeekPressWatch, { passive: true });
+  document.addEventListener('touchend', calWeekPressCancel);
+}
+
+let calWeekPendingPress = null;
+let calWeekPressTimer = null;
+
+function calWeekPressWatch(evt) {
+  if (!calWeekPendingPress) return; // 已经真正进入拖拽了，交给 calWeekDragMove 处理
+  const { x, y } = calWeekDragEventXY(evt);
+  if (Math.abs(x - calWeekPendingPress.x) > 8 || Math.abs(y - calWeekPendingPress.y) > 8) calWeekPressCancel();
+}
+
+function calWeekPressCancel() {
+  clearTimeout(calWeekPressTimer);
+  calWeekPressTimer = null;
+  calWeekPendingPress = null;
+  document.removeEventListener('touchmove', calWeekPressWatch);
+  document.removeEventListener('touchend', calWeekPressCancel);
+}
+
+function calWeekBeginDrag(el, evtLike) {
+  document.removeEventListener('touchmove', calWeekPressWatch);
+  document.removeEventListener('touchend', calWeekPressCancel);
   const rect = el.getBoundingClientRect();
-  const offsetX = x - rect.left;
+  const offsetX = evtLike.clientX - rect.left;
   const startSide = offsetX < rect.width / 2 ? 'guqin' : 'tea';
-  const snap = calWeekDragSnap(y - rect.top, rect.height);
+  const snap = calWeekDragSnap(evtLike.clientY - rect.top, rect.height);
   calWeekDragState = { el, rect, startSide, resource: startSide, startSnap: snap, curSnap: snap, dragged: false };
   document.addEventListener('mousemove', calWeekDragMove);
   document.addEventListener('mouseup', calWeekDragEnd);
