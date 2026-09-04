@@ -731,16 +731,26 @@
   .cal-week-expand-btn:hover { color: var(--gold); }
   .cal-week-expand-reset { background: none; border: none; color: var(--gold); font-size: 11px; cursor: pointer; text-decoration: underline; padding: 4px 8px; }
 
-  /* 关闭时段编辑模式：周视图里"这次编辑会话点过、跟数据库现状不一样"的半小时格叠层，
-     纯展示不拦截点击（pointer-events:none），真正的点击/拖拽还是交给 .cal-week-slots 本身处理 */
-  .cal-close-overlay { position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box; }
+  /* 关闭时段编辑模式：周视图里画出这条资源线"现在实际关着"的完整区间（数据库原状 + 这次
+     编辑会话里点过的变动叠一起算出来的），不是只画"跟原来不一样"的那部分——这样一进编辑
+     模式，之前整天关闭的日子就能看到一整条虚线块盖住全天，点里面某段可以重新打开，打开
+     的那段会从块里挖掉、虚线块跟着断开变短。纯展示不拦截点击（pointer-events:none），
+     真正的点击/拖拽还是交给 .cal-week-slots 本身处理 */
+  .cal-close-overlay {
+    position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.4), rgba(107, 107, 107, 0.4) 6px, rgba(140, 140, 140, 0.2) 6px, rgba(140, 140, 140, 0.2) 12px);
+    border: 1.5px dashed #6b6b6b;
+  }
   .cal-close-overlay.res-guqin { left: 3px; right: calc(50% + 2px); }
   .cal-close-overlay.res-tea { left: calc(50% + 2px); right: 3px; }
-  .cal-close-overlay.close-will-close {
-    background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.4), rgba(107, 107, 107, 0.4) 6px, rgba(140, 140, 140, 0.2) 6px, rgba(140, 140, 140, 0.2) 12px);
-    border: 2px dashed #6b6b6b;
+  /* 琴/茶各占半栏，横向空间很窄（手机上一栏才十几 px），横排文字根本放不下，
+     改成竖排——中文本身竖排就是正的，不用转 90 度，数字/冒号/横线跟着 mixed 一起竖着读 */
+  .cal-close-overlay-label {
+    writing-mode: vertical-rl; text-orientation: mixed;
+    font-size: 10px; font-weight: 700; color: #595959; background: rgba(255, 255, 255, 0.6);
+    padding: 4px 1px; border-radius: 3px; white-space: nowrap;
   }
-  .cal-close-overlay.close-will-open { border: 2px dashed var(--gold); background: rgba(168, 137, 74, 0.12); }
 
   /* 拖拽预选时间段的虚框：左半栏=只拖琴（红），右半栏=只拖茶（绿），拖过中线两栏都占=和（金）；
      开始时间贴框顶部、结束时间贴框底部，只在拖拽过程中出现，松手就消失换成弹窗 */
@@ -3402,25 +3412,25 @@ function calCloseToggleSlot(y, m, d, resource, slotIdx) {
   calCloseSetSlot(y, m, d, resource, slotIdx, !current);
 }
 
-// 周视图关闭时段的可视化叠层：已经存过的关闭状态交给普通事件条（"已关闭"灰纹）自己显示，
-// 这里只画"这次编辑会话点过、状态跟数据库不一样"的半小时格，画成连续的一段段，不用逐格画
-function calCloseWeekRunsPendingOnly(y, m, d, resource) {
+// 周视图关闭时段编辑模式的可视化：画出这条资源线"现在实际关着"的完整区间——数据库原状
+// 叠上这次编辑会话里点过的变动，不是只画"跟原来不一样"的那部分。这样一进编辑模式，之前
+// 整天关闭的日子就能看到一条虚线块盖住全天，点里面某段重新打开，那段会被挖掉、虚线块
+// 跟着断开变成两段，各自重新算区间——天然支持"全天关闭后精调重开几小时"这种情况
+function calCloseWeekEffectiveRuns(y, m, d, resource) {
   const runs = [];
-  let runStart = null, runVal = null;
+  let runStart = null;
   for (let i = 0; i <= 48; i++) {
-    const key = calCloseSlotKey(y, m, d, resource, i);
-    const has = i < 48 && closeWeekPending.has(key);
-    const pendingVal = has ? closeWeekPending.get(key) : null;
-    const baseline = i < 48 && calCloseIsExistingClosed(new Date(y, m, d), resource, i);
-    const isChange = has && pendingVal !== baseline;
-    if (isChange && runStart === null) { runStart = i; runVal = pendingVal; }
-    else if (runStart !== null && (!isChange || pendingVal !== runVal)) {
-      runs.push([runStart, i, runVal]);
-      runStart = null;
-      if (isChange) { runStart = i; runVal = pendingVal; }
-    }
+    const closed = i < 48 && calCloseEffectiveWeekSlot(y, m, d, resource, i);
+    if (closed && runStart === null) runStart = i;
+    else if (!closed && runStart !== null) { runs.push([runStart, i]); runStart = null; }
   }
   return runs;
+}
+// 半小时格下标转回"HH:MM"，一整天（0~48）就直接显示"全天"，不用写一串 00:00-24:00
+function calCloseFormatRunLabel(s0, s1) {
+  if (s0 === 0 && s1 === 48) return '全天';
+  const fmt = slot => `${String(Math.floor(slot / 2)).padStart(2, '0')}:${slot % 2 ? '30' : '00'}`;
+  return `${fmt(s0)}-${fmt(s1)}`;
 }
 
 // 月视图：鼠标/手指按下开始拖拽选日期范围，松手时按"这次要刷成关闭还是开放"统一处理整段范围
@@ -3654,7 +3664,9 @@ function renderCalWeek(events) {
     // 整天都关的日子，跟月视图一个思路：不在时间格里占一大块"已关闭"，改成表头盖个印章，
     // 时间轴上留白干净，"关闭"这件事直接在表头上一眼看到
     const isFullyClosed = calCloseIsDayFullyClosed(day.getFullYear(), day.getMonth(), day.getDate());
-    const dayEvents = weekEvents.filter(e => (calSameDay(e.start, day) || (e.start < day && e.end > day)) && !(isFullyClosed && e.isClosed));
+    // 编辑模式下，关闭状态全部交给下面新算的虚线块统一处理（不管整天还是部分时段关闭）；
+    // 平时不在编辑模式，只有整天关闭才不重复画事件条（交给表头印章），部分关闭还是照常显示
+    const dayEvents = weekEvents.filter(e => (calSameDay(e.start, day) || (e.start < day && e.end > day)) && !(e.isClosed && (calCloseMode || isFullyClosed)));
     const eventsHtml = dayEvents.map(e => {
       const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
       const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
@@ -3668,14 +3680,16 @@ function renderCalWeek(events) {
     let closeOverlayHtml = '';
     if (calCloseMode) {
       ['guqin', 'tea'].forEach(resource => {
-        calCloseWeekRunsPendingOnly(day.getFullYear(), day.getMonth(), day.getDate(), resource).forEach(([s0, s1, val]) => {
+        calCloseWeekEffectiveRuns(day.getFullYear(), day.getMonth(), day.getDate(), resource).forEach(([s0, s1]) => {
           const startH = s0 * 0.5, endH = s1 * 0.5;
           if (endH <= gridStart || startH >= gridEnd) return;
           const top = (Math.max(startH, gridStart) - gridStart) * pxPerHour;
           const height = (Math.min(endH, gridEnd) - Math.max(startH, gridStart)) * pxPerHour;
           const resCls = resource === 'guqin' ? ' res-guqin' : ' res-tea';
-          const stateCls = val ? ' close-will-close' : ' close-will-open';
-          closeOverlayHtml += `<div class="cal-close-overlay${resCls}${stateCls}" style="top:${top}px;height:${height}px"></div>`;
+          // 竖排文字至少要有点高度才放得下"全天"/"14:00-16:00"这几个字，太矮的一小段
+          // （比如就半小时）放不下就不写字，块本身的斜纹虚线还是照样显示
+          const label = height >= 36 ? `<span class="cal-close-overlay-label">${calCloseFormatRunLabel(s0, s1)}</span>` : '';
+          closeOverlayHtml += `<div class="cal-close-overlay${resCls}" style="top:${top}px;height:${height}px">${label}</div>`;
         });
       });
     }
