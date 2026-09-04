@@ -628,6 +628,7 @@
   .cal-month-cell {
     min-height: 92px; border: 1px solid var(--border); border-top: none; border-left: none;
     padding: 6px; cursor: pointer; transition: background .15s;
+    touch-action: pan-y; user-select: none;
   }
   .cal-month-grid { border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
   .cal-month-cell:hover { background: var(--bg); }
@@ -3188,82 +3189,94 @@ function cancelCloseMode() {
 // 保存关闭时段：逐天重算"这一天最终应该关多少"，然后把这一天原有的关闭记录整批删掉重插入，
 // 不做增量修补——这样月视图整天关/周视图半小时格精调叠在一起时，不用另外写区间拆分/资源窄化的
 // 特判逻辑，一律以数据库现状为底、按 月pending → 周pending 的顺序盖上去，重新算出最终该关的区间
+// 单独算+提交某一天的关闭记录，抽成函数是为了下面能用 Promise.all 把好几天一起并发提交，
+// 不然一天一个来回（查一次+删一次+插一次），关一整周就要顺序等 7×3 次网络往返，明显能感觉到卡
+async function saveCloseModeForDay(dateKey) {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dayStart = new Date(y, m, d);
+  const dayEnd = new Date(y, m, d + 1);
+  const { data: existingRows, error: fetchErr } = await db.from('schedule_events')
+    .select('*').eq('is_closed', true).lt('start_at', dayEnd.toISOString()).gt('end_at', dayStart.toISOString());
+  if (fetchErr) throw fetchErr;
+
+  // 1. 用数据库现有关闭记录，铺出这一天琴/茶两条线各 48 个半小时格的关闭状态网格
+  const grid = { guqin: new Array(48).fill(false), tea: new Array(48).fill(false) };
+  (existingRows || []).forEach(row => {
+    const s = new Date(row.start_at), e = new Date(row.end_at);
+    const sMin = s <= dayStart ? 0 : Math.round((s - dayStart) / 60000);
+    const eMin = e >= dayEnd ? 1440 : Math.round((e - dayStart) / 60000);
+    const s0 = Math.max(0, Math.floor(sMin / 30)), s1 = Math.min(48, Math.ceil(eMin / 30));
+    for (let i = s0; i < s1; i++) {
+      if (row.resource === 'both' || row.resource === 'guqin') grid.guqin[i] = true;
+      if (row.resource === 'both' || row.resource === 'tea') grid.tea[i] = true;
+    }
+  });
+
+  // 2. 叠上月视图"整天关/开"的 pending（覆盖底色）
+  if (closeMonthPending.has(dateKey)) {
+    const val = closeMonthPending.get(dateKey) === 'closed';
+    grid.guqin.fill(val);
+    grid.tea.fill(val);
+  }
+
+  // 3. 再叠上周视图半小时格的精调 pending（覆盖前两层）
+  closeWeekPending.forEach((val, key) => {
+    const [dk, resource, slotStr] = key.split('_');
+    if (dk !== dateKey) return;
+    grid[resource][Number(slotStr)] = val;
+  });
+
+  // 4. 网格转回连续区间：琴茶同时关的整段合成一条 both，否则各自单独一条
+  const newRows = [];
+  let runStart = null, runGuqin = false, runTea = false;
+  const flush = (endIdx) => {
+    if (runStart === null) return;
+    if (runGuqin || runTea) {
+      const resource = runGuqin && runTea ? 'both' : (runGuqin ? 'guqin' : 'tea');
+      newRows.push({
+        title: '已关闭', is_closed: true, member_id: null, resource,
+        start_at: new Date(y, m, d, 0, runStart * 30).toISOString(),
+        end_at: new Date(y, m, d, 0, endIdx * 30).toISOString(),
+      });
+    }
+    runStart = null;
+  };
+  for (let i = 0; i <= 48; i++) {
+    const g = i < 48 && grid.guqin[i], t = i < 48 && grid.tea[i];
+    if (runStart === null) {
+      if (g || t) { runStart = i; runGuqin = g; runTea = t; }
+    } else if (g !== runGuqin || t !== runTea) {
+      flush(i);
+      if (g || t) { runStart = i; runGuqin = g; runTea = t; }
+    }
+  }
+  flush(48);
+
+  // 5. 这一天原有的关闭记录整批删掉，换成新算出来的——删和插不互相依赖，并发发出去
+  const ops = [];
+  if (existingRows && existingRows.length) ops.push(db.from('schedule_events').delete().in('id', existingRows.map(r => r.id)));
+  if (newRows.length) ops.push(db.from('schedule_events').insert(newRows));
+  const results = await Promise.all(ops);
+  const failed = results.find(r => r && r.error);
+  if (failed) throw failed.error;
+}
+
 async function saveCloseMode() {
   const affectedDates = new Set();
   closeMonthPending.forEach((_, key) => affectedDates.add(key));
   closeWeekPending.forEach((_, key) => affectedDates.add(key.split('_')[0]));
   if (!affectedDates.size) { cancelCloseMode(); return; }
 
-  for (const dateKey of affectedDates) {
-    const [y, m, d] = dateKey.split('-').map(Number);
-    const dayStart = new Date(y, m, d);
-    const dayEnd = new Date(y, m, d + 1);
-    const { data: existingRows, error: fetchErr } = await db.from('schedule_events')
-      .select('*').eq('is_closed', true).lt('start_at', dayEnd.toISOString()).gt('end_at', dayStart.toISOString());
-    if (fetchErr) { showToast('保存失败：' + fetchErr.message); return; }
+  const saveBtn = document.querySelector('.close-mode-save-btn');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '保存中…'; }
 
-    // 1. 用数据库现有关闭记录，铺出这一天琴/茶两条线各 48 个半小时格的关闭状态网格
-    const grid = { guqin: new Array(48).fill(false), tea: new Array(48).fill(false) };
-    (existingRows || []).forEach(row => {
-      const s = new Date(row.start_at), e = new Date(row.end_at);
-      const sMin = s <= dayStart ? 0 : Math.round((s - dayStart) / 60000);
-      const eMin = e >= dayEnd ? 1440 : Math.round((e - dayStart) / 60000);
-      const s0 = Math.max(0, Math.floor(sMin / 30)), s1 = Math.min(48, Math.ceil(eMin / 30));
-      for (let i = s0; i < s1; i++) {
-        if (row.resource === 'both' || row.resource === 'guqin') grid.guqin[i] = true;
-        if (row.resource === 'both' || row.resource === 'tea') grid.tea[i] = true;
-      }
-    });
-
-    // 2. 叠上月视图"整天关/开"的 pending（覆盖底色）
-    if (closeMonthPending.has(dateKey)) {
-      const val = closeMonthPending.get(dateKey) === 'closed';
-      grid.guqin.fill(val);
-      grid.tea.fill(val);
-    }
-
-    // 3. 再叠上周视图半小时格的精调 pending（覆盖前两层）
-    closeWeekPending.forEach((val, key) => {
-      const [dk, resource, slotStr] = key.split('_');
-      if (dk !== dateKey) return;
-      grid[resource][Number(slotStr)] = val;
-    });
-
-    // 4. 网格转回连续区间：琴茶同时关的整段合成一条 both，否则各自单独一条
-    const newRows = [];
-    let runStart = null, runGuqin = false, runTea = false;
-    const flush = (endIdx) => {
-      if (runStart === null) return;
-      if (runGuqin || runTea) {
-        const resource = runGuqin && runTea ? 'both' : (runGuqin ? 'guqin' : 'tea');
-        newRows.push({
-          title: '已关闭', is_closed: true, member_id: null, resource,
-          start_at: new Date(y, m, d, 0, runStart * 30).toISOString(),
-          end_at: new Date(y, m, d, 0, endIdx * 30).toISOString(),
-        });
-      }
-      runStart = null;
-    };
-    for (let i = 0; i <= 48; i++) {
-      const g = i < 48 && grid.guqin[i], t = i < 48 && grid.tea[i];
-      if (runStart === null) {
-        if (g || t) { runStart = i; runGuqin = g; runTea = t; }
-      } else if (g !== runGuqin || t !== runTea) {
-        flush(i);
-        if (g || t) { runStart = i; runGuqin = g; runTea = t; }
-      }
-    }
-    flush(48);
-
-    // 5. 这一天原有的关闭记录整批删掉，换成新算出来的
-    if (existingRows && existingRows.length) {
-      const { error: delErr } = await db.from('schedule_events').delete().in('id', existingRows.map(r => r.id));
-      if (delErr) { showToast('保存失败：' + delErr.message); return; }
-    }
-    if (newRows.length) {
-      const { error: insErr } = await db.from('schedule_events').insert(newRows);
-      if (insErr) { showToast('保存失败：' + insErr.message); return; }
-    }
+  // 好几天的改动一起并发提交，不用一天等完了再等下一天
+  const results = await Promise.allSettled(Array.from(affectedDates).map(saveCloseModeForDay));
+  const failed = results.find(r => r.status === 'rejected');
+  if (failed) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '保存关闭设置'; }
+    showToast('保存失败：' + failed.reason.message);
+    return;
   }
 
   showToast('已保存');
@@ -3377,8 +3390,60 @@ function calMonthCellClick(evt, y, m, d) {
 
 function calMonthCellDown(evt, y, m, d) {
   if (!calCloseMode) return;
-  if (evt.type === 'mousedown' && evt.button !== 0) return;
-  evt.preventDefault();
+  if (evt.type === 'mousedown') {
+    if (evt.button !== 0) return;
+    evt.preventDefault();
+    calMonthBeginDrag(y, m, d);
+    return;
+  }
+  // 手指按下先别急着进边框选模式：正常上下滑动翻页要能照常用，跟周视图那套长按判定一个思路——
+  // 只有按住不怎么动、撑过这段等待时间，才真正开始框选，一碰格子就选中会跟垂直滑动手势打架
+  const t = evt.touches && evt.touches[0];
+  calMonthPendingPress = { y, m, d, x: t ? t.clientX : 0, cy: t ? t.clientY : 0 };
+  clearTimeout(calMonthPressTimer);
+  calMonthPressTimer = setTimeout(() => {
+    if (!calMonthPendingPress) return;
+    const p = calMonthPendingPress;
+    calMonthPendingPress = null;
+    document.removeEventListener('touchmove', calMonthPressWatch);
+    document.removeEventListener('touchend', calMonthPressTapEnd);
+    calMonthBeginDrag(p.y, p.m, p.d);
+  }, 350);
+  document.addEventListener('touchmove', calMonthPressWatch, { passive: true });
+  document.addEventListener('touchend', calMonthPressTapEnd);
+}
+
+let calMonthPendingPress = null;
+let calMonthPressTimer = null;
+
+function calMonthPressWatch(evt) {
+  if (!calMonthPendingPress) return; // 已经真正进入框选了，交给 calMonthDragMove 处理
+  const t = evt.touches && evt.touches[0];
+  if (!t) return;
+  if (Math.abs(t.clientX - calMonthPendingPress.x) > 8 || Math.abs(t.clientY - calMonthPendingPress.cy) > 8) calMonthPressCancel();
+}
+
+// 长按计时还没到、手指就松开了：只要中途没被判定成"在滑动"（那种情况 calMonthPressCancel
+// 已经把 calMonthPendingPress 清空了），就当成一次快速点按，直接切换这一天，不用非等到长按
+function calMonthPressTapEnd() {
+  const p = calMonthPendingPress;
+  calMonthPressCancel();
+  if (!p) return;
+  calMonthBeginDrag(p.y, p.m, p.d);
+  calMonthDragEnd();
+}
+
+function calMonthPressCancel() {
+  clearTimeout(calMonthPressTimer);
+  calMonthPressTimer = null;
+  calMonthPendingPress = null;
+  document.removeEventListener('touchmove', calMonthPressWatch);
+  document.removeEventListener('touchend', calMonthPressTapEnd);
+}
+
+function calMonthBeginDrag(y, m, d) {
+  document.removeEventListener('touchmove', calMonthPressWatch);
+  document.removeEventListener('touchend', calMonthPressTapEnd);
   const targetState = calCloseMonthEffective(y, m, d) === 'closed' ? 'open' : 'closed';
   calMonthDragAnchor = { date: new Date(y, m, d), targetState };
   calMonthDragPreview(new Date(y, m, d), new Date(y, m, d));
