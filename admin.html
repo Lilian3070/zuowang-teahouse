@@ -740,7 +740,7 @@
   .cal-close-overlay {
     position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box;
     display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-    padding: 4px 0; overflow: hidden;
+    padding: 4px 0;
     background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.4), rgba(107, 107, 107, 0.4) 6px, rgba(140, 140, 140, 0.2) 6px, rgba(140, 140, 140, 0.2) 12px);
     border: 1.5px dashed #6b6b6b;
   }
@@ -759,11 +759,13 @@
   }
   /* 平时（不在编辑模式）看已关闭时段：颜色比编辑模式的预选/预览淡很多——那边整块日历本来就
      压暗降饱和度提醒"在编辑"，这里是日常查看，太深会跟真行程抢注意力；也不写时间文字，
-     日常只需要一眼看出"这段关了"，具体几点到几点要看要改就进"关闭/开放时段"编辑模式 */
+     日常只需要一眼看出"这段关了"，具体几点到几点要看要改就进"关闭/开放时段"编辑模式。
+     细红色虚线框+淡红底，跟表头/月视图那个红色印章是同一套视觉语言，不用粗斜纹，
+     免得看着像大片阴影压在格子上 */
   .cal-week-closed-block {
     position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box;
-    background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.16), rgba(107, 107, 107, 0.16) 6px, rgba(140, 140, 140, 0.08) 6px, rgba(140, 140, 140, 0.08) 12px);
-    border: 1.5px dashed rgba(107, 107, 107, 0.35);
+    background: rgba(155, 74, 62, 0.05); border: 1.5px dashed var(--red); border-radius: 3px;
+    opacity: 0.85;
   }
   .cal-week-closed-block.res-guqin { left: 3px; right: calc(50% + 2px); }
   .cal-week-closed-block.res-tea { left: calc(50% + 2px); right: 3px; }
@@ -3443,10 +3445,10 @@ function calCloseWeekEffectiveRuns(y, m, d, resource) {
   return runs;
 }
 // 编辑模式预览块的时间标签：整天（0~48）直接显示"全天"；否则上面贴开始时间、下面贴结束
-// 时间（配合 CSS 里 .cal-close-overlay 的 flex space-between 布局），中间空间够的话
-// （块够高）插一段时长"1小时"/"1.5小时"，太矮的一小段放不下就只留首尾两个时间点
+// 时间（配合 CSS 里 .cal-close-overlay 的 flex space-between 布局），不管块多矮（哪怕就
+// 半小时一格）首尾两个时间点都要显示，跟拖拽预选新行程那套 .cal-week-selectbox 一个道理；
+// 中间空间够的话（块够高）再插一段时长"1小时"/"1.5小时"
 function calCloseOverlayTimeLabelHtml(s0, s1, height) {
-  if (height < 36) return '';
   if (s0 === 0 && s1 === 48) return `<span class="cal-close-overlay-label">全天</span>`;
   const fmt = slot => `${String(Math.floor(slot / 2)).padStart(2, '0')}:${slot % 2 ? '30' : '00'}`;
   const durHtml = height >= 70 ? `<span class="cal-close-overlay-duration">${calWeekFormatDuration((s1 - s0) * 0.5)}</span>` : '';
