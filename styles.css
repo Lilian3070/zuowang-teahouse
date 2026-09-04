@@ -598,30 +598,55 @@ section {
 /* 整张表（时间轴 + 每天一列）放在一个能上下、左右都滚动的框里，表头行和时间轴列各自
    position:sticky，滚动的时候始终看得到"这是星期几/几点"，跟后台周视图翻看长列表时
    的体验是一个道理 */
-.bwk-table-wrap { position: relative; max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
-.bwk-table { display: grid; }
+/* ⚠️ 下面这些数值不是随手定的，是照抄 admin.html 后台周视图的真实参数，改之前先去那边对一眼：
+   边框色 #D8D0C0（后台 --border）、隔天底色 #F8EED7（后台 .cal-week-daycol:nth-child(even)）、
+   半小时格高 24px（后台 calWeekPxPerHour = 48）、时间标 9px/10px 两行（后台手机版 @media 那套）、
+   半点线 dashed + 更淡。目的是让客人看到的这张表跟主理人后台那张是同一个组件，不是"长得像"。 */
+.bwk-table-wrap { position: relative; max-height: 360px; overflow: auto; border: 1px solid #D8D0C0; border-radius: 6px; }
+/* 结构跟后台 .cal-week-wrap 一样：左边一整根时间轴列 + 右边七天各一列。
+   不能用 CSS Grid 平铺格子——那样时间轴列的 position:sticky 会失效（grid 子项的包含块
+   就是它自己那一格，没有可以"吸"的余量），横向一滚时间轴就跑没了 */
+.bwk-table { display: flex; min-width: min-content; }
+.bwk-timecol {
+  position: sticky; left: 0; z-index: 4; flex: 0 0 46px; width: 46px;
+  background: var(--paper-deep); border-right: 1px solid #D8D0C0;
+}
+.bwk-days { display: flex; flex: 1; }
+.bwk-day-col { flex: 1 0 46px; min-width: 46px; background: var(--col-tint, #F7F3EC); }
 .bwk-corner, .bwk-col-head {
   position: sticky; top: 0; background: var(--paper-deep); z-index: 3;
-  padding: 5px 2px; text-align: center; font-size: 0.7rem; color: var(--ink-soft);
-  border-bottom: 1px solid var(--line);
+  height: 40px; box-sizing: border-box;
+  padding: 4px 2px; text-align: center; font-size: 0.7rem; color: var(--ink-soft);
+  border-bottom: 1px solid #D8D0C0;
 }
-.bwk-corner { left: 0; z-index: 4; }
 .bwk-col-head { white-space: nowrap; }
 .bwk-col-head b { display: block; font-size: 0.78rem; color: var(--ink); }
 .bwk-col-head.today b { color: var(--seal); }
 /* 已经过去的日子这一列还是照画（一周七天要完整），只是整列都不能点，表头也跟着淡下去 */
 .bwk-col-head.past { opacity: 0.45; }
+
+/* 时间标：跟后台一样每半小时都标，整点正常、半点小一号且淡一点；文字跨在网格线上
+   （后台是 transform: translateY(-6px)，这里放在内层 span 上做，免得影响外层的 sticky） */
 .bwk-time-label {
-  position: sticky; left: 0; z-index: 2; background: var(--paper-deep);
-  font-size: 0.62rem; color: var(--ink-soft); text-align: right; padding: 0 5px;
-  display: flex; align-items: center; justify-content: flex-end;
-  border-right: 1px solid var(--line); border-top: 1px solid var(--line);
+  height: 24px; box-sizing: border-box; color: #4A5C5A; padding: 0 4px;
+  display: flex; align-items: flex-start; justify-content: flex-end;
+  border-top: 1px dashed rgba(74, 92, 90, 0.4);
 }
-/* 每天列自己的底色（单双日交替，--col-tint 由 JS 按真实星期几算好传进来，
-   跟后台 .cal-week-daycol:nth-child(even) 是同一个视觉语言），忙/闲状态再叠一层上去，
-   不是拿纯灰/纯红盖住整格——这样格子本身还看得出"这是哪一天"，不同天不会看着糊成一片 */
-.bwk-cell { min-height: 20px; border-top: 1px dashed var(--line); border-left: 1px solid var(--line); background-color: var(--col-tint, var(--paper)); }
-.bwk-cell.hour-start, .bwk-time-label.hour { border-top: 1px solid var(--line); }
+.bwk-time-txt {
+  display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15;
+  transform: translateY(-6px);
+}
+.bwk-time-txt .p { font-size: 9px; }
+.bwk-time-txt .t { font-size: 10px; }
+.bwk-time-label.half .bwk-time-txt { opacity: 0.7; }
+.bwk-time-label.half .bwk-time-txt .t { font-size: 9px; }
+
+/* 每天列自己的底色（单双日交替，--col-tint 由 JS 传进来，值直接用后台那两个色号），
+   忙/闲状态再叠一层上去，不是拿纯灰/纯红盖住整格——这样还看得出"这是哪一天" */
+/* 高度必须跟 .bwk-time-label 一模一样（24px，后台 pxPerHour 48 的一半），
+   两边是各自独立的列，靠固定行高对齐，差一点点整张表的横线就会错开 */
+.bwk-cell { height: 24px; box-sizing: border-box; border-top: 1px dashed rgba(74, 92, 90, 0.4); border-left: 1px solid #D8D0C0; }
+.bwk-cell.hour-start, .bwk-time-label.hour { border-top: 1px solid #D8D0C0; }
 /* 灰=不能点（占用/关闭/已过去，客人不需要知道具体哪种），斜纹阴影跟后台"关闭时段"
    那套是同一个视觉语言；红=能点，点了变实心红；点了起点还没点终点的格子描一圈虚线框，
    提示"这是起点，再点一下同一天更晚的格子选终点" */

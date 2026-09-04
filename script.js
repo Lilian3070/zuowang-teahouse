@@ -121,9 +121,15 @@ function bwkPeriodWordForHour(h) {
   return '晚上';
 }
 function bwkFormatSlot(slotIdx) {
+  const p = bwkFormatSlotParts(slotIdx);
+  return `${p.period}${p.time}`;
+}
+// 拆成"上午"/"10:00"两段分两行显示，跟后台 formatSlotLabelParts + 手机版那套 CSS 一样，
+// 时间轴那一列很窄，一行放不下"上午10:00"六个字
+function bwkFormatSlotParts(slotIdx) {
   const h = Math.floor(slotIdx / 2), m = slotIdx % 2 ? 30 : 0;
   let h12 = h % 12; if (h12 === 0) h12 = 12;
-  return `${bwkPeriodWordForHour(h)}${h12}:${String(m).padStart(2, '0')}`;
+  return { period: bwkPeriodWordForHour(h), time: `${h12}:${String(m).padStart(2, '0')}` };
 }
 
 function bwkShiftWeek(dir) {
@@ -175,8 +181,9 @@ async function renderBwkWeek() {
       date: day, weekday: BWK_WEEKDAYS[i],
       isToday: day.getTime() === today.getTime(),
       isPast: day < today,
-      // 底色按"星期几"的奇偶交替，跟后台 .cal-week-daycol:nth-child(even) 一个道理
-      colTint: i % 2 === 0 ? 'var(--paper)' : 'var(--paper-deep)',
+      // 底色按"星期几"的奇偶交替，色号直接用后台那两个（#F7F3EC 是后台 --bg，
+      // #F8EED7 是后台 .cal-week-daycol:nth-child(even) 那条规则里的值），不另配一套
+      colTint: i % 2 === 0 ? '#F7F3EC' : '#F8EED7',
     });
   }
   days.forEach(d => {
@@ -207,27 +214,34 @@ function bwkPaintGrid() {
   const wrap = document.getElementById('bwkGrid');
   const days = bwkDaysData;
 
-  const headHtml = '<div class="bwk-corner"></div>' + days.map(d =>
-    `<div class="bwk-col-head${d.isToday ? ' today' : ''}${d.isPast ? ' past' : ''}" style="--col-tint:${d.colTint}"><span>星期${d.weekday}</span><b>${d.date.getMonth() + 1}/${d.date.getDate()}</b></div>`
-  ).join('');
-
-  let rowsHtml = '';
+  // DOM 结构也照后台来：左边一整根时间轴列 + 右边七天各自一列（后台是 .cal-week-timecol +
+  // .cal-week-days > .cal-week-daycol）。之前用 CSS Grid 平铺所有格子，结果时间轴列的
+  // position:sticky 失效——grid 子项的包含块是它自己那一格，根本没有可以"吸"的空间，
+  // 横向一滚时间轴就跟着跑没了。改成 flex 分列之后，时间轴列的包含块是整张表，才吸得住。
+  let timeColHtml = '<div class="bwk-corner"></div>';
   for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
-    const isHour = k % 2 === 0;
-    rowsHtml += `<div class="bwk-time-label${isHour ? ' hour' : ''}">${isHour ? bwkFormatSlot(k) : ''}</div>`;
-    days.forEach(d => {
-      const y = d.date.getFullYear(), m = d.date.getMonth(), dd = d.date.getDate();
+    // 跟后台一样每半小时都标时间（半点那行小一号、淡一点），不是只标整点
+    const tp = bwkFormatSlotParts(k);
+    timeColHtml += `<div class="bwk-time-label${k % 2 === 0 ? ' hour' : ' half'}"><span class="bwk-time-txt"><span class="p">${tp.period}</span><span class="t">${tp.time}</span></span></div>`;
+  }
+
+  const daysHtml = days.map(d => {
+    const y = d.date.getFullYear(), m = d.date.getMonth(), dd = d.date.getDate();
+    let cellsHtml = `<div class="bwk-col-head${d.isToday ? ' today' : ''}${d.isPast ? ' past' : ''}"><span>星期${d.weekday}</span><b>${m + 1}/${dd}</b></div>`;
+    for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
+      const isHour = k % 2 === 0;
       if (d.busy[k]) {
-        rowsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}" style="--col-tint:${d.colTint}"></div>`;
-        return;
+        cellsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}"></div>`;
+        continue;
       }
       const sameDay = bwkRangeStart && bwkRangeStart.y === y && bwkRangeStart.m === m && bwkRangeStart.d === dd;
       const isRangeStart = sameDay && bwkRangeStart.slot === k;
       const isSelected = bwkSelected && bwkSelected.y === y && bwkSelected.m === m && bwkSelected.d === dd && k >= bwkSelected.startSlot && k < bwkSelected.endSlot;
       const cls = isSelected ? ' selected' : isRangeStart ? ' range-start' : '';
-      rowsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}${cls}" style="--col-tint:${d.colTint}" data-y="${y}" data-m="${m}" data-d="${dd}" data-slot="${k}" onclick="bwkCellClick(this)"></div>`;
-    });
-  }
+      cellsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}${cls}" data-y="${y}" data-m="${m}" data-d="${dd}" data-slot="${k}" onclick="bwkCellClick(this)"></div>`;
+    }
+    return `<div class="bwk-day-col${d.isToday ? ' today' : ''}" style="--col-tint:${d.colTint}">${cellsHtml}</div>`;
+  }).join('');
 
   // 重画（比如点了起点要高亮）会把整块 HTML 换掉，滚动位置会跟着归零——先记下来再还原，
   // 不然点一下格子表格就"跳"回最上面/最左边，正在挑时间的人要重新滚回去找
@@ -235,7 +249,7 @@ function bwkPaintGrid() {
   const keepTop = prevWrap ? prevWrap.scrollTop : null;
   const keepLeft = prevWrap ? prevWrap.scrollLeft : null;
 
-  wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table" style="grid-template-columns:46px repeat(${days.length},minmax(46px,1fr))">${headHtml}${rowsHtml}</div></div>`;
+  wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table"><div class="bwk-timecol">${timeColHtml}</div><div class="bwk-days">${daysHtml}</div></div></div>`;
 
   const tableWrap = wrap.querySelector('.bwk-table-wrap');
   if (keepTop !== null) {
@@ -244,7 +258,8 @@ function bwkPaintGrid() {
   } else {
     // 头一次画这一周：本周的话前面几列是已经过去的日子，默认横向滚到"今天"这一列，
     // 免得一打开看到的全是灰掉的过去几天，还得自己往右划才找得到能约的日子
-    const firstPickable = tableWrap.querySelector('.bwk-col-head.today') || tableWrap.querySelector('.bwk-col-head:not(.past)');
+    const firstPickable = tableWrap.querySelector('.bwk-day-col.today') ||
+      [...tableWrap.querySelectorAll('.bwk-day-col')].find(c => !c.querySelector('.bwk-col-head.past'));
     if (firstPickable) tableWrap.scrollLeft = Math.max(0, firstPickable.offsetLeft - 46);
   }
 }
