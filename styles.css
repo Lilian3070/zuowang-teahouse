@@ -577,14 +577,17 @@ section {
    （原生控件英文/系统默认样式，跟这块暗色卡片视觉不搭），跟后台日历同一个思路、
    但视觉配色照这个表单本身的暗色卡片来，不是照搬后台 admin.html 那套 */
 .bp-date-picker { position: relative; }
+/* 这个选择器原来是配"已是知音"卡片的深色底设计的（浅色文字），现在这张卡片只剩一个
+   按钮，选择器搬进了浅色的预约弹窗里，浅色文字配浅色弹窗底几乎看不见（选完日期文字
+   "消失"），改成跟弹窗里其他输入框（.booking-form input 那一套）一样的浅底深字 */
 .bp-date-display {
   display: block; width: 100%; text-align: left; padding: 10px 12px;
-  border: 1px solid rgba(246, 241, 231, 0.3); border-radius: 4px;
-  background: rgba(246, 241, 231, 0.08); font-family: inherit; font-size: 0.95rem;
-  color: var(--paper); cursor: pointer;
+  border: 1px solid rgba(43, 40, 34, 0.35); border-radius: 4px;
+  background: #fff; font-family: inherit; font-size: 0.95rem;
+  color: var(--ink); cursor: pointer;
 }
 .bp-date-display:hover, .bp-date-display.open { border-color: var(--seal); }
-.bp-date-display.placeholder { color: #b6a988; }
+.bp-date-display.placeholder { color: #9c9484; }
 .bp-date-panel {
   display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
   background: var(--tea-deep); border: 1px solid rgba(246, 241, 231, 0.25); border-radius: 6px;

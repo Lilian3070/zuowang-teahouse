@@ -147,48 +147,49 @@
         <a href="#" class="cta-btn" onclick="onNavAccountClick(event); return false;">登入/注册 →</a>
       </div>
 
-      <button type="button" class="cta-btn" id="bookingRevealBtn" style="display:none" onclick="revealBookingForm()">雅室预约</button>
-
-      <form class="booking-form real-booking-form" id="realBookingForm" style="display:none" onsubmit="return submitBookingRequest(event)">
-        <label for="mode">泡茶方式</label>
-        <select id="mode" name="mode">
-          <option>自主泡茶</option>
-          <option>还没想好，先咨询</option>
-        </select>
-
-        <label for="bpDateDisplay">期望到访日期</label>
-        <div class="bp-date-picker" id="bpDatePicker">
-          <button type="button" class="bp-date-display placeholder" id="bpDateDisplay" onclick="toggleBpDatePanel(event)">请选择日期</button>
-          <input type="hidden" id="datetime" name="datetime">
-          <div class="bp-date-panel" id="bpDatePanel">
-            <div class="bp-date-header">
-              <button type="button" onclick="event.stopPropagation();bpShiftMonth(-1)">‹</button>
-              <span id="bpCalTitle"></span>
-              <button type="button" onclick="event.stopPropagation();bpShiftMonth(1)">›</button>
-            </div>
-            <div class="bp-date-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-            <div class="bp-date-days" id="bpCalDays"></div>
-          </div>
-        </div>
-
-        <label for="slot">期望时段</label>
-        <select id="slot" name="slot">
-          <option value="">请选择时段</option>
-          <option>上午（9:00-12:00）</option>
-          <option>下午（14:00-17:00）</option>
-          <option>晚上（18:00-21:00）</option>
-        </select>
-        <p style="font-size:0.8rem;color:#b6a988;margin:6px 0 0">具体几点到访，可在下方备注里说明，掌柜会与您确认</p>
-
-        <label for="note">备注</label>
-        <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
-
-        <button type="submit" class="submit-btn">提交预约申请</button>
-        <p id="bookingFormStatus" style="margin-top:12px;font-size:0.85rem;min-height:1.2em"></p>
-      </form>
+      <button type="button" class="cta-btn" id="bookingRevealBtn" style="display:none" onclick="openBookingModal()">雅室预约</button>
     </div>
   </div>
 </section>
+
+<div class="brand-modal" id="bookingModal" aria-hidden="true">
+  <div class="brand-modal-overlay" id="bookingModalOverlay"></div>
+  <div class="brand-modal-panel account-modal-panel" role="dialog" aria-modal="true">
+    <button class="modal-close" id="bookingModalClose" type="button" aria-label="关闭">✕</button>
+    <h3 style="margin:0 0 20px">雅室预约</h3>
+    <form class="booking-form real-booking-form" id="realBookingForm" onsubmit="return submitBookingRequest(event)">
+      <label for="bpDateDisplay">期望到访日期</label>
+      <div class="bp-date-picker" id="bpDatePicker">
+        <button type="button" class="bp-date-display placeholder" id="bpDateDisplay" onclick="toggleBpDatePanel(event)">请选择日期</button>
+        <input type="hidden" id="datetime" name="datetime">
+        <div class="bp-date-panel" id="bpDatePanel">
+          <div class="bp-date-header">
+            <button type="button" onclick="event.stopPropagation();bpShiftMonth(-1)">‹</button>
+            <span id="bpCalTitle"></span>
+            <button type="button" onclick="event.stopPropagation();bpShiftMonth(1)">›</button>
+          </div>
+          <div class="bp-date-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div class="bp-date-days" id="bpCalDays"></div>
+        </div>
+      </div>
+
+      <label for="slot">期望时段</label>
+      <select id="slot" name="slot">
+        <option value="">请选择时段</option>
+        <option>上午（9:00-12:00）</option>
+        <option>下午（14:00-17:00）</option>
+        <option>晚上（18:00-21:00）</option>
+      </select>
+      <p style="font-size:0.8rem;color:var(--ink-soft);margin:6px 0 0">具体几点到访，可在下方备注里说明，掌柜会与您确认</p>
+
+      <label for="note">备注</label>
+      <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
+
+      <button type="submit" class="submit-btn">提交预约申请</button>
+      <p id="bookingFormStatus" style="margin-top:12px;font-size:0.85rem;min-height:1.2em"></p>
+    </form>
+  </div>
+</div>
 
 <section id="yaji" class="yaji">
   <div class="section-head">

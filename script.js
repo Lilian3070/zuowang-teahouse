@@ -48,33 +48,37 @@ async function refreshAccountNav() {
 function updateBookingSectionVisibility() {
   const prompt = document.getElementById('bookingLoginPrompt');
   const revealBtn = document.getElementById('bookingRevealBtn');
-  const form = document.getElementById('realBookingForm');
-  if (!prompt || !revealBtn || !form) return;
+  if (!prompt || !revealBtn) return;
   const isMember = currentAccountRole === 'member';
   prompt.style.display = isMember ? 'none' : '';
-  // 登录状态变化（比如切换账号）时统一收回到"按钮"这一步，不保留上次是否展开过表单，
-  // 避免看着像表单已经填了一半又突然清空
   revealBtn.style.display = isMember ? '' : 'none';
-  form.style.display = 'none';
+  // 登录状态变化（比如切换账号）时把预约弹窗一起收起来，不留着一个引用着上一个账号的
+  // 表单开在那——比如刚提交完退出登录，弹窗还开着容易让人以为还能继续操作
+  if (!isMember) closeBookingModal();
 }
 
-function revealBookingForm() {
-  document.getElementById('bookingRevealBtn').style.display = 'none';
-  document.getElementById('realBookingForm').style.display = '';
+function openBookingModal() {
+  const modal = document.getElementById('bookingModal');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeBookingModal() {
+  const modal = document.getElementById('bookingModal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
 }
 
 async function submitBookingRequest(event) {
   event.preventDefault();
   const statusEl = document.getElementById('bookingFormStatus');
   if (!currentMemberId) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先登录会员账号'; return false; }
-  const mode = document.getElementById('mode').value;
   const datetime = document.getElementById('datetime').value.trim();
   if (!datetime) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请选择期望到访日期'; return false; }
   const slot = document.getElementById('slot').value;
   if (!slot) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请选择期望时段'; return false; }
   const note = document.getElementById('note').value.trim();
-  const combinedNote = '泡茶方式：' + mode + (note ? '；' + note : '');
-  const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note: combinedNote });
+  const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note });
   if (error) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '提交失败：' + error.message; return false; }
   statusEl.style.color = '#cfe0b8';
   statusEl.textContent = '已收到您的预约申请，我们会尽快与您确认。';
@@ -309,6 +313,8 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshAccountNav();
   document.getElementById('accountModalClose').addEventListener('click', closeAccountModal);
   document.getElementById('accountModalOverlay').addEventListener('click', closeAccountModal);
+  document.getElementById('bookingModalClose').addEventListener('click', closeBookingModal);
+  document.getElementById('bookingModalOverlay').addEventListener('click', closeBookingModal);
   ['acctLoginPassword', 'regPassword', 'regPasswordConfirm', 'forgotPassword', 'forgotPasswordConfirm'].forEach(addPasswordToggle);
   document.addEventListener('click', e => {
     if (!e.target.closest('#bpDatePicker')) closeBpDatePanel();
