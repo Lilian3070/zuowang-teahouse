@@ -47,11 +47,20 @@ async function refreshAccountNav() {
 
 function updateBookingSectionVisibility() {
   const prompt = document.getElementById('bookingLoginPrompt');
+  const revealBtn = document.getElementById('bookingRevealBtn');
   const form = document.getElementById('realBookingForm');
-  if (!prompt || !form) return;
+  if (!prompt || !revealBtn || !form) return;
   const isMember = currentAccountRole === 'member';
   prompt.style.display = isMember ? 'none' : '';
-  form.style.display = isMember ? '' : 'none';
+  // 登录状态变化（比如切换账号）时统一收回到"按钮"这一步，不保留上次是否展开过表单，
+  // 避免看着像表单已经填了一半又突然清空
+  revealBtn.style.display = isMember ? '' : 'none';
+  form.style.display = 'none';
+}
+
+function revealBookingForm() {
+  document.getElementById('bookingRevealBtn').style.display = 'none';
+  document.getElementById('realBookingForm').style.display = '';
 }
 
 async function submitBookingRequest(event) {
@@ -61,9 +70,11 @@ async function submitBookingRequest(event) {
   const mode = document.getElementById('mode').value;
   const datetime = document.getElementById('datetime').value.trim();
   if (!datetime) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请选择期望到访日期'; return false; }
+  const slot = document.getElementById('slot').value;
+  if (!slot) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请选择期望时段'; return false; }
   const note = document.getElementById('note').value.trim();
   const combinedNote = '泡茶方式：' + mode + (note ? '；' + note : '');
-  const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime, note: combinedNote });
+  const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note: combinedNote });
   if (error) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '提交失败：' + error.message; return false; }
   statusEl.style.color = '#cfe0b8';
   statusEl.textContent = '已收到您的预约申请，我们会尽快与您确认。';

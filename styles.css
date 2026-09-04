@@ -436,6 +436,10 @@ section {
 
 .track-verified .track-lead { color: #d9cdae; }
 
+/* plain-list 默认是给浅色的"新客初见"卡片配的深色文字，"已是知音"这张卡背景是深色
+   （--tea-deep），照搬会看不清，跟 .track-lead 一样换成同一套浅色文字 */
+.track-verified .plain-list li { color: #d9cdae; }
+
 .plain-list {
   list-style: none;
   padding: 0;
@@ -460,15 +464,19 @@ section {
 
 .cta-btn {
   display: block;
+  width: 100%;
   margin-top: auto;
   text-align: center;
   text-decoration: none;
   background: var(--seal);
   color: #fff;
   padding: 13px;
+  border: none;
   border-radius: 4px;
   font-size: 0.98rem;
+  font-family: inherit;
   letter-spacing: 0.08em;
+  cursor: pointer;
   transition: background 0.2s;
 }
 

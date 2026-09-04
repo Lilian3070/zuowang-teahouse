@@ -136,12 +136,18 @@
     <div class="track track-verified" id="booking-verified">
       <span class="track-label">知音通道</span>
       <h3>已是知音</h3>
-      <p class="track-lead">已注册的知音，登录后可直接提交席位预约申请，我们会尽快与您确认具体时间。</p>
+      <p class="track-lead">此间风物，茶烟琴韵，皆为知音设。</p>
+      <ul class="plain-list">
+        <li>大厅雅座：随心而至，客随主便，按位计席。</li>
+        <li>私享雅室：静谧独立，清修雅叙（可选定时段提交预约，待掌柜确认后方落定；亦可直接联络掌柜）。</li>
+      </ul>
 
       <div id="bookingLoginPrompt" class="booking-login-prompt" style="color:#d9cdae;font-size:0.9rem">
         <p style="margin:0 0 16px">请先<a href="#" onclick="onNavAccountClick(event); return false;" style="color:var(--paper);text-decoration:underline">登录会员账号</a>再提交预约申请（还不是会员？到店联络掌柜即可申请）。</p>
         <a href="#" class="cta-btn" onclick="onNavAccountClick(event); return false;">登入/注册 →</a>
       </div>
+
+      <button type="button" class="cta-btn" id="bookingRevealBtn" style="display:none" onclick="revealBookingForm()">雅室预约</button>
 
       <form class="booking-form real-booking-form" id="realBookingForm" style="display:none" onsubmit="return submitBookingRequest(event)">
         <label for="mode">泡茶方式</label>
@@ -164,6 +170,14 @@
             <div class="bp-date-days" id="bpCalDays"></div>
           </div>
         </div>
+
+        <label for="slot">期望时段</label>
+        <select id="slot" name="slot">
+          <option value="">请选择时段</option>
+          <option>上午（9:00-12:00）</option>
+          <option>下午（14:00-17:00）</option>
+          <option>晚上（18:00-21:00）</option>
+        </select>
         <p style="font-size:0.8rem;color:#b6a988;margin:6px 0 0">具体几点到访，可在下方备注里说明，掌柜会与您确认</p>
 
         <label for="note">备注</label>
