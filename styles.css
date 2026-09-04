@@ -565,6 +565,46 @@ section {
 
 .booking-form textarea { resize: vertical; min-height: 70px; }
 
+/* 首页预约表单"期望到访日期"，站内自制日历选择器，不用原生 <input type="date">
+   （原生控件英文/系统默认样式，跟这块暗色卡片视觉不搭），跟后台日历同一个思路、
+   但视觉配色照这个表单本身的暗色卡片来，不是照搬后台 admin.html 那套 */
+.bp-date-picker { position: relative; }
+.bp-date-display {
+  display: block; width: 100%; text-align: left; padding: 10px 12px;
+  border: 1px solid rgba(246, 241, 231, 0.3); border-radius: 4px;
+  background: rgba(246, 241, 231, 0.08); font-family: inherit; font-size: 0.95rem;
+  color: var(--paper); cursor: pointer;
+}
+.bp-date-display:hover, .bp-date-display.open { border-color: var(--seal); }
+.bp-date-display.placeholder { color: #b6a988; }
+.bp-date-panel {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  background: var(--tea-deep); border: 1px solid rgba(246, 241, 231, 0.25); border-radius: 6px;
+  padding: 12px; width: 260px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.bp-date-panel.open { display: block; }
+.bp-date-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.bp-date-header button {
+  background: none; border: none; color: var(--paper); font-size: 18px; cursor: pointer;
+  padding: 2px 10px; border-radius: 4px;
+}
+.bp-date-header button:hover { background: rgba(246, 241, 231, 0.12); }
+.bp-date-header span { font-size: 0.9rem; color: var(--paper); font-weight: 600; }
+.bp-date-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
+  font-size: 0.75rem; color: #b6a988; margin-bottom: 4px;
+}
+.bp-date-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.bp-date-days button {
+  aspect-ratio: 1; border: none; background: none; color: var(--paper);
+  font-size: 0.85rem; border-radius: 4px; cursor: pointer;
+}
+.bp-date-days button:hover:not(:disabled) { background: rgba(246, 241, 231, 0.14); }
+.bp-date-days button:disabled { color: rgba(246, 241, 231, 0.25); cursor: default; }
+.bp-date-days button.today { font-weight: 700; color: var(--seal); background: rgba(163, 49, 42, 0.18); }
+.bp-date-days button.selected { background: var(--seal); color: #fff; }
+.bp-date-days button.other-month { visibility: hidden; }
+
 .submit-btn {
   margin-top: 22px;
   width: 100%;

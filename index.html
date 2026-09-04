@@ -147,12 +147,24 @@
         <label for="mode">泡茶方式</label>
         <select id="mode" name="mode">
           <option>自主泡茶</option>
-          <option>店内代泡</option>
           <option>还没想好，先咨询</option>
         </select>
 
-        <label for="datetime">期望到访时间</label>
-        <input type="text" id="datetime" name="datetime" placeholder="例如：8月30日下午2点左右">
+        <label for="bpDateDisplay">期望到访日期</label>
+        <div class="bp-date-picker" id="bpDatePicker">
+          <button type="button" class="bp-date-display placeholder" id="bpDateDisplay" onclick="toggleBpDatePanel(event)">请选择日期</button>
+          <input type="hidden" id="datetime" name="datetime">
+          <div class="bp-date-panel" id="bpDatePanel">
+            <div class="bp-date-header">
+              <button type="button" onclick="event.stopPropagation();bpShiftMonth(-1)">‹</button>
+              <span id="bpCalTitle"></span>
+              <button type="button" onclick="event.stopPropagation();bpShiftMonth(1)">›</button>
+            </div>
+            <div class="bp-date-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            <div class="bp-date-days" id="bpCalDays"></div>
+          </div>
+        </div>
+        <p style="font-size:0.8rem;color:#b6a988;margin:6px 0 0">具体几点到访，可在下方备注里说明，掌柜会与您确认</p>
 
         <label for="note">备注</label>
         <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>

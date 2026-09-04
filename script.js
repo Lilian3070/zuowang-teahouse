@@ -60,6 +60,7 @@ async function submitBookingRequest(event) {
   if (!currentMemberId) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先登录会员账号'; return false; }
   const mode = document.getElementById('mode').value;
   const datetime = document.getElementById('datetime').value.trim();
+  if (!datetime) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请选择期望到访日期'; return false; }
   const note = document.getElementById('note').value.trim();
   const combinedNote = '泡茶方式：' + mode + (note ? '；' + note : '');
   const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime, note: combinedNote });
@@ -67,7 +68,72 @@ async function submitBookingRequest(event) {
   statusEl.style.color = '#cfe0b8';
   statusEl.textContent = '已收到您的预约申请，我们会尽快与您确认。';
   document.getElementById('realBookingForm').reset();
+  resetBpDatePicker();
   return false;
+}
+
+// 首页预约表单"期望到访日期"，站内自制的日历选择器（不用原生 <input type="date">），
+// 只选日期不选时间——具体几点由掌柜人工跟客人确认，见备注提示
+let bpAnchor = new Date();
+let bpSelectedDate = null;
+const BP_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
+function bpMondayIndex(d) { return (d.getDay() + 6) % 7; }
+
+function toggleBpDatePanel(event) {
+  event.stopPropagation();
+  const panel = document.getElementById('bpDatePanel');
+  const btn = document.getElementById('bpDateDisplay');
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  btn.classList.toggle('open', opening);
+  if (opening) { bpAnchor = bpSelectedDate || new Date(); renderBpCalendar(); }
+}
+
+function bpShiftMonth(dir) {
+  bpAnchor = new Date(bpAnchor.getFullYear(), bpAnchor.getMonth() + dir, 1);
+  renderBpCalendar();
+}
+
+function renderBpCalendar() {
+  const y = bpAnchor.getFullYear(), m = bpAnchor.getMonth();
+  document.getElementById('bpCalTitle').textContent = `${y}年${m + 1}月`;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const firstDay = new Date(y, m, 1);
+  const startOffset = bpMondayIndex(firstDay);
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  let html = '';
+  for (let i = 0; i < startOffset; i++) html += `<button type="button" class="other-month" disabled></button>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateObj = new Date(y, m, d);
+    const isPast = dateObj < today;
+    const isToday = dateObj.getTime() === today.getTime();
+    const isSelected = bpSelectedDate && dateObj.getTime() === bpSelectedDate.getTime();
+    html += `<button type="button" class="${isToday ? 'today ' : ''}${isSelected ? 'selected ' : ''}"${isPast ? ' disabled' : ''} onclick="event.stopPropagation();bpPickDate(${y},${m},${d})">${d}</button>`;
+  }
+  document.getElementById('bpCalDays').innerHTML = html;
+}
+
+function bpPickDate(y, m, d) {
+  bpSelectedDate = new Date(y, m, d);
+  const label = `${m + 1}月${d}日 周${BP_WEEKDAYS[bpMondayIndex(bpSelectedDate)]}`;
+  document.getElementById('datetime').value = label;
+  const displayBtn = document.getElementById('bpDateDisplay');
+  displayBtn.textContent = label;
+  displayBtn.classList.remove('placeholder');
+  closeBpDatePanel();
+}
+
+function closeBpDatePanel() {
+  document.getElementById('bpDatePanel').classList.remove('open');
+  document.getElementById('bpDateDisplay').classList.remove('open');
+}
+
+function resetBpDatePicker() {
+  bpSelectedDate = null;
+  const displayBtn = document.getElementById('bpDateDisplay');
+  displayBtn.textContent = '请选择日期';
+  displayBtn.classList.add('placeholder');
+  closeBpDatePanel();
 }
 
 function onNavAccountClick(event) {
@@ -233,6 +299,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('accountModalClose').addEventListener('click', closeAccountModal);
   document.getElementById('accountModalOverlay').addEventListener('click', closeAccountModal);
   ['acctLoginPassword', 'regPassword', 'regPasswordConfirm', 'forgotPassword', 'forgotPasswordConfirm'].forEach(addPasswordToggle);
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#bpDatePicker')) closeBpDatePanel();
+  });
 });
 
 document.addEventListener('DOMContentLoaded', () => {
