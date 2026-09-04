@@ -94,7 +94,6 @@ async function submitBookingRequest(event) {
 // 拖拽预选一个道理，只是这里用点两下代替拖拽，手机上更好操作）
 let bwkAnchor = bwkMonday(new Date()); // 当前显示这一周的周一
 let bwkDaysData = [];      // 当前这一周已经算好忙闲的每一天，点格子时直接查这份，不用重新请求
-let bwkRangeStart = null;  // 已经点了起点、还没点终点：{ y, m, d, slot }
 let bwkSelected = null;    // 起点+终点都选完了：{ y, m, d, startSlot, endSlot }
 const BWK_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -109,6 +108,10 @@ function bwkMonday(d) {
 // 看行程时习惯往前多留半小时方便看，不代表真的 8:30 就开门营业
 const BOOKING_BUSINESS_START_SLOT = 19; // 9:30 = 9.5*2
 const BOOKING_BUSINESS_END_SLOT = 47;   // 23:30 = 23.5*2
+// ⚠️ 这两个尺寸必须跟 styles.css 里 .bwk-cell 的 height、.bwk-col-head 的 height 一致，
+// 拖拽算"手指落在第几格"和预选框的定位都靠它们，改 CSS 记得同步改这里
+const BWK_SLOT_H = 24;  // 半小时一格的高度（后台 calWeekPxPerHour 48 的一半）
+const BWK_HEAD_H = 40;  // 表头那一行的高度
 
 // 时间标签格式跟后台完全一样：早上/上午/中午/下午/晚上 + 12 小时制，不是"18:00"这种
 // 24 小时制裸数字（periodWordForHour 的分段跟 admin.html 里那份一模一样）
@@ -137,14 +140,12 @@ function bwkShiftWeek(dir) {
   next.setDate(next.getDate() + dir * 7);
   if (next < bwkMonday(new Date())) return; // 不能翻到已经完全过去的那一周
   bwkAnchor = next;
-  bwkRangeStart = null;
   renderBwkWeek();
 }
 
 // 跟后台工具栏的"今天"按钮一个道理，翻了好几周之后能一键跳回本周
 function bwkGoToday() {
   bwkAnchor = bwkMonday(new Date());
-  bwkRangeStart = null;
   renderBwkWeek();
 }
 
@@ -204,12 +205,11 @@ async function renderBwkWeek() {
   });
 
   bwkDaysData = days;
-  bwkRangeStart = null;
   bwkPaintGrid();
 }
 
 // 纯画图，不查数据库——用 bwkDaysData 里已经算好的忙闲状态，配合当前选择状态
-// （bwkRangeStart 只选了起点 / bwkSelected 起点终点都选完了）画出高亮
+// （bwkDrag 正在拖 / bwkSelected 已经选定）画出预选框
 function bwkPaintGrid() {
   const wrap = document.getElementById('bwkGrid');
   const days = bwkDaysData;
@@ -234,13 +234,15 @@ function bwkPaintGrid() {
         cellsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}"></div>`;
         continue;
       }
-      const sameDay = bwkRangeStart && bwkRangeStart.y === y && bwkRangeStart.m === m && bwkRangeStart.d === dd;
-      const isRangeStart = sameDay && bwkRangeStart.slot === k;
-      const isSelected = bwkSelected && bwkSelected.y === y && bwkSelected.m === m && bwkSelected.d === dd && k >= bwkSelected.startSlot && k < bwkSelected.endSlot;
-      const cls = isSelected ? ' selected' : isRangeStart ? ' range-start' : '';
-      cellsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}${cls}" data-y="${y}" data-m="${m}" data-d="${dd}" data-slot="${k}" onclick="bwkCellClick(this)"></div>`;
+      cellsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}" data-slot="${k}"></div>`;
     }
-    return `<div class="bwk-day-col${d.isToday ? ' today' : ''}" style="--col-tint:${d.colTint}">${cellsHtml}</div>`;
+    // 这一天有没有正在拖的预选、或者已经选定的时间段——有的话盖一个带起止时间和时长的框
+    const drag = bwkDrag && bwkDrag.dragging && bwkSameDay(bwkDrag, y, m, dd)
+      ? { s0: Math.min(bwkDrag.anchor, bwkDrag.cur), s1: Math.max(bwkDrag.anchor, bwkDrag.cur) + 1, done: false }
+      : (bwkSelected && bwkSameDay(bwkSelected, y, m, dd)
+        ? { s0: bwkSelected.startSlot, s1: bwkSelected.endSlot, done: true } : null);
+    const selBoxHtml = drag ? bwkSelBoxHtml(drag.s0, drag.s1, drag.done) : '';
+    return `<div class="bwk-day-col${d.isToday ? ' today' : ''}" style="--col-tint:${d.colTint}" data-y="${y}" data-m="${m}" data-d="${dd}">${cellsHtml}${selBoxHtml}</div>`;
   }).join('');
 
   // 重画（比如点了起点要高亮）会把整块 HTML 换掉，滚动位置会跟着归零——先记下来再还原，
@@ -252,6 +254,11 @@ function bwkPaintGrid() {
   wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table"><div class="bwk-timecol">${timeColHtml}</div><div class="bwk-days">${daysHtml}</div></div></div>`;
 
   const tableWrap = wrap.querySelector('.bwk-table-wrap');
+  // 拖拽的起手式挂在整张表上（事件委托），重画之后不用一个个格子重新绑
+  const daysEl = tableWrap.querySelector('.bwk-days');
+  daysEl.addEventListener('mousedown', bwkDragStart);
+  daysEl.addEventListener('touchstart', bwkDragStart, { passive: true });
+
   if (keepTop !== null) {
     tableWrap.scrollTop = keepTop;
     tableWrap.scrollLeft = keepLeft;
@@ -267,37 +274,126 @@ function bwkPaintGrid() {
 function bwkFindDay(y, m, d) {
   return bwkDaysData.find(dd => dd.date.getFullYear() === y && dd.date.getMonth() === m && dd.date.getDate() === d);
 }
+function bwkSameDay(o, y, m, d) { return o.y === y && o.m === m && o.d === d; }
 
-// 点两下选一段时间：第一下点起点，第二下在同一天里点终点（起点到终点中间必须都还空着，
-// 中间只要有一格被占用就不让连续选过去，直接把这一下当成重新选起点）——跟后台拖拽
-// 预选一段时间是同一个意图，只是手机上用"点两下"代替"拖拽"更好操作
-function bwkCellClick(cell) {
-  const y = Number(cell.dataset.y), m = Number(cell.dataset.m), d = Number(cell.dataset.d), k = Number(cell.dataset.slot);
-  const isSameDayAsStart = bwkRangeStart && bwkRangeStart.y === y && bwkRangeStart.m === m && bwkRangeStart.d === d;
+// 拖出来的预选框 / 选定后的时间段：上贴开始时间、下贴结束时间，中间够高就写时长，
+// 跟后台拖拽预选新行程时那个框长一样
+function bwkSelBoxHtml(s0, s1, done) {
+  const top = BWK_HEAD_H + (s0 - BOOKING_BUSINESS_START_SLOT) * BWK_SLOT_H;
+  const height = (s1 - s0) * BWK_SLOT_H;
+  const hours = (s1 - s0) * 0.5;
+  const durHtml = height >= 56 ? `<span class="bwk-selbox-duration">${hours}小时</span>` : '';
+  return `<div class="bwk-selbox${done ? ' done' : ''}" style="top:${top}px;height:${height}px">` +
+    `<span class="bwk-selbox-label">${bwkFormatSlot(s0)}</span>${durHtml}` +
+    `<span class="bwk-selbox-label">${bwkFormatSlot(s1)}</span></div>`;
+}
 
-  if (!isSameDayAsStart || k <= bwkRangeStart.slot) {
-    // 换了一天，或者点的格子不比起点晚——当成重新选起点（点同一格两次=起止都是这半小时）
-    if (isSameDayAsStart && k === bwkRangeStart.slot) {
-      bwkFinalize(y, m, d, k, k + 1);
-      return;
-    }
-    bwkRangeStart = { y, m, d, slot: k };
+// ── 拖拽选时间段（跟后台周视图一样的手势）──
+// 鼠标：按下即开始拖。手机：先按住不动一小会儿才进入拖拽，免得跟上下滑页面的手势打架
+// （后台 calWeekDragStart 也是这个思路）。没拖动直接松手 = 只选这半小时。
+let bwkDrag = null;
+const BWK_LONG_PRESS_MS = 260;
+
+function bwkPointerXY(evt) {
+  const t = evt.touches && evt.touches[0];
+  return t ? { x: t.clientX, y: t.clientY } : { x: evt.clientX, y: evt.clientY };
+}
+
+// 根据手指/鼠标的纵向位置，算出落在这一天的第几个半小时格；再夹到"从起点开始连续空着"
+// 的范围内——中间碰到被占用的格子就停在那儿，不能跨过去选
+function bwkSlotFromY(dayEl, clientY, anchor, dayData) {
+  const rect = dayEl.getBoundingClientRect();
+  const offsetY = clientY - rect.top - BWK_HEAD_H;
+  let slot = BOOKING_BUSINESS_START_SLOT + Math.floor(offsetY / BWK_SLOT_H);
+  slot = Math.max(BOOKING_BUSINESS_START_SLOT, Math.min(BOOKING_BUSINESS_END_SLOT - 1, slot));
+  const step = slot >= anchor ? 1 : -1;
+  for (let i = anchor; ; i += step) {
+    if (dayData.busy[i]) return i - step;
+    if (i === slot) return slot;
+  }
+}
+
+function bwkDragStart(evt) {
+  const cell = evt.target.closest('.bwk-cell.open');
+  if (!cell) return;
+  const dayEl = cell.closest('.bwk-day-col');
+  const y = Number(dayEl.dataset.y), m = Number(dayEl.dataset.m), d = Number(dayEl.dataset.d);
+  const slot = Number(cell.dataset.slot);
+  const dayData = bwkFindDay(y, m, d);
+  if (!dayData) return;
+
+  bwkDrag = { y, m, d, dayEl, dayData, anchor: slot, cur: slot, dragging: false, moved: false };
+
+  if (evt.type === 'mousedown') {
+    if (evt.button !== 0) return;
+    evt.preventDefault();
+    bwkDrag.dragging = true;
     bwkSelected = null;
     bwkPaintGrid();
+    document.addEventListener('mousemove', bwkDragMove);
+    document.addEventListener('mouseup', bwkDragEnd);
     return;
   }
+  // 触摸：先记下按下的位置，按住不动够久才真正进入拖拽（期间手指大幅移动就取消，
+  // 让浏览器照常上下滚动看时间）
+  const p = bwkPointerXY(evt);
+  bwkDrag.startX = p.x; bwkDrag.startY = p.y;
+  bwkDrag.timer = setTimeout(() => {
+    if (!bwkDrag) return;
+    bwkDrag.dragging = true;
+    bwkSelected = null;
+    bwkPaintGrid();
+  }, BWK_LONG_PRESS_MS);
+  document.addEventListener('touchmove', bwkDragMove, { passive: false });
+  document.addEventListener('touchend', bwkDragEnd);
+  document.addEventListener('touchcancel', bwkDragEnd);
+}
 
-  // 起点到这一格之间是不是连续都空着——中间断开了就不能连选过去
-  const day = bwkFindDay(y, m, d);
-  for (let i = bwkRangeStart.slot; i <= k; i++) {
-    if (day.busy[i]) { bwkRangeStart = { y, m, d, slot: k }; bwkSelected = null; bwkPaintGrid(); return; }
+function bwkDragMove(evt) {
+  if (!bwkDrag) return;
+  const p = bwkPointerXY(evt);
+  if (!bwkDrag.dragging) {
+    // 还没进入拖拽（手机长按判定中）：手指挪动超过一点点就放弃，让页面正常滚动
+    if (Math.abs(p.y - bwkDrag.startY) > 10 || Math.abs(p.x - bwkDrag.startX) > 10) {
+      clearTimeout(bwkDrag.timer);
+      bwkCleanupDrag();
+    }
+    return;
   }
-  bwkFinalize(y, m, d, bwkRangeStart.slot, k + 1);
+  evt.preventDefault();
+  // ⚠️ 每次都重新查一遍这一列的元素：拖拽过程中每动一格就会重画整张表，
+  // 一开始记下来的那个 dayEl 早就被换掉了（detached 元素的 getBoundingClientRect
+  // 全是 0，算出来的格子会离谱地跑到最底下）
+  const dayEl = document.querySelector(`.bwk-day-col[data-y="${bwkDrag.y}"][data-m="${bwkDrag.m}"][data-d="${bwkDrag.d}"]`);
+  if (!dayEl) return;
+  const next = bwkSlotFromY(dayEl, p.y, bwkDrag.anchor, bwkDrag.dayData);
+  if (next !== bwkDrag.cur) { bwkDrag.cur = next; bwkDrag.moved = true; bwkPaintGrid(); }
+}
+
+function bwkDragEnd() {
+  if (!bwkDrag) return;
+  clearTimeout(bwkDrag.timer);
+  const { y, m, d, anchor, cur, dragging } = bwkDrag;
+  const wasDragging = dragging;
+  bwkCleanupDrag();
+  if (!wasDragging) { // 手机上轻轻一点没长按：也当成选这半小时
+    bwkFinalize(y, m, d, anchor, anchor + 1);
+    return;
+  }
+  bwkFinalize(y, m, d, Math.min(anchor, cur), Math.max(anchor, cur) + 1);
+}
+
+function bwkCleanupDrag() {
+  bwkDrag = null;
+  document.removeEventListener('mousemove', bwkDragMove);
+  document.removeEventListener('mouseup', bwkDragEnd);
+  document.removeEventListener('touchmove', bwkDragMove);
+  document.removeEventListener('touchend', bwkDragEnd);
+  document.removeEventListener('touchcancel', bwkDragEnd);
 }
 
 function bwkFinalize(y, m, d, startSlot, endSlot) {
   bwkSelected = { y, m, d, startSlot, endSlot };
-  bwkRangeStart = null;
   const dateLabel = `${m + 1}月${d}日 周${BWK_WEEKDAYS[(new Date(y, m, d).getDay() + 6) % 7]}`;
   const label = `${bwkFormatSlot(startSlot)}-${bwkFormatSlot(endSlot)}`;
   document.getElementById('datetime').value = dateLabel;
@@ -310,7 +406,6 @@ function bwkFinalize(y, m, d, startSlot, endSlot) {
 
 function resetBwkPicker() {
   bwkSelected = null;
-  bwkRangeStart = null;
   bwkAnchor = bwkMonday(new Date());
   document.getElementById('datetime').value = '';
   document.getElementById('slot').value = '';

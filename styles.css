@@ -612,7 +612,7 @@ section {
   background: var(--paper-deep); border-right: 1px solid #D8D0C0;
 }
 .bwk-days { display: flex; flex: 1; }
-.bwk-day-col { flex: 1 0 46px; min-width: 46px; background: var(--col-tint, #F7F3EC); }
+.bwk-day-col { position: relative; flex: 1 0 46px; min-width: 46px; background: var(--col-tint, #F7F3EC); }
 .bwk-corner, .bwk-col-head {
   position: sticky; top: 0; background: var(--paper-deep); z-index: 3;
   height: 40px; box-sizing: border-box;
@@ -653,13 +653,27 @@ section {
 .bwk-cell.busy {
   background-image: repeating-linear-gradient(45deg, rgba(43, 40, 34, 0.22) 0, rgba(43, 40, 34, 0.22) 1px, transparent 1px, transparent 7px);
 }
-.bwk-cell.open { background-image: linear-gradient(rgba(163, 49, 42, 0.18), rgba(163, 49, 42, 0.18)); cursor: pointer; }
-.bwk-cell.open:hover { background-image: linear-gradient(rgba(163, 49, 42, 0.34), rgba(163, 49, 42, 0.34)); }
-.bwk-cell.open.range-start {
-  background-image: linear-gradient(rgba(163, 49, 42, 0.5), rgba(163, 49, 42, 0.5));
-  outline: 2px dashed var(--seal); outline-offset: -2px;
+/* 可约的格子**不刷颜色**，就是这一天本身的底色——跟后台一样，空着的时间段是留白的。
+   之前给每个可约格子刷了一层红，叠在隔天交替的两种底色上就变成了粉红/肉色两种颜色，
+   整张表花掉了，反而看不出哪里是真的被选中 */
+.bwk-cell.open { cursor: pointer; touch-action: pan-y; }
+.bwk-cell.open:hover { background-image: linear-gradient(rgba(163, 49, 42, 0.12), rgba(163, 49, 42, 0.12)); }
+/* 拖出来的预选框 / 选定后的时间段：照后台 .cal-week-selectbox 那套——开始时间贴框顶、
+   结束时间贴框底、中间空间够就写时长。绝对定位盖在格子上面，pointer-events:none 让
+   点击和拖拽照样落到下面的格子上 */
+.bwk-selbox {
+  position: absolute; left: 2px; right: 2px; z-index: 4; box-sizing: border-box;
+  border: 2px dashed var(--seal); border-radius: 4px; background: rgba(163, 49, 42, 0.16);
+  pointer-events: none; display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between; padding: 2px 0; overflow: hidden;
 }
-.bwk-cell.open.selected { background-image: none; background-color: var(--seal); }
+.bwk-selbox.done { border-style: solid; background: rgba(163, 49, 42, 0.26); }
+.bwk-selbox-label {
+  font-size: 10px; font-weight: 700; color: var(--seal); background: #fff;
+  padding: 0 5px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  white-space: nowrap; line-height: 1.5; flex-shrink: 0;
+}
+.bwk-selbox-duration { font-size: 10px; font-weight: 600; color: var(--seal); opacity: 0.85; white-space: nowrap; }
 .bwk-loading { text-align: center; font-size: 0.85rem; color: var(--ink-soft); padding: 20px 0; }
 .bwk-selected-label { font-size: 0.85rem; color: var(--ink-soft); margin: 10px 0 16px; }
 .bwk-selected-label.picked { color: var(--seal); font-weight: 600; }
