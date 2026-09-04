@@ -3607,6 +3607,10 @@ function renderCalWeek(events) {
 
   let gridStart = Math.max(0, 8.5 - calWeekExtraEarly), gridEnd = Math.min(24, 23.5 + calWeekExtraLate);
   weekEvents.forEach(e => {
+    // 整天关闭的日子不再画那块占位的"已关闭"（改成表头小圆章了），这种事件本身还是
+    // 00:00-24:00 的一整条记录，不能再拿它来算"要不要把显示时段撑开到凌晨/半夜"，
+    // 不然一关一整天，时间轴反而莫名其妙从早上8点半跳成显示全天 0-24 点
+    if (e.isClosed && calCloseIsDayFullyClosed(e.start.getFullYear(), e.start.getMonth(), e.start.getDate())) return;
     const sH = e.start.getHours() + e.start.getMinutes() / 60;
     const eH = e.end.getHours() + e.end.getMinutes() / 60;
     if (sH < gridStart) gridStart = Math.floor(sH * 2) / 2;
