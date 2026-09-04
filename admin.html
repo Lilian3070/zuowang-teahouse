@@ -644,6 +644,14 @@
     padding: 1px 4px; border-radius: 2px; opacity: 0.85; pointer-events: none;
     letter-spacing: 0.5px; white-space: nowrap; z-index: 3; background: none; max-width: 78%;
   }
+  /* 部分时段关闭（没关满一整天）：贴右上角一个小圆圈角标，虚线边框（对应实心边框的整天印章，
+     虚线=只关了一部分，实心=整天都关），比印章小得多，不占地方，也不会跟真行程列表挤在一起 */
+  .cal-month-partial-close-badge {
+    position: absolute; top: 4px; right: 3px; width: 16px; height: 16px; border-radius: 50%;
+    border: 1.3px dashed var(--red); color: var(--red); font-weight: 700; font-size: 9px;
+    display: flex; align-items: center; justify-content: center; opacity: 0.85; pointer-events: none;
+    z-index: 3; background: none;
+  }
   .cal-month-grid { border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
   .cal-month-cell:hover { background: var(--bg); }
   .cal-month-cell.other-month { color: var(--ink-muted); opacity: 0.45; }
@@ -871,6 +879,7 @@
       font-size: 8px; padding: 0 2px; border-width: 1px; letter-spacing: 0;
       top: 2px; right: 2px; transform: rotate(-8deg);
     }
+    .cal-month-partial-close-badge { width: 13px; height: 13px; font-size: 7px; top: 2px; right: 2px; }
     .cal-month-close-pending-label { font-size: 11px; }
     .cal-week-timecol { width: 44px; }
     /* 窄屏放不下"星期一"这种 3 字，缩小字号避免换行挤破格子 */
@@ -3605,19 +3614,22 @@ function renderCalMonth(events) {
     const isToday = calSameDay(cellDate, today);
     const key = `${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`;
     const dayEventsAll = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
-    // 整天都关的日子改盖一个红色印章，不再跟"琴课"这种真行程一样排成一条列表行——
-    // 那样看着像是"今天有一件叫已关闭的事"，容易跟备忘录混在一起，一眼扫过去不够醒目。
-    // 只是部分时段关闭（没关满一整天）还是照常混在行程列表里显示，不单独处理
+    // 关闭时段不管整天还是部分，都不再跟"琴课"这种真行程一样排成一条列表行——那样看着像
+    // "今天有一件叫已关闭的事"，容易跟备忘录混在一起，部分关闭的日子如果拆成好几条记录还会
+    // 变成好几行重复的"已关闭"，更乱。整天关闭盖红色印章（原来就有）；部分关闭改成表头角上
+    // 一个小圆圈红色虚线角标，跟整天关闭的实心印章区分开——虚线=部分，实心=整天，一眼能分清
     const isFullyClosed = calCloseIsDayFullyClosed(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
-    const dayEvents = isFullyClosed ? dayEventsAll.filter(e => !e.isClosed) : dayEventsAll;
+    const hasPartialClose = !isFullyClosed && dayEventsAll.some(e => e.isClosed);
+    const dayEvents = dayEventsAll.filter(e => !e.isClosed);
     const maxShow = 3;
     const chips = dayEvents.slice(0, maxShow).map(e =>
-      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}${e.isClosed ? ' closed' : ''}" onclick="event.stopPropagation();${calCloseMode ? '' : `openEditEventModal('${e.id}')`}">${e.title}</div>`
+      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}" onclick="event.stopPropagation();${calCloseMode ? '' : `openEditEventModal('${e.id}')`}">${e.title}</div>`
     ).join('');
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">还有 ${dayEvents.length - maxShow} 条</div>`
       : '';
-    const closeStamp = isFullyClosed ? `<div class="cal-month-close-stamp">已关闭</div>` : '';
+    const closeStamp = isFullyClosed ? `<div class="cal-month-close-stamp">已关闭</div>`
+      : hasPartialClose ? `<div class="cal-month-partial-close-badge" title="这天有时段被关闭">关</div>` : '';
     const lunarInfo = getLunarLabel(cellDate);
     // 关闭时段编辑模式下，只标"这次编辑会话动过、状态跟数据库不一样"的日子——已经存过的关闭状态
     // 交给上面的红色印章自己显示，这里不重复画。格子中间加"关闭"/"开放"字样，
