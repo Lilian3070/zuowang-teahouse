@@ -112,8 +112,6 @@
   .resource-chip:hover { border-color: var(--gold); }
   .resource-chip.selected { border-color: var(--gold); background: var(--gold-soft); font-weight: 600; }
   .resource-chip .res-badge { width: 30px; height: 30px; }
-  .closed-toggle { width: 100%; justify-content: center; color: var(--ink-muted); }
-  .closed-toggle.selected { border-color: #a3a3a3; background: #ececec; color: #6b6b6b; font-weight: 600; }
   /* 事件条里的"和"标记要缩小，不然比文字行高还夸张 */
   .cal-week-event .res-badge, .cal-event-chip .res-badge { width: 13px; height: 13px; vertical-align: -2px; margin-right: 2px; }
   .btn-primary {
@@ -565,6 +563,24 @@
   .cal-nav-btn:hover, .cal-today-btn:hover { border-color: var(--gold); color: var(--gold); }
   .cal-title { font-size: 17px; font-weight: 700; color: var(--ink); margin: 0 4px; }
   .cal-toolbar-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  /* .btn-add-inline 原本的底色/圆角只写在 .add-inline-form .btn-add-inline 里，日历工具栏这几个
+     按钮不在那个表单容器下，之前一直是没有底色圆角的原生按钮样式，这次顺手一起补上 */
+  .cal-toolbar-right .btn-add-inline {
+    padding: 8px 14px; background: var(--gold); color: white; border: none;
+    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .close-mode-enter-btn { background: #6b6b6b !important; border-color: #6b6b6b !important; }
+  .close-mode-enter-btn:hover { background: #595959 !important; }
+  .close-mode-cancel-btn { background: white !important; color: var(--ink-muted) !important; border: 1px solid var(--border) !important; }
+  .close-mode-save-btn { background: #6b6b6b !important; border-color: #6b6b6b !important; }
+  .close-mode-save-btn:hover { background: #595959 !important; }
+  .cal-close-banner {
+    background: #ececec; border: 1px solid #cfcfcf; color: #595959; font-size: 13px;
+    padding: 8px 14px; border-radius: 6px; margin: 10px 0; line-height: 1.6;
+  }
+  /* 关闭时段编辑模式：整块日历降低饱和度、压暗一点，一眼看出跟平时的正常模式不一样，
+     不会误以为自己还在正常模式里点了空白格却什么都没弹出来 */
+  .cal-body.close-mode { filter: grayscale(0.8) brightness(0.97); user-select: none; }
   .cal-view-btn {
     border: 1px solid var(--border); background: white; color: var(--ink-muted); border-radius: 6px;
     padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 600;
@@ -623,6 +639,14 @@
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: 50%; background: var(--gold); color: white;
   }
+  /* 关闭时段编辑模式：拖拽经过的格子（还没松手，纯预览）、松手后待关闭/待开放的格子
+     （跟数据库现状不一样，还没点保存），三种状态各自的高亮 */
+  .cal-month-cell.close-preview { background: rgba(107, 107, 107, 0.28) !important; }
+  .cal-month-cell.close-will-close {
+    background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.35), rgba(107, 107, 107, 0.35) 6px, rgba(140, 140, 140, 0.18) 6px, rgba(140, 140, 140, 0.18) 12px);
+    outline: 2px dashed #6b6b6b; outline-offset: -2px;
+  }
+  .cal-month-cell.close-will-open { outline: 2px dashed var(--gold); outline-offset: -2px; }
   .cal-event-chip {
     font-size: 11px; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
@@ -673,6 +697,17 @@
   }
   .cal-week-expand-btn:hover { color: var(--gold); }
   .cal-week-expand-reset { background: none; border: none; color: var(--gold); font-size: 11px; cursor: pointer; text-decoration: underline; padding: 4px 8px; }
+
+  /* 关闭时段编辑模式：周视图里"这次编辑会话点过、跟数据库现状不一样"的半小时格叠层，
+     纯展示不拦截点击（pointer-events:none），真正的点击/拖拽还是交给 .cal-week-slots 本身处理 */
+  .cal-close-overlay { position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box; }
+  .cal-close-overlay.res-guqin { left: 3px; right: calc(50% + 2px); }
+  .cal-close-overlay.res-tea { left: calc(50% + 2px); right: 3px; }
+  .cal-close-overlay.close-will-close {
+    background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.4), rgba(107, 107, 107, 0.4) 6px, rgba(140, 140, 140, 0.2) 6px, rgba(140, 140, 140, 0.2) 12px);
+    border: 2px dashed #6b6b6b;
+  }
+  .cal-close-overlay.close-will-open { border: 2px dashed var(--gold); background: rgba(168, 137, 74, 0.12); }
 
   /* 拖拽预选时间段的虚框：左半栏=只拖琴（红），右半栏=只拖茶（绿），拖过中线两栏都占=和（金）；
      开始时间贴框顶部、结束时间贴框底部，只在拖拽过程中出现，松手就消失换成弹窗 */
@@ -1209,9 +1244,6 @@
     <div class="form-group">
       <label>标题</label>
       <input type="text" id="eventTitle" placeholder="例：古琴课 / 外出采购">
-    </div>
-    <div class="form-group">
-      <button type="button" class="resource-chip closed-toggle" id="eventClosedToggle" onclick="toggleEventClosed()">手动关闭此时段（客人不可预约，不算"约满"）</button>
     </div>
     <div class="form-group" id="eventMemberGroup">
       <label>关联会员（选填）</label>
@@ -3030,6 +3062,13 @@ let calWeekExtraEarly = 0; // 手动点"显示更早时段"往前多展开的小
 let calWeekExtraLate = 0;  // 手动点"显示更晚时段"往后多展开的小时数
 const CAL_WEEKDAYS = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
 
+// ── 关闭时段编辑模式：批量选日期/时段关闭或重开，不再挂在"添加行程"弹窗里改，
+// 因为那是另一件事——关闭时段是"这段时间不开放"，不是一条要显示细节的行程。
+// 月视图整天关/开、周视图半小时格关/开，都先记在下面两个 Map 里，点"保存"才一次性写数据库。
+let calCloseMode = false;
+let closeMonthPending = new Map(); // "y-m-d" -> 'closed' | 'open'（这次编辑会话里，这一整天最终要变成什么状态）
+let closeWeekPending = new Map();  // "y-m-d_resource_slotIdx" -> true(关)/false(开)，resource 只会是 guqin/tea（both 会展开成两条都写）
+
 // 琴/茶/和：圆形线条框 + 主理人手写小篆字（抠图自 assets/icon-guqin.png 等，白底转透明+上色），
 // 日历表头、"添加行程"资源选择、事件条共用（配色见 .res-badge CSS）
 // 手机屏幕窄，图标本来就要缩小，粗笔画在小尺寸下显得更粗更抢眼，所以另外配了一套细笔画版本，
@@ -3105,6 +3144,10 @@ async function renderCalendar(forceRefresh = false) {
 
   const el = document.getElementById('calendarEl');
   if (!el) return;
+  const canCloseHere = calView === 'month' || calView === 'week';
+  const rightControls = calCloseMode
+    ? `<button class="btn-add-inline close-mode-cancel-btn" onclick="cancelCloseMode()">取消</button><button class="btn-add-inline close-mode-save-btn" onclick="saveCloseMode()">保存关闭设置</button>`
+    : `${canCloseHere ? `<button class="btn-add-inline close-mode-enter-btn" onclick="enterCloseMode()">关闭时段</button>` : ''}<button class="btn-add-inline" onclick="openAddEventModal(null)">+ 添加行程</button>`;
   el.innerHTML = `
     <div class="cal-toolbar">
       <div class="cal-toolbar-left">
@@ -3117,15 +3160,118 @@ async function renderCalendar(forceRefresh = false) {
         <button class="cal-view-btn" data-view="year" onclick="calSetView('year')">年</button>
         <button class="cal-view-btn" data-view="month" onclick="calSetView('month')">月</button>
         <button class="cal-view-btn" data-view="week" onclick="calSetView('week')">周</button>
-        <button class="btn-add-inline" onclick="openAddEventModal(null)">+ 添加行程</button>
+        ${rightControls}
       </div>
     </div>
-    <div class="cal-body" id="calBody"></div>
+    ${calCloseMode ? `<div class="cal-close-banner">关闭时段编辑模式——点击或拖拽选择要关闭/重新开放的日期或时段，选完点"保存关闭设置"才会生效</div>` : ''}
+    <div class="cal-body${calCloseMode ? ' close-mode' : ''}" id="calBody"></div>
   `;
   document.querySelectorAll('.cal-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === calView));
   if (calView === 'year') renderCalYear(events);
   else if (calView === 'week') renderCalWeek(events);
   else renderCalMonth(events);
+}
+
+function enterCloseMode() {
+  calCloseMode = true;
+  closeMonthPending.clear();
+  closeWeekPending.clear();
+  renderCalendar();
+}
+function cancelCloseMode() {
+  calCloseMode = false;
+  closeMonthPending.clear();
+  closeWeekPending.clear();
+  renderCalendar();
+}
+
+// 保存关闭时段：逐天重算"这一天最终应该关多少"，然后把这一天原有的关闭记录整批删掉重插入，
+// 不做增量修补——这样月视图整天关/周视图半小时格精调叠在一起时，不用另外写区间拆分/资源窄化的
+// 特判逻辑，一律以数据库现状为底、按 月pending → 周pending 的顺序盖上去，重新算出最终该关的区间
+async function saveCloseMode() {
+  const affectedDates = new Set();
+  closeMonthPending.forEach((_, key) => affectedDates.add(key));
+  closeWeekPending.forEach((_, key) => affectedDates.add(key.split('_')[0]));
+  if (!affectedDates.size) { cancelCloseMode(); return; }
+
+  for (const dateKey of affectedDates) {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dayStart = new Date(y, m, d);
+    const dayEnd = new Date(y, m, d + 1);
+    const { data: existingRows, error: fetchErr } = await db.from('schedule_events')
+      .select('*').eq('is_closed', true).lt('start_at', dayEnd.toISOString()).gt('end_at', dayStart.toISOString());
+    if (fetchErr) { showToast('保存失败：' + fetchErr.message); return; }
+
+    // 1. 用数据库现有关闭记录，铺出这一天琴/茶两条线各 48 个半小时格的关闭状态网格
+    const grid = { guqin: new Array(48).fill(false), tea: new Array(48).fill(false) };
+    (existingRows || []).forEach(row => {
+      const s = new Date(row.start_at), e = new Date(row.end_at);
+      const sMin = s <= dayStart ? 0 : Math.round((s - dayStart) / 60000);
+      const eMin = e >= dayEnd ? 1440 : Math.round((e - dayStart) / 60000);
+      const s0 = Math.max(0, Math.floor(sMin / 30)), s1 = Math.min(48, Math.ceil(eMin / 30));
+      for (let i = s0; i < s1; i++) {
+        if (row.resource === 'both' || row.resource === 'guqin') grid.guqin[i] = true;
+        if (row.resource === 'both' || row.resource === 'tea') grid.tea[i] = true;
+      }
+    });
+
+    // 2. 叠上月视图"整天关/开"的 pending（覆盖底色）
+    if (closeMonthPending.has(dateKey)) {
+      const val = closeMonthPending.get(dateKey) === 'closed';
+      grid.guqin.fill(val);
+      grid.tea.fill(val);
+    }
+
+    // 3. 再叠上周视图半小时格的精调 pending（覆盖前两层）
+    closeWeekPending.forEach((val, key) => {
+      const [dk, resource, slotStr] = key.split('_');
+      if (dk !== dateKey) return;
+      grid[resource][Number(slotStr)] = val;
+    });
+
+    // 4. 网格转回连续区间：琴茶同时关的整段合成一条 both，否则各自单独一条
+    const newRows = [];
+    let runStart = null, runGuqin = false, runTea = false;
+    const flush = (endIdx) => {
+      if (runStart === null) return;
+      if (runGuqin || runTea) {
+        const resource = runGuqin && runTea ? 'both' : (runGuqin ? 'guqin' : 'tea');
+        newRows.push({
+          title: '已关闭', is_closed: true, member_id: null, resource,
+          start_at: new Date(y, m, d, 0, runStart * 30).toISOString(),
+          end_at: new Date(y, m, d, 0, endIdx * 30).toISOString(),
+        });
+      }
+      runStart = null;
+    };
+    for (let i = 0; i <= 48; i++) {
+      const g = i < 48 && grid.guqin[i], t = i < 48 && grid.tea[i];
+      if (runStart === null) {
+        if (g || t) { runStart = i; runGuqin = g; runTea = t; }
+      } else if (g !== runGuqin || t !== runTea) {
+        flush(i);
+        if (g || t) { runStart = i; runGuqin = g; runTea = t; }
+      }
+    }
+    flush(48);
+
+    // 5. 这一天原有的关闭记录整批删掉，换成新算出来的
+    if (existingRows && existingRows.length) {
+      const { error: delErr } = await db.from('schedule_events').delete().in('id', existingRows.map(r => r.id));
+      if (delErr) { showToast('保存失败：' + delErr.message); return; }
+    }
+    if (newRows.length) {
+      const { error: insErr } = await db.from('schedule_events').insert(newRows);
+      if (insErr) { showToast('保存失败：' + insErr.message); return; }
+    }
+  }
+
+  showToast('已保存');
+  calCloseMode = false;
+  closeMonthPending.clear();
+  closeWeekPending.clear();
+  delete tabProductsCache['schedule'];
+  renderCalendar();
 }
 
 function calSetView(v) { calView = v; renderCalendar(); }
@@ -3139,6 +3285,149 @@ function calNav(dir) {
 function calGoToWeekOfDay(y, m, d) {
   calAnchor = new Date(y, m, d);
   calSetView('week');
+}
+
+// ── 关闭时段：读状态用的几个小工具函数 ──
+// 数据库里某一天、某条资源线、某个半小时格（0~47）是不是已经被关闭了（不看这次编辑会话的 pending，
+// 只看已经存进 tabProductsCache 的 is_closed 行）
+function calCloseIsExistingClosed(dateObj, resource, slotIdx) {
+  const events = tabProductsCache['schedule'] || [];
+  const slotStart = slotIdx * 30, slotEnd = slotStart + 30;
+  const dayStart = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+  // 不能直接用 e.end.getHours()/getMinutes() 换算"这一天的第几分钟"——关闭一整天的记录
+  // end_at 正好是次日 0 点，getHours()/getMinutes() 会读成 0:00，误判成"从这天一开始就没关"。
+  // 改用跟 dayStart 的绝对时间差来算，跨到当天以外的部分直接夹到 0/1440。
+  return events.some(e => {
+    if (!e.isClosed || e.end <= dayStart || e.start >= dayEnd) return false;
+    if (e.resource !== 'both' && e.resource !== resource) return false;
+    const sMin = e.start <= dayStart ? 0 : Math.round((e.start - dayStart) / 60000);
+    const eMin = e.end >= dayEnd ? 1440 : Math.round((e.end - dayStart) / 60000);
+    return sMin <= slotStart && eMin >= slotEnd;
+  });
+}
+// 这一天是不是"整天都关"（琴茶两条线 48 个半小时格全部关闭）——月视图按天关闭/判断锚点状态用
+function calCloseIsDayFullyClosed(y, m, d) {
+  const dateObj = new Date(y, m, d);
+  for (let i = 0; i < 48; i++) {
+    if (!calCloseIsExistingClosed(dateObj, 'guqin', i)) return false;
+    if (!calCloseIsExistingClosed(dateObj, 'tea', i)) return false;
+  }
+  return true;
+}
+// 这一天当前"最终生效"状态（已经在这次编辑会话里点过就用 pending 里的，没点过就看数据库原状）——
+// 月视图点击/拖拽时用来决定这一次是要刷成"关"还是"开"
+function calCloseMonthEffective(y, m, d) {
+  const key = `${y}-${m}-${d}`;
+  if (closeMonthPending.has(key)) return closeMonthPending.get(key);
+  return calCloseIsDayFullyClosed(y, m, d) ? 'closed' : 'open';
+}
+function calCloseSlotKey(y, m, d, resource, slotIdx) { return `${y}-${m}-${d}_${resource}_${slotIdx}`; }
+function calCloseMinutesToSlotIdx(mins) { return Math.floor(mins / 30); }
+// 周视图某个半小时格、某条资源线，当前"最终生效"状态（同样是 pending 优先，没有就看数据库原状）
+function calCloseEffectiveWeekSlot(y, m, d, resource, slotIdx) {
+  const key = calCloseSlotKey(y, m, d, resource, slotIdx);
+  if (closeWeekPending.has(key)) return closeWeekPending.get(key);
+  const dateKey = `${y}-${m}-${d}`;
+  if (closeMonthPending.has(dateKey)) return closeMonthPending.get(dateKey) === 'closed';
+  return calCloseIsExistingClosed(new Date(y, m, d), resource, slotIdx);
+}
+// 把某个半小时格设成关/开（both 会同时写琴、茶两条线）
+function calCloseSetSlot(y, m, d, resource, slotIdx, val) {
+  if (resource === 'both') {
+    closeWeekPending.set(calCloseSlotKey(y, m, d, 'guqin', slotIdx), val);
+    closeWeekPending.set(calCloseSlotKey(y, m, d, 'tea', slotIdx), val);
+  } else {
+    closeWeekPending.set(calCloseSlotKey(y, m, d, resource, slotIdx), val);
+  }
+}
+function calCloseToggleSlot(y, m, d, resource, slotIdx) {
+  const current = calCloseEffectiveWeekSlot(y, m, d, resource === 'both' ? 'guqin' : resource, slotIdx);
+  calCloseSetSlot(y, m, d, resource, slotIdx, !current);
+}
+
+// 周视图关闭时段的可视化叠层：已经存过的关闭状态交给普通事件条（"已关闭"灰纹）自己显示，
+// 这里只画"这次编辑会话点过、状态跟数据库不一样"的半小时格，画成连续的一段段，不用逐格画
+function calCloseWeekRunsPendingOnly(y, m, d, resource) {
+  const runs = [];
+  let runStart = null, runVal = null;
+  for (let i = 0; i <= 48; i++) {
+    const key = calCloseSlotKey(y, m, d, resource, i);
+    const has = i < 48 && closeWeekPending.has(key);
+    const pendingVal = has ? closeWeekPending.get(key) : null;
+    const baseline = i < 48 && calCloseIsExistingClosed(new Date(y, m, d), resource, i);
+    const isChange = has && pendingVal !== baseline;
+    if (isChange && runStart === null) { runStart = i; runVal = pendingVal; }
+    else if (runStart !== null && (!isChange || pendingVal !== runVal)) {
+      runs.push([runStart, i, runVal]);
+      runStart = null;
+      if (isChange) { runStart = i; runVal = pendingVal; }
+    }
+  }
+  return runs;
+}
+
+// 月视图：鼠标/手指按下开始拖拽选日期范围，松手时按"这次要刷成关闭还是开放"统一处理整段范围
+let calMonthDragAnchor = null;
+
+function calMonthCellClick(evt, y, m, d) {
+  if (calCloseMode) return; // 编辑模式下点击交给 mousedown/mouseup 处理，不跳转周视图
+  calGoToWeekOfDay(y, m, d);
+}
+
+function calMonthCellDown(evt, y, m, d) {
+  if (!calCloseMode) return;
+  if (evt.type === 'mousedown' && evt.button !== 0) return;
+  evt.preventDefault();
+  const targetState = calCloseMonthEffective(y, m, d) === 'closed' ? 'open' : 'closed';
+  calMonthDragAnchor = { date: new Date(y, m, d), targetState };
+  calMonthDragPreview(new Date(y, m, d), new Date(y, m, d));
+  document.addEventListener('mousemove', calMonthDragMove);
+  document.addEventListener('mouseup', calMonthDragEnd);
+  document.addEventListener('touchmove', calMonthDragMove, { passive: false });
+  document.addEventListener('touchend', calMonthDragEnd);
+}
+
+function calMonthDragEventXY(evt) {
+  const t = evt.touches && evt.touches[0];
+  return { x: t ? t.clientX : evt.clientX, y: t ? t.clientY : evt.clientY };
+}
+
+function calMonthDragMove(evt) {
+  if (!calMonthDragAnchor) return;
+  if (evt.type === 'touchmove') evt.preventDefault();
+  const { x, y } = calMonthDragEventXY(evt);
+  const el = document.elementFromPoint(x, y);
+  const cell = el && el.closest('.cal-month-cell[data-cy]');
+  if (!cell) return;
+  const hoverDate = new Date(Number(cell.dataset.cy), Number(cell.dataset.cm), Number(cell.dataset.cd));
+  calMonthDragPreview(calMonthDragAnchor.date, hoverDate);
+}
+
+// 拖拽选中的是"日期范围"本身（从锚点那天到当前悬停那天之间，不管中间跨了几行网格），
+// 每次移动只是给这个范围内的格子加一个临时的高亮预览类，真正落 pending 要等松手
+function calMonthDragPreview(dateA, dateB) {
+  const lo = new Date(Math.min(dateA, dateB)), hi = new Date(Math.max(dateA, dateB));
+  document.querySelectorAll('.cal-month-cell[data-cy]').forEach(cell => {
+    const cd = new Date(Number(cell.dataset.cy), Number(cell.dataset.cm), Number(cell.dataset.cd));
+    cell.classList.toggle('close-preview', cd >= lo && cd <= hi);
+  });
+  calMonthDragAnchor.rangeLo = lo;
+  calMonthDragAnchor.rangeHi = hi;
+}
+
+function calMonthDragEnd() {
+  document.removeEventListener('mousemove', calMonthDragMove);
+  document.removeEventListener('mouseup', calMonthDragEnd);
+  document.removeEventListener('touchmove', calMonthDragMove);
+  document.removeEventListener('touchend', calMonthDragEnd);
+  if (!calMonthDragAnchor) return;
+  const { rangeLo, rangeHi, targetState } = calMonthDragAnchor;
+  for (let d = new Date(rangeLo); d <= rangeHi; d.setDate(d.getDate() + 1)) {
+    closeMonthPending.set(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`, targetState);
+  }
+  calMonthDragAnchor = null;
+  renderCalendar();
 }
 
 // 月视图：一格一天，超过 3 条行程折叠成"还有 N 条"，点某天跳到周视图方便按时段安排行程
@@ -3169,14 +3458,27 @@ function renderCalMonth(events) {
     const dayEvents = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
     const maxShow = 3;
     const chips = dayEvents.slice(0, maxShow).map(e =>
-      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}${e.isClosed ? ' closed' : ''}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`
+      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}${e.isClosed ? ' closed' : ''}" onclick="event.stopPropagation();${calCloseMode ? '' : `openEditEventModal('${e.id}')`}">${e.title}</div>`
     ).join('');
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">还有 ${dayEvents.length - maxShow} 条</div>`
       : '';
     const lunarInfo = getLunarLabel(cellDate);
+    // 关闭时段编辑模式下，只标"这次编辑会话动过、状态跟数据库不一样"的日子——已经存过的关闭状态
+    // 交给上面 chips 里"已关闭"那条灰纹事件条自己显示，这里不重复画
+    let closePendingCls = '';
+    if (calCloseMode) {
+      const dateKeyC = `${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`;
+      const original = calCloseIsDayFullyClosed(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate()) ? 'closed' : 'open';
+      const pendingVal = closeMonthPending.get(dateKeyC);
+      if (pendingVal && pendingVal !== original) closePendingCls = pendingVal === 'closed' ? ' close-will-close' : ' close-will-open';
+    }
     cellsHtml += `
-      <div class="cal-month-cell${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}" onclick="calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
+      <div class="cal-month-cell${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}${closePendingCls}"
+        data-cy="${cellDate.getFullYear()}" data-cm="${cellDate.getMonth()}" data-cd="${cellDate.getDate()}"
+        onclick="calMonthCellClick(event,${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})"
+        onmousedown="calMonthCellDown(event,${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})"
+        ontouchstart="calMonthCellDown(event,${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
         <div class="cal-month-daynum">${cellD}</div>
         <div class="cal-month-lunar${lunarInfo.special ? ' special' : ''}">${lunarInfo.text}</div>
         ${chips}${more}
@@ -3235,8 +3537,22 @@ function renderCalWeek(events) {
       // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
       const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
       const closedCls = e.isClosed ? ' closed' : '';
-      return `<div class="cal-week-event${resCls}${closedCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
+      return `<div class="cal-week-event${resCls}${closedCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();${calCloseMode ? '' : `openEditEventModal('${e.id}')`}">${e.title}</div>`;
     }).join('');
+    let closeOverlayHtml = '';
+    if (calCloseMode) {
+      ['guqin', 'tea'].forEach(resource => {
+        calCloseWeekRunsPendingOnly(day.getFullYear(), day.getMonth(), day.getDate(), resource).forEach(([s0, s1, val]) => {
+          const startH = s0 * 0.5, endH = s1 * 0.5;
+          if (endH <= gridStart || startH >= gridEnd) return;
+          const top = (Math.max(startH, gridStart) - gridStart) * pxPerHour;
+          const height = (Math.min(endH, gridEnd) - Math.max(startH, gridStart)) * pxPerHour;
+          const resCls = resource === 'guqin' ? ' res-guqin' : ' res-tea';
+          const stateCls = val ? ' close-will-close' : ' close-will-open';
+          closeOverlayHtml += `<div class="cal-close-overlay${resCls}${stateCls}" style="top:${top}px;height:${height}px"></div>`;
+        });
+      });
+    }
     const weekLunarInfo = getLunarLabel(day);
     daysHtml += `
       <div class="cal-week-daycol">
@@ -3247,6 +3563,7 @@ function renderCalWeek(events) {
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)" onmousedown="calWeekDragStart(event, this)" ontouchstart="calWeekDragStart(event, this)">
           <div class="cal-week-divider"></div>
           ${hourLines}
+          ${closeOverlayHtml}
           ${eventsHtml}
         </div>
       </div>`;
@@ -3294,6 +3611,11 @@ function calWeekSlotClick(evt, el) {
   const snapped = Math.max(0, Math.floor((calWeekGridStart + offsetY / calWeekPxPerHour) * 2) / 2);
   const h = Math.floor(snapped), min = Math.round((snapped % 1) * 60);
   const y = Number(el.dataset.y), m = Number(el.dataset.m), d = Number(el.dataset.d);
+  if (calCloseMode) {
+    calCloseToggleSlot(y, m, d, defaultResource, calCloseMinutesToSlotIdx(h * 60 + min));
+    renderCalendar();
+    return;
+  }
   const start = new Date(y, m, d, h, min);
   openAddEventModal(null, start, new Date(start.getTime() + 60 * 60 * 1000), defaultResource);
 }
@@ -3436,7 +3758,22 @@ function calWeekDragEnd() {
   if (box) box.remove();
   if (!s.dragged) return;
   calWeekSuppressClick = true;
+  if (calCloseMode) { applyWeekCloseDrag(s); return; }
   openAddEventModal(null, s.finalStart, s.finalEnd, s.resource);
+}
+
+// 关闭时段编辑模式下，周视图拖拽松手：把拖过的半小时格全部刷成跟锚点（拖拽起点那一格）
+// 相反的状态——锚点原来是开的，整段就刷成"待关闭"；锚点原来是关的，整段就刷成"待开放"
+function applyWeekCloseDrag(s) {
+  const y = Number(s.el.dataset.y), m = Number(s.el.dataset.m), d = Number(s.el.dataset.d);
+  const startMin = s.finalStart.getHours() * 60 + s.finalStart.getMinutes();
+  const endMin = s.finalEnd.getHours() * 60 + s.finalEnd.getMinutes();
+  const firstSlot = Math.floor(startMin / 30);
+  const lastSlot = Math.ceil(endMin / 30) - 1;
+  const anchorResource = s.resource === 'both' ? 'guqin' : s.resource;
+  const targetVal = !calCloseEffectiveWeekSlot(y, m, d, anchorResource, firstSlot);
+  for (let i = firstSlot; i <= lastSlot; i++) calCloseSetSlot(y, m, d, s.resource, i, targetVal);
+  renderCalendar();
 }
 
 // 年视图：12 个月缩略图，有行程的日子标个小圆点，点某天直接跳到那个月
@@ -3614,8 +3951,6 @@ document.addEventListener('click', (e) => {
 
 // 行程占用哪条资源线（琴/茶/两者都占），跟周视图里每天的左右分栏一一对应
 let eventResourceValue = null;
-// 这条是不是"主理人手动关闭时段"（不挂会员、不算约满，纯粹拿它占位挡住这段时间不能被约）
-let eventIsClosed = false;
 
 function pickEventResource(val) {
   eventResourceValue = val;
@@ -3623,16 +3958,6 @@ function pickEventResource(val) {
     btn.classList.toggle('selected', btn.dataset.resource === val);
   });
   updateEventTimeConstraints();
-}
-
-function toggleEventClosed() {
-  eventIsClosed = !eventIsClosed;
-  document.getElementById('eventClosedToggle').classList.toggle('selected', eventIsClosed);
-  document.getElementById('eventMemberGroup').style.display = eventIsClosed ? 'none' : '';
-  if (eventIsClosed) document.getElementById('eventMemberSelect').value = '';
-  if (eventIsClosed && !document.getElementById('eventTitle').value.trim()) {
-    document.getElementById('eventTitle').value = '已关闭';
-  }
 }
 
 // 算某一天、某条资源线上已经被占用的时间段（同一天 + 资源线有交集才算冲突，
@@ -3679,9 +4004,6 @@ async function openAddEventModal(memberId, startDate, endDate, defaultResource) 
   document.getElementById('eventDeleteBtn').style.display = 'none';
   document.getElementById('eventTitle').value = '';
   document.getElementById('eventNote').value = '';
-  eventIsClosed = false;
-  document.getElementById('eventClosedToggle').classList.remove('selected');
-  document.getElementById('eventMemberGroup').style.display = '';
   pickEventResource(defaultResource || null);
   dtPickerInit('eventStart', startDate);
   dtPickerInit('eventEnd', endDate);
@@ -3698,9 +4020,6 @@ async function openEditEventModal(id) {
   document.getElementById('eventDeleteBtn').style.display = '';
   document.getElementById('eventTitle').value = data.title;
   document.getElementById('eventNote').value = data.note || '';
-  eventIsClosed = !!data.is_closed;
-  document.getElementById('eventClosedToggle').classList.toggle('selected', eventIsClosed);
-  document.getElementById('eventMemberGroup').style.display = eventIsClosed ? 'none' : '';
   pickEventResource(data.resource || 'both');
   dtPickerInit('eventStart', data.start_at);
   dtPickerInit('eventEnd', data.end_at);
@@ -3724,8 +4043,8 @@ function closeEventModal() {
 
 async function saveEvent() {
   const id = document.getElementById('eventEditId').value;
-  const title = document.getElementById('eventTitle').value.trim() || (eventIsClosed ? '已关闭' : '');
-  const memberId = eventIsClosed ? null : (document.getElementById('eventMemberSelect').value || null);
+  const title = document.getElementById('eventTitle').value.trim();
+  const memberId = document.getElementById('eventMemberSelect').value || null;
   const startDate = dtPickerGetValue('eventStart');
   const endDate = dtPickerGetValue('eventEnd');
   if (!title || !startDate || !endDate) { showToast('请填写标题和起止时间'); return; }
@@ -3734,7 +4053,6 @@ async function saveEvent() {
     title,
     member_id: memberId,
     resource: eventResourceValue,
-    is_closed: eventIsClosed,
     start_at: startDate.toISOString(),
     end_at: endDate.toISOString(),
     note: document.getElementById('eventNote').value.trim() || null,
