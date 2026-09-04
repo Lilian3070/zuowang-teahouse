@@ -174,13 +174,10 @@
       </div>
 
       <label for="slot">期望时段</label>
-      <select id="slot" name="slot">
-        <option value="">请选择时段</option>
-        <option>上午（9:00-12:00）</option>
-        <option>下午（14:00-17:00）</option>
-        <option>晚上（18:00-21:00）</option>
+      <select id="slot" name="slot" disabled>
+        <option value="">请先选择日期</option>
       </select>
-      <p style="font-size:0.8rem;color:var(--ink-soft);margin:6px 0 0">具体几点到访，可在下方备注里说明，掌柜会与您确认</p>
+      <p style="font-size:0.8rem;color:var(--ink-soft);margin:6px 0 0">时段选项按茶室当前实际空档实时列出；更具体的到访时间可在下方备注里说明，掌柜会与您确认</p>
 
       <label for="note">备注</label>
       <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
@@ -369,6 +366,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=23"></script>
+<script src="script.js?v=24"></script>
 </body>
 </html>

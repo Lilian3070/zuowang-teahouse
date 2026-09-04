@@ -136,11 +136,77 @@ function bpPickDate(y, m, d) {
   displayBtn.textContent = label;
   displayBtn.classList.remove('placeholder');
   closeBpDatePanel();
+  loadTeaAvailability(bpSelectedDate);
 }
 
 function closeBpDatePanel() {
   document.getElementById('bpDatePanel').classList.remove('open');
   document.getElementById('bpDateDisplay').classList.remove('open');
+}
+
+// 选完日期后，"期望时段"下拉不再是固定的"上午/下午/晚上"三个死选项，改成实时查
+// schedule_events 里茶室（resource: tea/both）这天真正还空着的区间，只列出真的能约的时段——
+// 跟主理人的行程/关闭状态对不上的时段客人根本选不到，不用等提交了才被回绝。
+// 营业时段固定 8:30-23:30、半小时为单位，跟 admin.html 后台日历默认显示的时间轴一致。
+const BOOKING_BUSINESS_START_SLOT = 17; // 8:30 = 8.5*2
+const BOOKING_BUSINESS_END_SLOT = 47;   // 23:30 = 23.5*2
+function bpFormatSlot(slotIdx) {
+  return `${String(Math.floor(slotIdx / 2)).padStart(2, '0')}:${slotIdx % 2 ? '30' : '00'}`;
+}
+
+async function loadTeaAvailability(dateObj) {
+  const select = document.getElementById('slot');
+  select.disabled = true;
+  select.innerHTML = '<option value="">查询空档中…</option>';
+
+  const dayStart = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+  const { data, error } = await db.rpc('get_tea_busy_ranges', {
+    p_start: dayStart.toISOString(), p_end: dayEnd.toISOString(),
+  });
+
+  if (error) {
+    // 查询失败（比如网络抖动）不把人卡死在这一步，退回到手动说明时段，掌柜人工确认时兜底
+    select.disabled = false;
+    select.innerHTML = '<option value="时段查询失败，请在备注说明期望时间">时段查询失败，可在备注说明期望时间</option>';
+    return;
+  }
+
+  const busy = new Array(48).fill(false);
+  (data || []).forEach(r => {
+    const s = new Date(r.start_at), e = new Date(r.end_at);
+    const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
+    const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
+    for (let i = Math.max(0, sSlot); i < Math.min(48, eSlot); i++) busy[i] = true;
+  });
+
+  // 选的是今天的话，已经过去的时间也不能再约，一并标成"忙"
+  const now = new Date();
+  if (calSameLocalDay(dateObj, now)) {
+    const nowSlot = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30);
+    for (let i = 0; i < Math.min(48, nowSlot); i++) busy[i] = true;
+  }
+
+  const runs = [];
+  let runStart = null;
+  for (let i = BOOKING_BUSINESS_START_SLOT; i <= BOOKING_BUSINESS_END_SLOT; i++) {
+    const open = i < BOOKING_BUSINESS_END_SLOT && !busy[i];
+    if (open && runStart === null) runStart = i;
+    else if (!open && runStart !== null) { runs.push([runStart, i]); runStart = null; }
+  }
+
+  if (runs.length === 0) {
+    select.disabled = true;
+    select.innerHTML = '<option value="">这天空档已经约满，换个日期试试</option>';
+    return;
+  }
+  select.disabled = false;
+  select.innerHTML = '<option value="">请选择时段</option>' +
+    runs.map(([s0, s1]) => { const label = `${bpFormatSlot(s0)}-${bpFormatSlot(s1)}`; return `<option value="${label}">${label}</option>`; }).join('');
+}
+
+function calSameLocalDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 function resetBpDatePicker() {
@@ -149,6 +215,9 @@ function resetBpDatePicker() {
   displayBtn.textContent = '请选择日期';
   displayBtn.classList.add('placeholder');
   closeBpDatePanel();
+  const select = document.getElementById('slot');
+  select.disabled = true;
+  select.innerHTML = '<option value="">请先选择日期</option>';
 }
 
 function onNavAccountClick(event) {
