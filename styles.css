@@ -614,14 +614,24 @@ section {
   display: flex; align-items: center; justify-content: flex-end;
   border-right: 1px solid var(--line); border-top: 1px solid var(--line);
 }
-.bwk-cell { min-height: 20px; border-top: 1px dashed var(--line); border-left: 1px solid var(--line); }
+/* 每天列自己的底色（单双日交替，--col-tint 由 JS 按真实星期几算好传进来，
+   跟后台 .cal-week-daycol:nth-child(even) 是同一个视觉语言），忙/闲状态再叠一层上去，
+   不是拿纯灰/纯红盖住整格——这样格子本身还看得出"这是哪一天"，不同天不会看着糊成一片 */
+.bwk-cell { min-height: 20px; border-top: 1px dashed var(--line); border-left: 1px solid var(--line); background-color: var(--col-tint, var(--paper)); }
 .bwk-cell.hour-start, .bwk-time-label.hour { border-top: 1px solid var(--line); }
-/* 灰=不能点（占用/关闭/已过去，客人不需要知道具体哪种），红=能点——两种颜色要一眼分得清，
-   之前透明度太低（0.07）挤在一起看着都差不多，加深到看一眼就能分出"这排能选、那排不能" */
-.bwk-cell.busy { background: rgba(43, 40, 34, 0.16); }
-.bwk-cell.open { background: rgba(163, 49, 42, 0.16); cursor: pointer; }
-.bwk-cell.open:hover { background: rgba(163, 49, 42, 0.32); }
-.bwk-cell.open.selected { background: var(--seal); }
+/* 灰=不能点（占用/关闭/已过去，客人不需要知道具体哪种），斜纹阴影跟后台"关闭时段"
+   那套是同一个视觉语言；红=能点，点了变实心红；点了起点还没点终点的格子描一圈虚线框，
+   提示"这是起点，再点一下同一天更晚的格子选终点" */
+.bwk-cell.busy {
+  background-image: repeating-linear-gradient(45deg, rgba(43, 40, 34, 0.22) 0, rgba(43, 40, 34, 0.22) 1px, transparent 1px, transparent 7px);
+}
+.bwk-cell.open { background-image: linear-gradient(rgba(163, 49, 42, 0.18), rgba(163, 49, 42, 0.18)); cursor: pointer; }
+.bwk-cell.open:hover { background-image: linear-gradient(rgba(163, 49, 42, 0.34), rgba(163, 49, 42, 0.34)); }
+.bwk-cell.open.range-start {
+  background-image: linear-gradient(rgba(163, 49, 42, 0.5), rgba(163, 49, 42, 0.5));
+  outline: 2px dashed var(--seal); outline-offset: -2px;
+}
+.bwk-cell.open.selected { background-image: none; background-color: var(--seal); }
 .bwk-loading { text-align: center; font-size: 0.85rem; color: var(--ink-soft); padding: 20px 0; }
 .bwk-selected-label { font-size: 0.85rem; color: var(--ink-soft); margin: 10px 0 16px; }
 .bwk-selected-label.picked { color: var(--seal); font-weight: 600; }

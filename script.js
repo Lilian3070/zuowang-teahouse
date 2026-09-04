@@ -88,11 +88,14 @@ async function submitBookingRequest(event) {
   return false;
 }
 
-// 首页预约表单选时段：简化版"周表"，跟后台周视图一个道理（一排七天），但只给客人看
-// "这天还有哪几段真的空着"——具体行程、关闭标记这些后台细节都不显示，点一个空档
-// 直接选定"哪天+几点到几点"，不用先选日期、再单独选时段两步分开来
+// 首页预约表单选时段：照抄后台 admin.html 周视图的表格骨架（时间轴+按天分栏+半小时格），
+// 只是内容做阉割——看不到备忘录/行程标题，格子只剩"能点"（空档）跟"不能点"（占用/关闭/
+// 已过去，统一灰色斜纹，不挂钩具体原因）两种状态；点起点、再点终点选一段时间（跟后台
+// 拖拽预选一个道理，只是这里用点两下代替拖拽，手机上更好操作）
 let bwkAnchor = bwkMonday(new Date()); // 当前显示这一周的周一
-let bwkSelected = null; // { y, m, d, label }
+let bwkDaysData = [];      // 当前这一周已经算好忙闲的每一天，点格子时直接查这份，不用重新请求
+let bwkRangeStart = null;  // 已经点了起点、还没点终点：{ y, m, d, slot }
+let bwkSelected = null;    // 起点+终点都选完了：{ y, m, d, startSlot, endSlot }
 const BWK_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
 function bwkMonday(d) {
@@ -106,8 +109,21 @@ function bwkMonday(d) {
 // 看行程时习惯往前多留半小时方便看，不代表真的 8:30 就开门营业
 const BOOKING_BUSINESS_START_SLOT = 19; // 9:30 = 9.5*2
 const BOOKING_BUSINESS_END_SLOT = 47;   // 23:30 = 23.5*2
+
+// 时间标签格式跟后台完全一样：早上/上午/中午/下午/晚上 + 12 小时制，不是"18:00"这种
+// 24 小时制裸数字（periodWordForHour 的分段跟 admin.html 里那份一模一样）
+function bwkPeriodWordForHour(h) {
+  if (h < 5) return '凌晨';
+  if (h < 9) return '早上';
+  if (h < 12) return '上午';
+  if (h < 13) return '中午';
+  if (h < 18) return '下午';
+  return '晚上';
+}
 function bwkFormatSlot(slotIdx) {
-  return `${String(Math.floor(slotIdx / 2)).padStart(2, '0')}:${slotIdx % 2 ? '30' : '00'}`;
+  const h = Math.floor(slotIdx / 2), m = slotIdx % 2 ? 30 : 0;
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return `${bwkPeriodWordForHour(h)}${h12}:${String(m).padStart(2, '0')}`;
 }
 
 function bwkShiftWeek(dir) {
@@ -115,12 +131,19 @@ function bwkShiftWeek(dir) {
   next.setDate(next.getDate() + dir * 7);
   if (next < bwkMonday(new Date())) return; // 不能翻到已经完全过去的那一周
   bwkAnchor = next;
+  bwkRangeStart = null;
   renderBwkWeek();
 }
 
-// 表格结构照抄后台 admin.html 周视图：左边一列时间轴，右边每天一列，格子按半小时切——
-// 跟后台唯一的区别是内容做了阉割（看不到备忘录/行程标题，格子只剩"能点"/"不能点"两种状态），
-// 骨架和交互逻辑（点格子选时间）是同一套，不是另外发明一套下拉/列表
+// 跟后台工具栏的"今天"按钮一个道理，翻了好几周之后能一键跳回本周
+function bwkGoToday() {
+  bwkAnchor = bwkMonday(new Date());
+  bwkRangeStart = null;
+  renderBwkWeek();
+}
+
+// 查一次这一周的忙闲数据（网络请求），算好每天每格状态后交给 bwkPaintGrid 画——
+// 拆成两步是因为点格子选起点/终点只是重新画一下高亮，不用每点一下就重新查一次数据库
 async function renderBwkWeek() {
   const wrap = document.getElementById('bwkGrid');
   const todayMonday = bwkMonday(new Date());
@@ -143,14 +166,18 @@ async function renderBwkWeek() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = new Date();
 
-  // 已经过去的日子这一列直接不画，本周从"今天"开始；先把要画的每一天、和这一天
-  // 每半小时格是忙是闲，都算好，再统一拼表格（时间轴要按行、天要按列，不能像之前
-  // 列表那样一天算完就直接输出）
+  // 已经过去的日子这一列直接不画，本周从"今天"开始
   const days = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
     if (day < today) continue;
-    days.push({ date: day, weekday: BWK_WEEKDAYS[i], isToday: day.getTime() === today.getTime() });
+    // 底色按"星期几"的奇偶交替（跟后台 .cal-week-daycol:nth-child(even) 一个道理），
+    // 用真实星期几算，不是用第几栏算——不然过去的日子被跳过后，颜色交替会跟着错位
+    const mondayIdx = (day.getDay() + 6) % 7;
+    days.push({
+      date: day, weekday: BWK_WEEKDAYS[i], isToday: day.getTime() === today.getTime(),
+      colTint: mondayIdx % 2 === 0 ? 'var(--paper)' : 'var(--paper-deep)',
+    });
   }
   days.forEach(d => {
     const dayStart = d.date, dayEnd = new Date(d.date); dayEnd.setDate(dayEnd.getDate() + 1);
@@ -168,8 +195,19 @@ async function renderBwkWeek() {
     d.busy = busy;
   });
 
-  let headHtml = '<div class="bwk-corner"></div>' + days.map(d =>
-    `<div class="bwk-col-head${d.isToday ? ' today' : ''}"><span>${d.weekday}</span><b>${d.date.getMonth() + 1}/${d.date.getDate()}</b></div>`
+  bwkDaysData = days;
+  bwkRangeStart = null;
+  bwkPaintGrid();
+}
+
+// 纯画图，不查数据库——用 bwkDaysData 里已经算好的忙闲状态，配合当前选择状态
+// （bwkRangeStart 只选了起点 / bwkSelected 起点终点都选完了）画出高亮
+function bwkPaintGrid() {
+  const wrap = document.getElementById('bwkGrid');
+  const days = bwkDaysData;
+
+  const headHtml = '<div class="bwk-corner"></div>' + days.map(d =>
+    `<div class="bwk-col-head${d.isToday ? ' today' : ''}" style="--col-tint:${d.colTint}"><span>${d.weekday}</span><b>${d.date.getMonth() + 1}/${d.date.getDate()}</b></div>`
   ).join('');
 
   let rowsHtml = '';
@@ -177,35 +215,69 @@ async function renderBwkWeek() {
     const isHour = k % 2 === 0;
     rowsHtml += `<div class="bwk-time-label${isHour ? ' hour' : ''}">${isHour ? bwkFormatSlot(k) : ''}</div>`;
     days.forEach(d => {
-      const label = bwkFormatSlot(k);
+      const y = d.date.getFullYear(), m = d.date.getMonth(), dd = d.date.getDate();
       if (d.busy[k]) {
-        rowsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}"></div>`;
-      } else {
-        const isSel = bwkSelected && bwkSelected.y === d.date.getFullYear() && bwkSelected.m === d.date.getMonth() && bwkSelected.d === d.date.getDate() && bwkSelected.label === label;
-        rowsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}${isSel ? ' selected' : ''}" data-y="${d.date.getFullYear()}" data-m="${d.date.getMonth()}" data-d="${d.date.getDate()}" data-label="${label}" title="${label}" onclick="bwkSelectChip(this)"></div>`;
+        rowsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}" style="--col-tint:${d.colTint}"></div>`;
+        return;
       }
+      const sameDay = bwkRangeStart && bwkRangeStart.y === y && bwkRangeStart.m === m && bwkRangeStart.d === dd;
+      const isRangeStart = sameDay && bwkRangeStart.slot === k;
+      const isSelected = bwkSelected && bwkSelected.y === y && bwkSelected.m === m && bwkSelected.d === dd && k >= bwkSelected.startSlot && k < bwkSelected.endSlot;
+      const cls = isSelected ? ' selected' : isRangeStart ? ' range-start' : '';
+      rowsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}${cls}" style="--col-tint:${d.colTint}" data-y="${y}" data-m="${m}" data-d="${dd}" data-slot="${k}" onclick="bwkCellClick(this)"></div>`;
     });
   }
 
-  wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table" style="grid-template-columns:44px repeat(${days.length},minmax(46px,1fr))">${headHtml}${rowsHtml}</div></div>`;
+  wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table" style="grid-template-columns:46px repeat(${days.length},minmax(46px,1fr))">${headHtml}${rowsHtml}</div></div>`;
 }
 
-function bwkSelectChip(cell) {
-  const y = Number(cell.dataset.y), m = Number(cell.dataset.m), d = Number(cell.dataset.d), label = cell.dataset.label;
-  bwkSelected = { y, m, d, label };
+function bwkFindDay(y, m, d) {
+  return bwkDaysData.find(dd => dd.date.getFullYear() === y && dd.date.getMonth() === m && dd.date.getDate() === d);
+}
+
+// 点两下选一段时间：第一下点起点，第二下在同一天里点终点（起点到终点中间必须都还空着，
+// 中间只要有一格被占用就不让连续选过去，直接把这一下当成重新选起点）——跟后台拖拽
+// 预选一段时间是同一个意图，只是手机上用"点两下"代替"拖拽"更好操作
+function bwkCellClick(cell) {
+  const y = Number(cell.dataset.y), m = Number(cell.dataset.m), d = Number(cell.dataset.d), k = Number(cell.dataset.slot);
+  const isSameDayAsStart = bwkRangeStart && bwkRangeStart.y === y && bwkRangeStart.m === m && bwkRangeStart.d === d;
+
+  if (!isSameDayAsStart || k <= bwkRangeStart.slot) {
+    // 换了一天，或者点的格子不比起点晚——当成重新选起点（点同一格两次=起止都是这半小时）
+    if (isSameDayAsStart && k === bwkRangeStart.slot) {
+      bwkFinalize(y, m, d, k, k + 1);
+      return;
+    }
+    bwkRangeStart = { y, m, d, slot: k };
+    bwkSelected = null;
+    bwkPaintGrid();
+    return;
+  }
+
+  // 起点到这一格之间是不是连续都空着——中间断开了就不能连选过去
+  const day = bwkFindDay(y, m, d);
+  for (let i = bwkRangeStart.slot; i <= k; i++) {
+    if (day.busy[i]) { bwkRangeStart = { y, m, d, slot: k }; bwkSelected = null; bwkPaintGrid(); return; }
+  }
+  bwkFinalize(y, m, d, bwkRangeStart.slot, k + 1);
+}
+
+function bwkFinalize(y, m, d, startSlot, endSlot) {
+  bwkSelected = { y, m, d, startSlot, endSlot };
+  bwkRangeStart = null;
   const dateLabel = `${m + 1}月${d}日 周${BWK_WEEKDAYS[(new Date(y, m, d).getDay() + 6) % 7]}`;
+  const label = `${bwkFormatSlot(startSlot)}-${bwkFormatSlot(endSlot)}`;
   document.getElementById('datetime').value = dateLabel;
   document.getElementById('slot').value = label;
   const selEl = document.getElementById('bwkSelectedLabel');
   selEl.textContent = `已选：${dateLabel} ${label}`;
   selEl.classList.add('picked');
-  document.querySelectorAll('.bwk-cell.open').forEach(c => {
-    c.classList.toggle('selected', c === cell);
-  });
+  bwkPaintGrid();
 }
 
 function resetBwkPicker() {
   bwkSelected = null;
+  bwkRangeStart = null;
   bwkAnchor = bwkMonday(new Date());
   document.getElementById('datetime').value = '';
   document.getElementById('slot').value = '';
