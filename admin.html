@@ -661,6 +661,15 @@
     outline: 2px dashed #6b6b6b; outline-offset: -2px;
   }
   .cal-month-cell.close-will-open { outline: 2px dashed var(--gold); outline-offset: -2px; }
+  /* 格子中间的"关闭"/"开放"字样，跟外面虚线框颜色对应（灰=待关闭、金=待开放），
+     点了要变成哪个状态一眼就看清楚 */
+  .cal-month-close-pending-label {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 13px; font-weight: 700; opacity: 0.85; pointer-events: none; z-index: 4;
+    white-space: nowrap;
+  }
+  .close-will-close .cal-month-close-pending-label { color: #6b6b6b; }
+  .close-will-open .cal-month-close-pending-label { color: var(--gold); }
   .cal-event-chip {
     font-size: 11px; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
@@ -826,6 +835,7 @@
       font-size: 8px; padding: 0 2px; border-width: 1px; letter-spacing: 0;
       top: 2px; right: 2px; transform: rotate(-8deg);
     }
+    .cal-month-close-pending-label { font-size: 11px; }
     .cal-week-timecol { width: 44px; }
     /* 窄屏放不下"星期一"这种 3 字，缩小字号避免换行挤破格子 */
     .cal-month-weekdays span { font-size: 11px; }
@@ -3569,13 +3579,18 @@ function renderCalMonth(events) {
     const closeStamp = isFullyClosed ? `<div class="cal-month-close-stamp">已关闭</div>` : '';
     const lunarInfo = getLunarLabel(cellDate);
     // 关闭时段编辑模式下，只标"这次编辑会话动过、状态跟数据库不一样"的日子——已经存过的关闭状态
-    // 交给上面的红色印章自己显示，这里不重复画
+    // 交给上面的红色印章自己显示，这里不重复画。格子中间加"关闭"/"开放"字样，
+    // 点了要变成哪个状态一眼就看清楚，不用光靠虚线框颜色猜
     let closePendingCls = '';
+    let closePendingLabel = '';
     if (calCloseMode) {
       const dateKeyC = `${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`;
       const original = calCloseIsDayFullyClosed(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate()) ? 'closed' : 'open';
       const pendingVal = closeMonthPending.get(dateKeyC);
-      if (pendingVal && pendingVal !== original) closePendingCls = pendingVal === 'closed' ? ' close-will-close' : ' close-will-open';
+      if (pendingVal && pendingVal !== original) {
+        closePendingCls = pendingVal === 'closed' ? ' close-will-close' : ' close-will-open';
+        closePendingLabel = `<div class="cal-month-close-pending-label">${pendingVal === 'closed' ? '关闭' : '开放'}</div>`;
+      }
     }
     cellsHtml += `
       <div class="cal-month-cell${otherMonth ? ' other-month' : ''}${isToday ? ' today' : ''}${closePendingCls}"
@@ -3585,7 +3600,7 @@ function renderCalMonth(events) {
         ontouchstart="calMonthCellDown(event,${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
         <div class="cal-month-daynum">${cellD}</div>
         <div class="cal-month-lunar${lunarInfo.special ? ' special' : ''}">${lunarInfo.text}</div>
-        ${chips}${more}${closeStamp}
+        ${chips}${more}${closeStamp}${closePendingLabel}
       </div>`;
   }
   document.getElementById('calBody').innerHTML = `
