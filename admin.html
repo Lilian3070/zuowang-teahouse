@@ -630,18 +630,18 @@
     padding: 6px; cursor: pointer; transition: background .15s; position: relative; overflow: hidden;
     touch-action: pan-y; user-select: none;
   }
-  /* 整天关闭盖一个红色印章，透明底、压一点旋转角度，直接盖在左上角的日期数字上——
-     数字本身黑色加粗，压在上面也不会被印章的红色边框/文字挡到看不清，比盖在格子
-     正中间（容易叠住其他行程条的文字）更看得清楚。
-     跟"琴课"这种正常行程的列表条区分开，不会看着像备忘录里的一条。
+  /* 整天关闭盖一个红色印章，透明底、压一点旋转角度，贴右上角放——日期数字在左上角，
+     印章靠右留出数字的空间，不会整个盖住数字，跟"琴课"这种正常行程的列表条也区分开，
+     不会看着像备忘录里的一条。
      格子本身很小（尤其手机上一格没多宽），印章必须做得够小才能框在格子里，
      不然文字+边框+旋转的投影宽度会比格子还宽，溢出去盖住旁边的日子——
-     字号、内边距、旋转角度都要跟着格子尺寸走，见下面手机端 @media 里进一步缩小 */
+     字号、内边距、旋转角度都要跟着格子尺寸走，见下面 @media 里手机上进一步缩小，
+     屏幕更窄的机型还有一级更小的尺寸 */
   .cal-month-close-stamp {
-    position: absolute; top: 4px; left: 4px; transform: rotate(-10deg); transform-origin: top left;
+    position: absolute; top: 4px; right: 3px; transform: rotate(-10deg); transform-origin: top right;
     border: 1.5px solid var(--red); color: var(--red); font-weight: 700; font-size: 10px;
     padding: 1px 4px; border-radius: 2px; opacity: 0.85; pointer-events: none;
-    letter-spacing: 0.5px; white-space: nowrap; z-index: 3; background: none; max-width: 90%;
+    letter-spacing: 0.5px; white-space: nowrap; z-index: 3; background: none; max-width: 78%;
   }
   .cal-month-grid { border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
   .cal-month-cell:hover { background: var(--bg); }
@@ -814,7 +814,7 @@
     .cal-month-cell { min-height: 64px; padding: 4px; }
     .cal-month-close-stamp {
       font-size: 8px; padding: 0 2px; border-width: 1px; letter-spacing: 0;
-      top: 2px; left: 2px; transform: rotate(-8deg);
+      top: 2px; right: 2px; transform: rotate(-8deg);
     }
     .cal-week-timecol { width: 44px; }
     /* 窄屏放不下"星期一"这种 3 字，缩小字号避免换行挤破格子 */
@@ -842,6 +842,12 @@
 
     /* 已排的行程字很容易在窄栏里被挤成竖排还切一半，居中显示能看得清楚一点 */
     .cal-week-event { font-size: 10px; padding: 2px 3px; line-height: 1.25; }
+  }
+
+  /* 屏幕比一般手机还窄（老款小屏机型），月视图一格更小，关闭印章跟着再缩一号，
+     不然还是会显得比格子挤 */
+  @media (max-width: 400px) {
+    .cal-month-close-stamp { font-size: 7px; padding: 0 1px; letter-spacing: 0; }
   }
 
   /* 分类管理面板 */
