@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 茶 · 器 · 琴</title>
-<link rel="stylesheet" href="styles.css?v=26">
+<link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
 
@@ -154,30 +154,24 @@
 
 <div class="brand-modal" id="bookingModal" aria-hidden="true">
   <div class="brand-modal-overlay" id="bookingModalOverlay"></div>
-  <div class="brand-modal-panel account-modal-panel" role="dialog" aria-modal="true">
+  <div class="brand-modal-panel booking-modal-panel" role="dialog" aria-modal="true">
     <button class="modal-close" id="bookingModalClose" type="button" aria-label="关闭">✕</button>
-    <h3 style="margin:0 0 20px">雅室预约</h3>
-    <form class="booking-form real-booking-form" id="realBookingForm" onsubmit="return submitBookingRequest(event)">
-      <label for="bpDateDisplay">期望到访日期</label>
-      <div class="bp-date-picker" id="bpDatePicker">
-        <button type="button" class="bp-date-display placeholder" id="bpDateDisplay" onclick="toggleBpDatePanel(event)">请选择日期</button>
-        <input type="hidden" id="datetime" name="datetime">
-        <div class="bp-date-panel" id="bpDatePanel">
-          <div class="bp-date-header">
-            <button type="button" onclick="event.stopPropagation();bpShiftMonth(-1)">‹</button>
-            <span id="bpCalTitle"></span>
-            <button type="button" onclick="event.stopPropagation();bpShiftMonth(1)">›</button>
-          </div>
-          <div class="bp-date-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-          <div class="bp-date-days" id="bpCalDays"></div>
-        </div>
-      </div>
+    <h3 style="margin:0 0 16px">雅室预约</h3>
 
-      <label for="slot">期望时段</label>
-      <select id="slot" name="slot" disabled>
-        <option value="">请先选择日期</option>
-      </select>
-      <p style="font-size:0.8rem;color:var(--ink-soft);margin:6px 0 0">时段选项按茶室当前实际空档实时列出；更具体的到访时间可在下方备注里说明，掌柜会与您确认</p>
+    <label style="display:block;font-size:0.85rem;color:var(--ink-soft);margin:0 0 6px">选择到访时段</label>
+    <div class="bwk-picker" id="bwkPicker">
+      <div class="bwk-nav">
+        <button type="button" id="bwkPrevBtn" onclick="bwkShiftWeek(-1)">‹</button>
+        <span id="bwkRangeLabel"></span>
+        <button type="button" onclick="bwkShiftWeek(1)">›</button>
+      </div>
+      <div class="bwk-grid" id="bwkGrid"></div>
+    </div>
+    <p id="bwkSelectedLabel" class="bwk-selected-label">尚未选择时段</p>
+
+    <form class="booking-form real-booking-form" id="realBookingForm" onsubmit="return submitBookingRequest(event)">
+      <input type="hidden" id="datetime" name="datetime">
+      <input type="hidden" id="slot" name="slot">
 
       <label for="note">备注</label>
       <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
@@ -366,6 +360,6 @@
 </div>
 
 <script src="assets/vendor/supabase-js@2.112.4.min.js"></script>
-<script src="script.js?v=24"></script>
+<script src="script.js?v=25"></script>
 </body>
 </html>

@@ -61,6 +61,8 @@ function openBookingModal() {
   const modal = document.getElementById('bookingModal');
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
+  bwkAnchor = bwkMonday(new Date());
+  renderBwkWeek();
 }
 
 function closeBookingModal() {
@@ -74,150 +76,139 @@ async function submitBookingRequest(event) {
   const statusEl = document.getElementById('bookingFormStatus');
   if (!currentMemberId) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先登录会员账号'; return false; }
   const datetime = document.getElementById('datetime').value.trim();
-  if (!datetime) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请选择期望到访日期'; return false; }
   const slot = document.getElementById('slot').value;
-  if (!slot) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请选择期望时段'; return false; }
+  if (!datetime || !slot) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先在上方选择到访时段'; return false; }
   const note = document.getElementById('note').value.trim();
   const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note });
   if (error) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '提交失败：' + error.message; return false; }
   statusEl.style.color = '#cfe0b8';
   statusEl.textContent = '已收到您的预约申请，我们会尽快与您确认。';
   document.getElementById('realBookingForm').reset();
-  resetBpDatePicker();
+  resetBwkPicker();
   return false;
 }
 
-// 首页预约表单"期望到访日期"，站内自制的日历选择器（不用原生 <input type="date">），
-// 只选日期不选时间——具体几点由掌柜人工跟客人确认，见备注提示
-let bpAnchor = new Date();
-let bpSelectedDate = null;
-const BP_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
-function bpMondayIndex(d) { return (d.getDay() + 6) % 7; }
+// 首页预约表单选时段：简化版"周表"，跟后台周视图一个道理（一排七天），但只给客人看
+// "这天还有哪几段真的空着"——具体行程、关闭标记这些后台细节都不显示，点一个空档
+// 直接选定"哪天+几点到几点"，不用先选日期、再单独选时段两步分开来
+let bwkAnchor = bwkMonday(new Date()); // 当前显示这一周的周一
+let bwkSelected = null; // { y, m, d, label }
+const BWK_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
-function toggleBpDatePanel(event) {
-  event.stopPropagation();
-  const panel = document.getElementById('bpDatePanel');
-  const btn = document.getElementById('bpDateDisplay');
-  const opening = !panel.classList.contains('open');
-  panel.classList.toggle('open', opening);
-  btn.classList.toggle('open', opening);
-  if (opening) { bpAnchor = bpSelectedDate || new Date(); renderBpCalendar(); }
+function bwkMonday(d) {
+  const monday = new Date(d);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  return monday;
 }
 
-function bpShiftMonth(dir) {
-  bpAnchor = new Date(bpAnchor.getFullYear(), bpAnchor.getMonth() + dir, 1);
-  renderBpCalendar();
-}
-
-function renderBpCalendar() {
-  const y = bpAnchor.getFullYear(), m = bpAnchor.getMonth();
-  document.getElementById('bpCalTitle').textContent = `${y}年${m + 1}月`;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const firstDay = new Date(y, m, 1);
-  const startOffset = bpMondayIndex(firstDay);
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-  let html = '';
-  for (let i = 0; i < startOffset; i++) html += `<button type="button" class="other-month" disabled></button>`;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateObj = new Date(y, m, d);
-    const isPast = dateObj < today;
-    const isToday = dateObj.getTime() === today.getTime();
-    const isSelected = bpSelectedDate && dateObj.getTime() === bpSelectedDate.getTime();
-    html += `<button type="button" class="${isToday ? 'today ' : ''}${isSelected ? 'selected ' : ''}"${isPast ? ' disabled' : ''} onclick="event.stopPropagation();bpPickDate(${y},${m},${d})">${d}</button>`;
-  }
-  document.getElementById('bpCalDays').innerHTML = html;
-}
-
-function bpPickDate(y, m, d) {
-  bpSelectedDate = new Date(y, m, d);
-  const label = `${m + 1}月${d}日 周${BP_WEEKDAYS[bpMondayIndex(bpSelectedDate)]}`;
-  document.getElementById('datetime').value = label;
-  const displayBtn = document.getElementById('bpDateDisplay');
-  displayBtn.textContent = label;
-  displayBtn.classList.remove('placeholder');
-  closeBpDatePanel();
-  loadTeaAvailability(bpSelectedDate);
-}
-
-function closeBpDatePanel() {
-  document.getElementById('bpDatePanel').classList.remove('open');
-  document.getElementById('bpDateDisplay').classList.remove('open');
-}
-
-// 选完日期后，"期望时段"下拉不再是固定的"上午/下午/晚上"三个死选项，改成实时查
-// schedule_events 里茶室（resource: tea/both）这天真正还空着的区间，只列出真的能约的时段——
-// 跟主理人的行程/关闭状态对不上的时段客人根本选不到，不用等提交了才被回绝。
-// 营业时段固定 8:30-23:30、半小时为单位，跟 admin.html 后台日历默认显示的时间轴一致。
-const BOOKING_BUSINESS_START_SLOT = 17; // 8:30 = 8.5*2
+// 营业时间是 9:30-23:30——跟后台日历默认显示窗口的 8:30 不是一回事，那只是后台自己
+// 看行程时习惯往前多留半小时方便看，不代表真的 8:30 就开门营业
+const BOOKING_BUSINESS_START_SLOT = 19; // 9:30 = 9.5*2
 const BOOKING_BUSINESS_END_SLOT = 47;   // 23:30 = 23.5*2
-function bpFormatSlot(slotIdx) {
+function bwkFormatSlot(slotIdx) {
   return `${String(Math.floor(slotIdx / 2)).padStart(2, '0')}:${slotIdx % 2 ? '30' : '00'}`;
 }
 
-async function loadTeaAvailability(dateObj) {
-  const select = document.getElementById('slot');
-  select.disabled = true;
-  select.innerHTML = '<option value="">查询空档中…</option>';
+function bwkShiftWeek(dir) {
+  const next = new Date(bwkAnchor);
+  next.setDate(next.getDate() + dir * 7);
+  if (next < bwkMonday(new Date())) return; // 不能翻到已经完全过去的那一周
+  bwkAnchor = next;
+  renderBwkWeek();
+}
 
-  const dayStart = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
-  const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+async function renderBwkWeek() {
+  const grid = document.getElementById('bwkGrid');
+  const todayMonday = bwkMonday(new Date());
+  document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayMonday.getTime();
+
+  const weekEnd = new Date(bwkAnchor); weekEnd.setDate(weekEnd.getDate() + 7);
+  const lastDay = new Date(weekEnd); lastDay.setDate(lastDay.getDate() - 1);
+  document.getElementById('bwkRangeLabel').textContent =
+    `${bwkAnchor.getMonth() + 1}月${bwkAnchor.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
+
+  grid.innerHTML = '<div class="bwk-loading">查询空档中…</div>';
   const { data, error } = await db.rpc('get_tea_busy_ranges', {
-    p_start: dayStart.toISOString(), p_end: dayEnd.toISOString(),
+    p_start: bwkAnchor.toISOString(), p_end: weekEnd.toISOString(),
   });
-
   if (error) {
-    // 查询失败（比如网络抖动）不把人卡死在这一步，退回到手动说明时段，掌柜人工确认时兜底
-    select.disabled = false;
-    select.innerHTML = '<option value="时段查询失败，请在备注说明期望时间">时段查询失败，可在备注说明期望时间</option>';
+    grid.innerHTML = '<div class="bwk-loading">查询失败，请稍后重试，或直接在备注里说明期望时间</div>';
     return;
   }
 
-  const busy = new Array(48).fill(false);
-  (data || []).forEach(r => {
-    const s = new Date(r.start_at), e = new Date(r.end_at);
-    const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
-    const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
-    for (let i = Math.max(0, sSlot); i < Math.min(48, eSlot); i++) busy[i] = true;
-  });
-
-  // 选的是今天的话，已经过去的时间也不能再约，一并标成"忙"
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = new Date();
-  if (calSameLocalDay(dateObj, now)) {
-    const nowSlot = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30);
-    for (let i = 0; i < Math.min(48, nowSlot); i++) busy[i] = true;
-  }
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
+    const isPast = day < today;
+    const isToday = day.getTime() === today.getTime();
+    const dayStart = day, dayEnd = new Date(day); dayEnd.setDate(dayEnd.getDate() + 1);
 
-  const runs = [];
-  let runStart = null;
-  for (let i = BOOKING_BUSINESS_START_SLOT; i <= BOOKING_BUSINESS_END_SLOT; i++) {
-    const open = i < BOOKING_BUSINESS_END_SLOT && !busy[i];
-    if (open && runStart === null) runStart = i;
-    else if (!open && runStart !== null) { runs.push([runStart, i]); runStart = null; }
-  }
+    let chipsHtml;
+    if (isPast) {
+      chipsHtml = '<div class="bwk-day-empty">已过去</div>';
+    } else {
+      const busy = new Array(48).fill(false);
+      (data || []).forEach(r => {
+        const s = new Date(r.start_at), e = new Date(r.end_at);
+        const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
+        const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
+        for (let k = Math.max(0, sSlot); k < Math.min(48, eSlot); k++) busy[k] = true;
+      });
+      if (isToday) {
+        const nowSlot = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30);
+        for (let k = 0; k < Math.min(48, nowSlot); k++) busy[k] = true;
+      }
+      const runs = [];
+      let runStart = null;
+      for (let k = BOOKING_BUSINESS_START_SLOT; k <= BOOKING_BUSINESS_END_SLOT; k++) {
+        const open = k < BOOKING_BUSINESS_END_SLOT && !busy[k];
+        if (open && runStart === null) runStart = k;
+        else if (!open && runStart !== null) { runs.push([runStart, k]); runStart = null; }
+      }
+      chipsHtml = runs.length === 0
+        ? '<div class="bwk-day-empty">约满</div>'
+        : runs.map(([s0, s1]) => {
+            const label = `${bwkFormatSlot(s0)}-${bwkFormatSlot(s1)}`;
+            const isSel = bwkSelected && bwkSelected.y === day.getFullYear() && bwkSelected.m === day.getMonth() && bwkSelected.d === day.getDate() && bwkSelected.label === label;
+            return `<button type="button" class="bwk-chip${isSel ? ' selected' : ''}" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" data-label="${label}" onclick="bwkSelectChip(this)">${label}</button>`;
+          }).join('');
+    }
 
-  if (runs.length === 0) {
-    select.disabled = true;
-    select.innerHTML = '<option value="">这天空档已经约满，换个日期试试</option>';
-    return;
+    html += `
+      <div class="bwk-day${isToday ? ' today' : ''}${isPast ? ' past' : ''}">
+        <div class="bwk-day-head"><span>${BWK_WEEKDAYS[i]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b></div>
+        <div class="bwk-day-chips">${chipsHtml}</div>
+      </div>`;
   }
-  select.disabled = false;
-  select.innerHTML = '<option value="">请选择时段</option>' +
-    runs.map(([s0, s1]) => { const label = `${bpFormatSlot(s0)}-${bpFormatSlot(s1)}`; return `<option value="${label}">${label}</option>`; }).join('');
+  grid.innerHTML = html;
 }
 
-function calSameLocalDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+function bwkSelectChip(btn) {
+  const y = Number(btn.dataset.y), m = Number(btn.dataset.m), d = Number(btn.dataset.d), label = btn.dataset.label;
+  bwkSelected = { y, m, d, label };
+  const dateLabel = `${m + 1}月${d}日 周${BWK_WEEKDAYS[(new Date(y, m, d).getDay() + 6) % 7]}`;
+  document.getElementById('datetime').value = dateLabel;
+  document.getElementById('slot').value = label;
+  const selEl = document.getElementById('bwkSelectedLabel');
+  selEl.textContent = `已选：${dateLabel} ${label}`;
+  selEl.classList.add('picked');
+  document.querySelectorAll('.bwk-chip').forEach(chip => {
+    chip.classList.toggle('selected', chip === btn);
+  });
 }
 
-function resetBpDatePicker() {
-  bpSelectedDate = null;
-  const displayBtn = document.getElementById('bpDateDisplay');
-  displayBtn.textContent = '请选择日期';
-  displayBtn.classList.add('placeholder');
-  closeBpDatePanel();
-  const select = document.getElementById('slot');
-  select.disabled = true;
-  select.innerHTML = '<option value="">请先选择日期</option>';
+function resetBwkPicker() {
+  bwkSelected = null;
+  bwkAnchor = bwkMonday(new Date());
+  document.getElementById('datetime').value = '';
+  document.getElementById('slot').value = '';
+  const selEl = document.getElementById('bwkSelectedLabel');
+  selEl.textContent = '尚未选择时段';
+  selEl.classList.remove('picked');
+  renderBwkWeek();
 }
 
 function onNavAccountClick(event) {
@@ -385,9 +376,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('bookingModalClose').addEventListener('click', closeBookingModal);
   document.getElementById('bookingModalOverlay').addEventListener('click', closeBookingModal);
   ['acctLoginPassword', 'regPassword', 'regPasswordConfirm', 'forgotPassword', 'forgotPasswordConfirm'].forEach(addPasswordToggle);
-  document.addEventListener('click', e => {
-    if (!e.target.closest('#bpDatePicker')) closeBpDatePanel();
-  });
 });
 
 document.addEventListener('DOMContentLoaded', () => {

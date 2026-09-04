@@ -573,48 +573,47 @@ section {
 
 .booking-form textarea { resize: vertical; min-height: 70px; }
 
-/* 首页预约表单"期望到访日期"，站内自制日历选择器，不用原生 <input type="date">
-   （原生控件英文/系统默认样式，跟这块暗色卡片视觉不搭），跟后台日历同一个思路、
-   但视觉配色照这个表单本身的暗色卡片来，不是照搬后台 admin.html 那套 */
-.bp-date-picker { position: relative; }
-/* 这个选择器原来是配"已是知音"卡片的深色底设计的（浅色文字），现在这张卡片只剩一个
-   按钮，选择器搬进了浅色的预约弹窗里，浅色文字配浅色弹窗底几乎看不见（选完日期文字
-   "消失"），改成跟弹窗里其他输入框（.booking-form input 那一套）一样的浅底深字 */
-.bp-date-display {
-  display: block; width: 100%; text-align: left; padding: 10px 12px;
-  border: 1px solid rgba(43, 40, 34, 0.35); border-radius: 4px;
-  background: #fff; font-family: inherit; font-size: 0.95rem;
-  color: var(--ink); cursor: pointer;
+/* 首页预约表单选时段：简化版"周表"，跟后台周视图一个道理（一排七天），但客人只看得到
+   "这天还有哪几段真的空着"——具体行程、关闭标记、资源分栏这些后台细节全部不显示，
+   点一个空档格子就直接选定"哪天+几点到几点"，不用先选日期再单独选时段两步分开来 */
+.booking-modal-panel { max-width: 640px; }
+.bwk-picker {
+  border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--paper-deep);
 }
-.bp-date-display:hover, .bp-date-display.open { border-color: var(--seal); }
-.bp-date-display.placeholder { color: #9c9484; }
-.bp-date-panel {
-  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
-  background: var(--tea-deep); border: 1px solid rgba(246, 241, 231, 0.25); border-radius: 6px;
-  padding: 12px; width: 260px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+.bwk-nav {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font-size: 0.85rem; font-weight: 600; color: var(--ink);
 }
-.bp-date-panel.open { display: block; }
-.bp-date-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.bp-date-header button {
-  background: none; border: none; color: var(--paper); font-size: 18px; cursor: pointer;
-  padding: 2px 10px; border-radius: 4px;
+.bwk-nav span {
+  flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.bp-date-header button:hover { background: rgba(246, 241, 231, 0.12); }
-.bp-date-header span { font-size: 0.9rem; color: var(--paper); font-weight: 600; }
-.bp-date-weekdays {
-  display: grid; grid-template-columns: repeat(7, 1fr); text-align: center;
-  font-size: 0.75rem; color: #b6a988; margin-bottom: 4px;
+.bwk-nav button {
+  flex-shrink: 0; background: none; border: 1px solid var(--line); color: var(--ink-soft); font-size: 16px;
+  cursor: pointer; padding: 2px 10px; border-radius: 4px;
 }
-.bp-date-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.bp-date-days button {
-  aspect-ratio: 1; border: none; background: none; color: var(--paper);
-  font-size: 0.85rem; border-radius: 4px; cursor: pointer;
+.bwk-nav button:hover:not(:disabled) { border-color: var(--seal); color: var(--seal); }
+.bwk-nav button:disabled { opacity: 0.35; cursor: default; }
+.bwk-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.bwk-day { flex: 0 0 96px; display: flex; flex-direction: column; gap: 6px; }
+.bwk-day-head {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  font-size: 0.75rem; color: var(--ink-soft); padding-bottom: 6px; border-bottom: 1px solid var(--line);
 }
-.bp-date-days button:hover:not(:disabled) { background: rgba(246, 241, 231, 0.14); }
-.bp-date-days button:disabled { color: rgba(246, 241, 231, 0.25); cursor: default; }
-.bp-date-days button.today { font-weight: 700; color: var(--seal); background: rgba(163, 49, 42, 0.18); }
-.bp-date-days button.selected { background: var(--seal); color: #fff; }
-.bp-date-days button.other-month { visibility: hidden; }
+.bwk-day-head b { font-size: 0.85rem; color: var(--ink); }
+.bwk-day.today .bwk-day-head b { color: var(--seal); }
+.bwk-day.past { opacity: 0.5; }
+.bwk-day-chips { display: flex; flex-direction: column; gap: 5px; }
+.bwk-chip {
+  font-family: inherit; font-size: 0.78rem; padding: 6px 4px; border-radius: 4px;
+  border: 1px solid var(--seal); background: rgba(163, 49, 42, 0.07); color: var(--seal);
+  cursor: pointer; text-align: center; white-space: nowrap;
+}
+.bwk-chip:hover { background: rgba(163, 49, 42, 0.16); }
+.bwk-chip.selected { background: var(--seal); color: #fff; }
+.bwk-day-empty { font-size: 0.78rem; color: var(--ink-soft); opacity: 0.7; text-align: center; padding-top: 8px; }
+.bwk-loading { flex: 1; text-align: center; font-size: 0.85rem; color: var(--ink-soft); padding: 20px 0; }
+.bwk-selected-label { font-size: 0.85rem; color: var(--ink-soft); margin: 10px 0 16px; }
+.bwk-selected-label.picked { color: var(--seal); font-weight: 600; }
 
 .submit-btn {
   margin-top: 22px;
