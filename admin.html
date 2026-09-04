@@ -3714,9 +3714,12 @@ function renderCalWeek(events) {
     // 平时不在编辑模式，画关闭时段用的数据源改成跟编辑模式一样的"合并后的生效区间"
     // （calCloseWeekEffectiveRuns），不再直接按数据库里每一条 is_closed 记录各自的
     // start/end 单独画——如果关闭记录实际是分成好几条相邻的短记录存的，各画各的会漏掉
-    // 拼接处、显示出来比实际关闭时间短一截，跟编辑模式里看到的对不上
+    // 拼接处、显示出来比实际关闭时间短一截，跟编辑模式里看到的对不上。
+    // 整天关闭的日子也要画这圈红色虚线框（贯穿整个可见时间轴），不再只靠表头那个小印章——
+    // 表头印章负责"一眼扫过去知道这天关了"，时间轴上的虚线框负责"每个格子本身也看得出关了"，
+    // 两个不冲突，一起显示
     let closedEventsHtml = '';
-    if (!calCloseMode && !isFullyClosed) {
+    if (!calCloseMode) {
       ['guqin', 'tea'].forEach(resource => {
         calCloseWeekEffectiveRuns(day.getFullYear(), day.getMonth(), day.getDate(), resource).forEach(([s0, s1]) => {
           const startH = s0 * 0.5, endH = s1 * 0.5;
