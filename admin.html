@@ -627,16 +627,19 @@
   .cal-month-weekdays span { text-align: center; font-size: 15px; font-weight: 700; color: var(--ink-muted); padding: 6px 0; }
   .cal-month-cell {
     min-height: 92px; border: 1px solid var(--border); border-top: none; border-left: none;
-    padding: 6px; cursor: pointer; transition: background .15s; position: relative;
+    padding: 6px; cursor: pointer; transition: background .15s; position: relative; overflow: hidden;
     touch-action: pan-y; user-select: none;
   }
   /* 整天关闭盖一个红色印章，透明底、压一点旋转角度，叠在日期数字/行程条上面，
-     跟"琴课"这种正常行程的列表条区分开，不会看着像备忘录里的一条 */
+     跟"琴课"这种正常行程的列表条区分开，不会看着像备忘录里的一条。
+     格子本身很小（尤其手机上一格没多宽），印章必须做得够小才能框在格子里，
+     不然文字+边框+旋转的投影宽度会比格子还宽，溢出去盖住旁边的日子——
+     字号、内边距、旋转角度都要跟着格子尺寸走，见下面手机端 @media 里进一步缩小 */
   .cal-month-close-stamp {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-14deg);
-    border: 2px solid var(--red); color: var(--red); font-weight: 700; font-size: 13px;
-    padding: 2px 7px; border-radius: 3px; opacity: 0.8; pointer-events: none;
-    letter-spacing: 3px; white-space: nowrap; z-index: 3; background: none;
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-10deg);
+    border: 1.5px solid var(--red); color: var(--red); font-weight: 700; font-size: 10px;
+    padding: 1px 4px; border-radius: 2px; opacity: 0.8; pointer-events: none;
+    letter-spacing: 0.5px; white-space: nowrap; z-index: 3; background: none; max-width: 90%;
   }
   .cal-month-grid { border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
   .cal-month-cell:hover { background: var(--bg); }
@@ -807,6 +810,9 @@
     .cal-toolbar-right { justify-content: center; }
     .cal-year-grid { grid-template-columns: repeat(2, 1fr); }
     .cal-month-cell { min-height: 64px; padding: 4px; }
+    .cal-month-close-stamp {
+      font-size: 8px; padding: 0 2px; border-width: 1px; letter-spacing: 0; transform: translate(-50%, -50%) rotate(-8deg);
+    }
     .cal-week-timecol { width: 44px; }
     /* 窄屏放不下"星期一"这种 3 字，缩小字号避免换行挤破格子 */
     .cal-month-weekdays span { font-size: 11px; }
