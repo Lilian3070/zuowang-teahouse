@@ -118,8 +118,11 @@ function bwkShiftWeek(dir) {
   renderBwkWeek();
 }
 
+// 表格结构照抄后台 admin.html 周视图：左边一列时间轴，右边每天一列，格子按半小时切——
+// 跟后台唯一的区别是内容做了阉割（看不到备忘录/行程标题，格子只剩"能点"/"不能点"两种状态），
+// 骨架和交互逻辑（点格子选时间）是同一套，不是另外发明一套下拉/列表
 async function renderBwkWeek() {
-  const grid = document.getElementById('bwkGrid');
+  const wrap = document.getElementById('bwkGrid');
   const todayMonday = bwkMonday(new Date());
   document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayMonday.getTime();
 
@@ -128,24 +131,29 @@ async function renderBwkWeek() {
   document.getElementById('bwkRangeLabel').textContent =
     `${bwkAnchor.getMonth() + 1}月${bwkAnchor.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
 
-  grid.innerHTML = '<div class="bwk-loading">查询空档中…</div>';
+  wrap.innerHTML = '<div class="bwk-loading">查询空档中…</div>';
   const { data, error } = await db.rpc('get_tea_busy_ranges', {
     p_start: bwkAnchor.toISOString(), p_end: weekEnd.toISOString(),
   });
   if (error) {
-    grid.innerHTML = '<div class="bwk-loading">查询失败，请稍后重试，或直接在备注里说明期望时间</div>';
+    wrap.innerHTML = '<div class="bwk-loading">查询失败，请稍后重试，或直接在备注里说明期望时间</div>';
     return;
   }
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = new Date();
-  let html = '';
+
+  // 已经过去的日子这一列直接不画，本周从"今天"开始；先把要画的每一天、和这一天
+  // 每半小时格是忙是闲，都算好，再统一拼表格（时间轴要按行、天要按列，不能像之前
+  // 列表那样一天算完就直接输出）
+  const days = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
-    if (day < today) continue; // 已经过去的日子直接不显示这一栏，不占位、不用画"已过去"
-    const isToday = day.getTime() === today.getTime();
-    const dayStart = day, dayEnd = new Date(day); dayEnd.setDate(dayEnd.getDate() + 1);
-
+    if (day < today) continue;
+    days.push({ date: day, weekday: BWK_WEEKDAYS[i], isToday: day.getTime() === today.getTime() });
+  }
+  days.forEach(d => {
+    const dayStart = d.date, dayEnd = new Date(d.date); dayEnd.setDate(dayEnd.getDate() + 1);
     const busy = new Array(48).fill(false);
     (data || []).forEach(r => {
       const s = new Date(r.start_at), e = new Date(r.end_at);
@@ -153,37 +161,37 @@ async function renderBwkWeek() {
       const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
       for (let k = Math.max(0, sSlot); k < Math.min(48, eSlot); k++) busy[k] = true;
     });
-    if (isToday) {
+    if (d.isToday) {
       const nowSlot = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30);
       for (let k = 0; k < Math.min(48, nowSlot); k++) busy[k] = true;
     }
+    d.busy = busy;
+  });
 
-    // 不再把连续空档合并成一大段（合并成一段的话点一下就等于把整段几小时都占了，
-    // 客人一般只是想订某个时间点开始，不是订到打烊）——跟后台周表一样按半小时
-    // 一格一格列出来，客人自己点具体从几点开始
-    const openSlots = [];
-    for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
-      if (!busy[k]) openSlots.push(k);
-    }
-    const chipsHtml = openSlots.length === 0
-      ? '<div class="bwk-day-empty">约满</div>'
-      : openSlots.map(k => {
-          const label = bwkFormatSlot(k);
-          const isSel = bwkSelected && bwkSelected.y === day.getFullYear() && bwkSelected.m === day.getMonth() && bwkSelected.d === day.getDate() && bwkSelected.label === label;
-          return `<button type="button" class="bwk-chip${isSel ? ' selected' : ''}" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" data-label="${label}" onclick="bwkSelectChip(this)">${label}</button>`;
-        }).join('');
+  let headHtml = '<div class="bwk-corner"></div>' + days.map(d =>
+    `<div class="bwk-col-head${d.isToday ? ' today' : ''}"><span>${d.weekday}</span><b>${d.date.getMonth() + 1}/${d.date.getDate()}</b></div>`
+  ).join('');
 
-    html += `
-      <div class="bwk-day${isToday ? ' today' : ''}">
-        <div class="bwk-day-head"><span>${BWK_WEEKDAYS[i]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b></div>
-        <div class="bwk-day-chips">${chipsHtml}</div>
-      </div>`;
+  let rowsHtml = '';
+  for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
+    const isHour = k % 2 === 0;
+    rowsHtml += `<div class="bwk-time-label${isHour ? ' hour' : ''}">${isHour ? bwkFormatSlot(k) : ''}</div>`;
+    days.forEach(d => {
+      const label = bwkFormatSlot(k);
+      if (d.busy[k]) {
+        rowsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}"></div>`;
+      } else {
+        const isSel = bwkSelected && bwkSelected.y === d.date.getFullYear() && bwkSelected.m === d.date.getMonth() && bwkSelected.d === d.date.getDate() && bwkSelected.label === label;
+        rowsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}${isSel ? ' selected' : ''}" data-y="${d.date.getFullYear()}" data-m="${d.date.getMonth()}" data-d="${d.date.getDate()}" data-label="${label}" title="${label}" onclick="bwkSelectChip(this)"></div>`;
+      }
+    });
   }
-  grid.innerHTML = html;
+
+  wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table" style="grid-template-columns:44px repeat(${days.length},minmax(46px,1fr))">${headHtml}${rowsHtml}</div></div>`;
 }
 
-function bwkSelectChip(btn) {
-  const y = Number(btn.dataset.y), m = Number(btn.dataset.m), d = Number(btn.dataset.d), label = btn.dataset.label;
+function bwkSelectChip(cell) {
+  const y = Number(cell.dataset.y), m = Number(cell.dataset.m), d = Number(cell.dataset.d), label = cell.dataset.label;
   bwkSelected = { y, m, d, label };
   const dateLabel = `${m + 1}月${d}日 周${BWK_WEEKDAYS[(new Date(y, m, d).getDay() + 6) % 7]}`;
   document.getElementById('datetime').value = dateLabel;
@@ -191,8 +199,8 @@ function bwkSelectChip(btn) {
   const selEl = document.getElementById('bwkSelectedLabel');
   selEl.textContent = `已选：${dateLabel} ${label}`;
   selEl.classList.add('picked');
-  document.querySelectorAll('.bwk-chip').forEach(chip => {
-    chip.classList.toggle('selected', chip === btn);
+  document.querySelectorAll('.bwk-cell.open').forEach(c => {
+    c.classList.toggle('selected', c === cell);
   });
 }
 

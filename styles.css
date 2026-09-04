@@ -573,12 +573,13 @@ section {
 
 .booking-form textarea { resize: vertical; min-height: 70px; }
 
-/* 首页预约表单选时段：简化版"周表"，跟后台周视图一个道理（一排七天），但客人只看得到
-   "这天还有哪几段真的空着"——具体行程、关闭标记、资源分栏这些后台细节全部不显示，
-   点一个空档格子就直接选定"哪天+几点到几点"，不用先选日期再单独选时段两步分开来 */
+/* 首页预约表单选时段：照后台 admin.html 周视图的表格样子做（时间轴+按天分栏的格子表），
+   不是另外发明一套列表/下拉——客人看到的是同一种"表格"，只是内容做了阉割：看不到备忘录/
+   行程标题这些隐私细节，格子只剩"能点"（空档，点了选中）跟"不能点"（灰色，占用/关闭/已过去，
+   统一不显示原因）两种状态，营业时段之外的时间根本不画格子 */
 .booking-modal-panel { max-width: 640px; }
 .bwk-picker {
-  border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--paper-deep);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--paper-deep);
 }
 .bwk-nav {
   display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
@@ -593,29 +594,35 @@ section {
 }
 .bwk-nav button:hover:not(:disabled) { border-color: var(--seal); color: var(--seal); }
 .bwk-nav button:disabled { opacity: 0.35; cursor: default; }
-.bwk-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
-.bwk-day { flex: 0 0 108px; display: flex; flex-direction: column; gap: 6px; }
-.bwk-day-head {
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
-  font-size: 0.75rem; color: var(--ink-soft); padding-bottom: 6px; border-bottom: 1px solid var(--line);
+
+/* 整张表（时间轴 + 每天一列）放在一个能上下、左右都滚动的框里，表头行和时间轴列各自
+   position:sticky，滚动的时候始终看得到"这是星期几/几点"，跟后台周视图翻看长列表时
+   的体验是一个道理 */
+.bwk-table-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.bwk-table { display: grid; }
+.bwk-corner, .bwk-col-head {
+  position: sticky; top: 0; background: var(--paper-deep); z-index: 3;
+  padding: 5px 2px; text-align: center; font-size: 0.7rem; color: var(--ink-soft);
+  border-bottom: 1px solid var(--line);
 }
-.bwk-day-head b { font-size: 0.85rem; color: var(--ink); }
-.bwk-day.today .bwk-day-head b { color: var(--seal); }
-/* 半小时一格摆下来，一天最多能有二十几格（营业时段全空的时候），列表会很长——
-   每栏自己滚动，不撑高整个弹窗，也让每栏高度整齐好对齐 */
-.bwk-day-chips {
-  display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px;
-  max-height: 240px; overflow-y: auto; padding-right: 2px;
+.bwk-corner { left: 0; z-index: 4; }
+.bwk-col-head b { display: block; font-size: 0.78rem; color: var(--ink); }
+.bwk-col-head.today b { color: var(--seal); }
+.bwk-time-label {
+  position: sticky; left: 0; z-index: 2; background: var(--paper-deep);
+  font-size: 0.62rem; color: var(--ink-soft); text-align: right; padding: 0 5px;
+  display: flex; align-items: center; justify-content: flex-end;
+  border-right: 1px solid var(--line); border-top: 1px solid var(--line);
 }
-.bwk-chip {
-  flex: 0 0 calc(50% - 2px); font-family: inherit; font-size: 0.72rem; padding: 5px 2px;
-  border-radius: 4px; border: 1px solid var(--seal); background: rgba(163, 49, 42, 0.07);
-  color: var(--seal); cursor: pointer; text-align: center; white-space: nowrap;
-}
-.bwk-chip:hover { background: rgba(163, 49, 42, 0.16); }
-.bwk-chip.selected { background: var(--seal); color: #fff; }
-.bwk-day-empty { flex: 1 1 100%; font-size: 0.78rem; color: var(--ink-soft); opacity: 0.7; text-align: center; padding-top: 8px; }
-.bwk-loading { flex: 1; text-align: center; font-size: 0.85rem; color: var(--ink-soft); padding: 20px 0; }
+.bwk-cell { min-height: 20px; border-top: 1px dashed var(--line); border-left: 1px solid var(--line); }
+.bwk-cell.hour-start, .bwk-time-label.hour { border-top: 1px solid var(--line); }
+/* 灰=不能点（占用/关闭/已过去，客人不需要知道具体哪种），红=能点——两种颜色要一眼分得清，
+   之前透明度太低（0.07）挤在一起看着都差不多，加深到看一眼就能分出"这排能选、那排不能" */
+.bwk-cell.busy { background: rgba(43, 40, 34, 0.16); }
+.bwk-cell.open { background: rgba(163, 49, 42, 0.16); cursor: pointer; }
+.bwk-cell.open:hover { background: rgba(163, 49, 42, 0.32); }
+.bwk-cell.open.selected { background: var(--seal); }
+.bwk-loading { text-align: center; font-size: 0.85rem; color: var(--ink-soft); padding: 20px 0; }
 .bwk-selected-label { font-size: 0.85rem; color: var(--ink-soft); margin: 10px 0 16px; }
 .bwk-selected-label.picked { color: var(--seal); font-weight: 600; }
 
