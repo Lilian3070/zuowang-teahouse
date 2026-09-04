@@ -598,7 +598,7 @@ section {
 /* 整张表（时间轴 + 每天一列）放在一个能上下、左右都滚动的框里，表头行和时间轴列各自
    position:sticky，滚动的时候始终看得到"这是星期几/几点"，跟后台周视图翻看长列表时
    的体验是一个道理 */
-.bwk-table-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.bwk-table-wrap { position: relative; max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
 .bwk-table { display: grid; }
 .bwk-corner, .bwk-col-head {
   position: sticky; top: 0; background: var(--paper-deep); z-index: 3;
@@ -606,8 +606,11 @@ section {
   border-bottom: 1px solid var(--line);
 }
 .bwk-corner { left: 0; z-index: 4; }
+.bwk-col-head { white-space: nowrap; }
 .bwk-col-head b { display: block; font-size: 0.78rem; color: var(--ink); }
 .bwk-col-head.today b { color: var(--seal); }
+/* 已经过去的日子这一列还是照画（一周七天要完整），只是整列都不能点，表头也跟着淡下去 */
+.bwk-col-head.past { opacity: 0.45; }
 .bwk-time-label {
   position: sticky; left: 0; z-index: 2; background: var(--paper-deep);
   font-size: 0.62rem; color: var(--ink-soft); text-align: right; padding: 0 5px;

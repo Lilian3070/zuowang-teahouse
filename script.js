@@ -166,22 +166,23 @@ async function renderBwkWeek() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = new Date();
 
-  // 已经过去的日子这一列直接不画，本周从"今天"开始
+  // 一周七天整整齐齐都画出来（跟后台周表一样，一眼看得到完整一周），已经过去的日子
+  // 不是不显示，而是整列都算成"不能点"——跟被占用的时段一样是灰色斜纹
   const days = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
-    if (day < today) continue;
-    // 底色按"星期几"的奇偶交替（跟后台 .cal-week-daycol:nth-child(even) 一个道理），
-    // 用真实星期几算，不是用第几栏算——不然过去的日子被跳过后，颜色交替会跟着错位
-    const mondayIdx = (day.getDay() + 6) % 7;
     days.push({
-      date: day, weekday: BWK_WEEKDAYS[i], isToday: day.getTime() === today.getTime(),
-      colTint: mondayIdx % 2 === 0 ? 'var(--paper)' : 'var(--paper-deep)',
+      date: day, weekday: BWK_WEEKDAYS[i],
+      isToday: day.getTime() === today.getTime(),
+      isPast: day < today,
+      // 底色按"星期几"的奇偶交替，跟后台 .cal-week-daycol:nth-child(even) 一个道理
+      colTint: i % 2 === 0 ? 'var(--paper)' : 'var(--paper-deep)',
     });
   }
   days.forEach(d => {
     const dayStart = d.date, dayEnd = new Date(d.date); dayEnd.setDate(dayEnd.getDate() + 1);
     const busy = new Array(48).fill(false);
+    if (d.isPast) { busy.fill(true); d.busy = busy; return; } // 过去的日子整列不能点
     (data || []).forEach(r => {
       const s = new Date(r.start_at), e = new Date(r.end_at);
       const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
@@ -207,7 +208,7 @@ function bwkPaintGrid() {
   const days = bwkDaysData;
 
   const headHtml = '<div class="bwk-corner"></div>' + days.map(d =>
-    `<div class="bwk-col-head${d.isToday ? ' today' : ''}" style="--col-tint:${d.colTint}"><span>${d.weekday}</span><b>${d.date.getMonth() + 1}/${d.date.getDate()}</b></div>`
+    `<div class="bwk-col-head${d.isToday ? ' today' : ''}${d.isPast ? ' past' : ''}" style="--col-tint:${d.colTint}"><span>星期${d.weekday}</span><b>${d.date.getMonth() + 1}/${d.date.getDate()}</b></div>`
   ).join('');
 
   let rowsHtml = '';
@@ -228,7 +229,24 @@ function bwkPaintGrid() {
     });
   }
 
+  // 重画（比如点了起点要高亮）会把整块 HTML 换掉，滚动位置会跟着归零——先记下来再还原，
+  // 不然点一下格子表格就"跳"回最上面/最左边，正在挑时间的人要重新滚回去找
+  const prevWrap = wrap.querySelector('.bwk-table-wrap');
+  const keepTop = prevWrap ? prevWrap.scrollTop : null;
+  const keepLeft = prevWrap ? prevWrap.scrollLeft : null;
+
   wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table" style="grid-template-columns:46px repeat(${days.length},minmax(46px,1fr))">${headHtml}${rowsHtml}</div></div>`;
+
+  const tableWrap = wrap.querySelector('.bwk-table-wrap');
+  if (keepTop !== null) {
+    tableWrap.scrollTop = keepTop;
+    tableWrap.scrollLeft = keepLeft;
+  } else {
+    // 头一次画这一周：本周的话前面几列是已经过去的日子，默认横向滚到"今天"这一列，
+    // 免得一打开看到的全是灰掉的过去几天，还得自己往右划才找得到能约的日子
+    const firstPickable = tableWrap.querySelector('.bwk-col-head.today') || tableWrap.querySelector('.bwk-col-head:not(.past)');
+    if (firstPickable) tableWrap.scrollLeft = Math.max(0, firstPickable.offsetLeft - 46);
+  }
 }
 
 function bwkFindDay(y, m, d) {
