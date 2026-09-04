@@ -603,9 +603,10 @@
   .cal-week-event { background: rgba(168, 137, 74, 0.4); }
   .cal-week-event.res-guqin { background: rgba(155, 74, 62, 0.24); }
   .cal-week-event.res-tea { background: rgba(107, 140, 122, 0.4); }
-  /* 手动关闭的时段：跟琴/茶/和三种颜色都不一样，用斜纹灰底一眼认出"这段不是行程，是主理人关闭的"，
-     不管占用哪条资源线都盖成这个样子，优先级要压过上面 res-guqin/res-tea 的颜色规则 */
-  .cal-event-chip.closed, .cal-week-event.closed {
+  /* 手动关闭的时段：月视图列表里跟琴/茶/和三种颜色都不一样，用斜纹灰底一眼认出"这段不是行程，
+     是主理人关闭的"；周视图不再用这个卡片样式画（改用 .cal-close-overlay，见下面），这条规则
+     只剩月视图在用 */
+  .cal-event-chip.closed {
     background: repeating-linear-gradient(45deg, #e2e2e2, #e2e2e2 6px, #ececec 6px, #ececec 12px);
     color: #8a8a8a; border-left: 3px solid #a3a3a3;
   }
@@ -3201,7 +3202,7 @@ async function renderCalendar(forceRefresh = false) {
   const canCloseHere = calView === 'month' || calView === 'week';
   const rightControls = calCloseMode
     ? `<button class="btn-add-inline close-mode-cancel-btn" onclick="cancelCloseMode()">取消</button><button class="btn-add-inline close-mode-save-btn" onclick="saveCloseMode()">保存关闭设置</button>`
-    : `${canCloseHere ? `<button class="btn-add-inline close-mode-enter-btn" onclick="enterCloseMode()">关闭时段</button>` : ''}<button class="btn-add-inline" onclick="openAddEventModal(null)">+ 添加行程</button>`;
+    : `${canCloseHere ? `<button class="btn-add-inline close-mode-enter-btn" onclick="enterCloseMode()">关闭/开放时段</button>` : ''}<button class="btn-add-inline" onclick="openAddEventModal(null)">+ 添加行程</button>`;
   el.innerHTML = `
     <div class="cal-toolbar">
       <div class="cal-toolbar-left">
@@ -3665,17 +3666,31 @@ function renderCalWeek(events) {
     // 时间轴上留白干净，"关闭"这件事直接在表头上一眼看到
     const isFullyClosed = calCloseIsDayFullyClosed(day.getFullYear(), day.getMonth(), day.getDate());
     // 编辑模式下，关闭状态全部交给下面新算的虚线块统一处理（不管整天还是部分时段关闭）；
-    // 平时不在编辑模式，只有整天关闭才不重复画事件条（交给表头印章），部分关闭还是照常显示
-    const dayEvents = weekEvents.filter(e => (calSameDay(e.start, day) || (e.start < day && e.end > day)) && !(e.isClosed && (calCloseMode || isFullyClosed)));
-    const eventsHtml = dayEvents.map(e => {
+    // 平时不在编辑模式，只有整天关闭才不重复画事件条（交给表头印章），部分关闭还是照常显示——
+    // 但不再跟真行程用同一种卡片样式画（那样看着像备忘录、还挡住格子背景），部分关闭的时段
+    // 单独拆出来，用编辑模式选框预览同一套斜纹虚线+竖排时间标签的样子画，一眼认出"这只是
+    // 关闭状态"，也不会挡住背后的格线
+    const dayEventsAll = weekEvents.filter(e => calSameDay(e.start, day) || (e.start < day && e.end > day));
+    const normalEvents = dayEventsAll.filter(e => !e.isClosed);
+    const closedEvents = (!calCloseMode && !isFullyClosed) ? dayEventsAll.filter(e => e.isClosed) : [];
+    const eventsHtml = normalEvents.map(e => {
       const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
       const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
       const top = (sH - gridStart) * pxPerHour;
       const height = Math.max((eH - sH) * pxPerHour, 20);
       // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
       const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
-      const closedCls = e.isClosed ? ' closed' : '';
-      return `<div class="cal-week-event${resCls}${closedCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();${calCloseMode ? '' : `openEditEventModal('${e.id}')`}">${e.title}</div>`;
+      return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
+    }).join('');
+    const closedEventsHtml = closedEvents.map(e => {
+      const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
+      const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
+      const top = (sH - gridStart) * pxPerHour;
+      const height = Math.max((eH - sH) * pxPerHour, 20);
+      const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
+      const fmt = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+      const label = height >= 36 ? `<span class="cal-close-overlay-label">${fmt(sH)}-${fmt(eH)}</span>` : '';
+      return `<div class="cal-close-overlay${resCls}" style="top:${top}px;height:${height}px">${label}</div>`;
     }).join('');
     let closeOverlayHtml = '';
     if (calCloseMode) {
@@ -3705,6 +3720,7 @@ function renderCalWeek(events) {
           <div class="cal-week-divider"></div>
           ${hourLines}
           ${closeOverlayHtml}
+          ${closedEventsHtml}
           ${eventsHtml}
         </div>
       </div>`;
