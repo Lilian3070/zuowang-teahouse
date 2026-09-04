@@ -77,7 +77,7 @@ async function submitBookingRequest(event) {
   if (!currentMemberId) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先登录会员账号'; return false; }
   const datetime = document.getElementById('datetime').value.trim();
   const slot = document.getElementById('slot').value;
-  if (!datetime || !slot) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先在上方选择到访时段'; return false; }
+  if (!datetime || !slot) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先在上方选择到访时间'; return false; }
   const note = document.getElementById('note').value.trim();
   const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note });
   if (error) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '提交失败：' + error.message; return false; }
@@ -142,43 +142,39 @@ async function renderBwkWeek() {
   let html = '';
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
-    const isPast = day < today;
+    if (day < today) continue; // 已经过去的日子直接不显示这一栏，不占位、不用画"已过去"
     const isToday = day.getTime() === today.getTime();
     const dayStart = day, dayEnd = new Date(day); dayEnd.setDate(dayEnd.getDate() + 1);
 
-    let chipsHtml;
-    if (isPast) {
-      chipsHtml = '<div class="bwk-day-empty">已过去</div>';
-    } else {
-      const busy = new Array(48).fill(false);
-      (data || []).forEach(r => {
-        const s = new Date(r.start_at), e = new Date(r.end_at);
-        const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
-        const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
-        for (let k = Math.max(0, sSlot); k < Math.min(48, eSlot); k++) busy[k] = true;
-      });
-      if (isToday) {
-        const nowSlot = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30);
-        for (let k = 0; k < Math.min(48, nowSlot); k++) busy[k] = true;
-      }
-      const runs = [];
-      let runStart = null;
-      for (let k = BOOKING_BUSINESS_START_SLOT; k <= BOOKING_BUSINESS_END_SLOT; k++) {
-        const open = k < BOOKING_BUSINESS_END_SLOT && !busy[k];
-        if (open && runStart === null) runStart = k;
-        else if (!open && runStart !== null) { runs.push([runStart, k]); runStart = null; }
-      }
-      chipsHtml = runs.length === 0
-        ? '<div class="bwk-day-empty">约满</div>'
-        : runs.map(([s0, s1]) => {
-            const label = `${bwkFormatSlot(s0)}-${bwkFormatSlot(s1)}`;
-            const isSel = bwkSelected && bwkSelected.y === day.getFullYear() && bwkSelected.m === day.getMonth() && bwkSelected.d === day.getDate() && bwkSelected.label === label;
-            return `<button type="button" class="bwk-chip${isSel ? ' selected' : ''}" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" data-label="${label}" onclick="bwkSelectChip(this)">${label}</button>`;
-          }).join('');
+    const busy = new Array(48).fill(false);
+    (data || []).forEach(r => {
+      const s = new Date(r.start_at), e = new Date(r.end_at);
+      const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
+      const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
+      for (let k = Math.max(0, sSlot); k < Math.min(48, eSlot); k++) busy[k] = true;
+    });
+    if (isToday) {
+      const nowSlot = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30);
+      for (let k = 0; k < Math.min(48, nowSlot); k++) busy[k] = true;
     }
 
+    // 不再把连续空档合并成一大段（合并成一段的话点一下就等于把整段几小时都占了，
+    // 客人一般只是想订某个时间点开始，不是订到打烊）——跟后台周表一样按半小时
+    // 一格一格列出来，客人自己点具体从几点开始
+    const openSlots = [];
+    for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
+      if (!busy[k]) openSlots.push(k);
+    }
+    const chipsHtml = openSlots.length === 0
+      ? '<div class="bwk-day-empty">约满</div>'
+      : openSlots.map(k => {
+          const label = bwkFormatSlot(k);
+          const isSel = bwkSelected && bwkSelected.y === day.getFullYear() && bwkSelected.m === day.getMonth() && bwkSelected.d === day.getDate() && bwkSelected.label === label;
+          return `<button type="button" class="bwk-chip${isSel ? ' selected' : ''}" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" data-label="${label}" onclick="bwkSelectChip(this)">${label}</button>`;
+        }).join('');
+
     html += `
-      <div class="bwk-day${isToday ? ' today' : ''}${isPast ? ' past' : ''}">
+      <div class="bwk-day${isToday ? ' today' : ''}">
         <div class="bwk-day-head"><span>${BWK_WEEKDAYS[i]}</span><b>${day.getMonth() + 1}/${day.getDate()}</b></div>
         <div class="bwk-day-chips">${chipsHtml}</div>
       </div>`;
@@ -206,7 +202,7 @@ function resetBwkPicker() {
   document.getElementById('datetime').value = '';
   document.getElementById('slot').value = '';
   const selEl = document.getElementById('bwkSelectedLabel');
-  selEl.textContent = '尚未选择时段';
+  selEl.textContent = '尚未选择时间';
   selEl.classList.remove('picked');
   renderBwkWeek();
 }

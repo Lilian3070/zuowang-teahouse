@@ -594,23 +594,27 @@ section {
 .bwk-nav button:hover:not(:disabled) { border-color: var(--seal); color: var(--seal); }
 .bwk-nav button:disabled { opacity: 0.35; cursor: default; }
 .bwk-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
-.bwk-day { flex: 0 0 96px; display: flex; flex-direction: column; gap: 6px; }
+.bwk-day { flex: 0 0 108px; display: flex; flex-direction: column; gap: 6px; }
 .bwk-day-head {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   font-size: 0.75rem; color: var(--ink-soft); padding-bottom: 6px; border-bottom: 1px solid var(--line);
 }
 .bwk-day-head b { font-size: 0.85rem; color: var(--ink); }
 .bwk-day.today .bwk-day-head b { color: var(--seal); }
-.bwk-day.past { opacity: 0.5; }
-.bwk-day-chips { display: flex; flex-direction: column; gap: 5px; }
+/* 半小时一格摆下来，一天最多能有二十几格（营业时段全空的时候），列表会很长——
+   每栏自己滚动，不撑高整个弹窗，也让每栏高度整齐好对齐 */
+.bwk-day-chips {
+  display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px;
+  max-height: 240px; overflow-y: auto; padding-right: 2px;
+}
 .bwk-chip {
-  font-family: inherit; font-size: 0.78rem; padding: 6px 4px; border-radius: 4px;
-  border: 1px solid var(--seal); background: rgba(163, 49, 42, 0.07); color: var(--seal);
-  cursor: pointer; text-align: center; white-space: nowrap;
+  flex: 0 0 calc(50% - 2px); font-family: inherit; font-size: 0.72rem; padding: 5px 2px;
+  border-radius: 4px; border: 1px solid var(--seal); background: rgba(163, 49, 42, 0.07);
+  color: var(--seal); cursor: pointer; text-align: center; white-space: nowrap;
 }
 .bwk-chip:hover { background: rgba(163, 49, 42, 0.16); }
 .bwk-chip.selected { background: var(--seal); color: #fff; }
-.bwk-day-empty { font-size: 0.78rem; color: var(--ink-soft); opacity: 0.7; text-align: center; padding-top: 8px; }
+.bwk-day-empty { flex: 1 1 100%; font-size: 0.78rem; color: var(--ink-soft); opacity: 0.7; text-align: center; padding-top: 8px; }
 .bwk-loading { flex: 1; text-align: center; font-size: 0.85rem; color: var(--ink-soft); padding: 20px 0; }
 .bwk-selected-label { font-size: 0.85rem; color: var(--ink-soft); margin: 10px 0 16px; }
 .bwk-selected-label.picked { color: var(--seal); font-weight: 600; }
