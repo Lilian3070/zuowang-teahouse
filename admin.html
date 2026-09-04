@@ -739,19 +739,36 @@
      真正的点击/拖拽还是交给 .cal-week-slots 本身处理 */
   .cal-close-overlay {
     position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box;
-    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 4px 0; overflow: hidden;
     background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.4), rgba(107, 107, 107, 0.4) 6px, rgba(140, 140, 140, 0.2) 6px, rgba(140, 140, 140, 0.2) 12px);
     border: 1.5px dashed #6b6b6b;
   }
   .cal-close-overlay.res-guqin { left: 3px; right: calc(50% + 2px); }
   .cal-close-overlay.res-tea { left: calc(50% + 2px); right: 3px; }
   /* 琴/茶各占半栏，横向空间很窄（手机上一栏才十几 px），横排文字根本放不下，
-     改成竖排——中文本身竖排就是正的，不用转 90 度，数字/冒号/横线跟着 mixed 一起竖着读 */
+     改成竖排——中文本身竖排就是正的，不用转 90 度，数字/冒号/横线跟着 mixed 一起竖着读。
+     开始时间贴块顶部、结束时间贴块底部（flex space-between），中间空间够的话插一段
+     时长（1小时/1.5小时），跟拖拽预选时间段那套贴顶贴底的布局是同一个视觉语言 */
   .cal-close-overlay-label {
     writing-mode: vertical-rl; text-orientation: mixed;
     font-size: 10px; font-weight: 700; color: #595959; background: rgba(255, 255, 255, 0.6);
-    padding: 4px 1px; border-radius: 3px; white-space: nowrap;
+    padding: 4px 1px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
   }
+  .cal-close-overlay-duration {
+    writing-mode: vertical-rl; text-orientation: mixed;
+    font-size: 9px; color: #7d7d7d; white-space: nowrap;
+  }
+  /* 平时（不在编辑模式）看已关闭时段：颜色比编辑模式的预选/预览淡很多——那边整块日历本来就
+     压暗降饱和度提醒"在编辑"，这里是日常查看，太深会跟真行程抢注意力；也不写时间文字，
+     日常只需要一眼看出"这段关了"，具体几点到几点要看要改就进"关闭/开放时段"编辑模式 */
+  .cal-week-closed-block {
+    position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box;
+    background: repeating-linear-gradient(45deg, rgba(107, 107, 107, 0.16), rgba(107, 107, 107, 0.16) 6px, rgba(140, 140, 140, 0.08) 6px, rgba(140, 140, 140, 0.08) 12px);
+    border: 1.5px dashed rgba(107, 107, 107, 0.35);
+  }
+  .cal-week-closed-block.res-guqin { left: 3px; right: calc(50% + 2px); }
+  .cal-week-closed-block.res-tea { left: calc(50% + 2px); right: 3px; }
 
   /* 拖拽预选时间段的虚框：左半栏=只拖琴（红），右半栏=只拖茶（绿），拖过中线两栏都占=和（金）；
      开始时间贴框顶部、结束时间贴框底部，只在拖拽过程中出现，松手就消失换成弹窗 */
@@ -3427,11 +3444,16 @@ function calCloseWeekEffectiveRuns(y, m, d, resource) {
   }
   return runs;
 }
-// 半小时格下标转回"HH:MM"，一整天（0~48）就直接显示"全天"，不用写一串 00:00-24:00
-function calCloseFormatRunLabel(s0, s1) {
-  if (s0 === 0 && s1 === 48) return '全天';
+// 编辑模式预览块的时间标签：整天（0~48）直接显示"全天"；否则上面贴开始时间、下面贴结束
+// 时间（配合 CSS 里 .cal-close-overlay 的 flex space-between 布局），中间空间够的话
+// （块够高）插一段时长"1小时"/"1.5小时"，太矮的一小段放不下就只留首尾两个时间点
+function calCloseOverlayTimeLabelHtml(s0, s1, height) {
+  if (height < 36) return '';
+  if (s0 === 0 && s1 === 48) return `<span class="cal-close-overlay-label">全天</span>`;
   const fmt = slot => `${String(Math.floor(slot / 2)).padStart(2, '0')}:${slot % 2 ? '30' : '00'}`;
-  return `${fmt(s0)}-${fmt(s1)}`;
+  const durH = (s1 - s0) * 0.5;
+  const durHtml = height >= 70 ? `<span class="cal-close-overlay-duration">${durH}小时</span>` : '';
+  return `<span class="cal-close-overlay-label">${fmt(s0)}</span>${durHtml}<span class="cal-close-overlay-label">${fmt(s1)}</span>`;
 }
 
 // 月视图：鼠标/手指按下开始拖拽选日期范围，松手时按"这次要刷成关闭还是开放"统一处理整段范围
@@ -3688,9 +3710,9 @@ function renderCalWeek(events) {
       const top = (sH - gridStart) * pxPerHour;
       const height = Math.max((eH - sH) * pxPerHour, 20);
       const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
-      const fmt = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
-      const label = height >= 36 ? `<span class="cal-close-overlay-label">${fmt(sH)}-${fmt(eH)}</span>` : '';
-      return `<div class="cal-close-overlay${resCls}" style="top:${top}px;height:${height}px">${label}</div>`;
+      // 平时不在编辑模式，不写时间文字——只是让人一眼看出"这段关了"，具体几点到几点
+      // 要进"关闭/开放时段"编辑模式才需要看
+      return `<div class="cal-week-closed-block${resCls}" style="top:${top}px;height:${height}px"></div>`;
     }).join('');
     let closeOverlayHtml = '';
     if (calCloseMode) {
@@ -3701,9 +3723,7 @@ function renderCalWeek(events) {
           const top = (Math.max(startH, gridStart) - gridStart) * pxPerHour;
           const height = (Math.min(endH, gridEnd) - Math.max(startH, gridStart)) * pxPerHour;
           const resCls = resource === 'guqin' ? ' res-guqin' : ' res-tea';
-          // 竖排文字至少要有点高度才放得下"全天"/"14:00-16:00"这几个字，太矮的一小段
-          // （比如就半小时）放不下就不写字，块本身的斜纹虚线还是照样显示
-          const label = height >= 36 ? `<span class="cal-close-overlay-label">${calCloseFormatRunLabel(s0, s1)}</span>` : '';
+          const label = calCloseOverlayTimeLabelHtml(s0, s1, height);
           closeOverlayHtml += `<div class="cal-close-overlay${resCls}" style="top:${top}px;height:${height}px">${label}</div>`;
         });
       });
