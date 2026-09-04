@@ -3702,7 +3702,6 @@ function renderCalWeek(events) {
     // 关闭状态"，也不会挡住背后的格线
     const dayEventsAll = weekEvents.filter(e => calSameDay(e.start, day) || (e.start < day && e.end > day));
     const normalEvents = dayEventsAll.filter(e => !e.isClosed);
-    const closedEvents = (!calCloseMode && !isFullyClosed) ? dayEventsAll.filter(e => e.isClosed) : [];
     const eventsHtml = normalEvents.map(e => {
       const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
       const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
@@ -3712,16 +3711,25 @@ function renderCalWeek(events) {
       const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
       return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
     }).join('');
-    const closedEventsHtml = closedEvents.map(e => {
-      const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
-      const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
-      const top = (sH - gridStart) * pxPerHour;
-      const height = Math.max((eH - sH) * pxPerHour, 20);
-      const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
-      // 平时不在编辑模式，不写时间文字——只是让人一眼看出"这段关了"，具体几点到几点
-      // 要进"关闭/开放时段"编辑模式才需要看
-      return `<div class="cal-week-closed-block${resCls}" style="top:${top}px;height:${height}px"></div>`;
-    }).join('');
+    // 平时不在编辑模式，画关闭时段用的数据源改成跟编辑模式一样的"合并后的生效区间"
+    // （calCloseWeekEffectiveRuns），不再直接按数据库里每一条 is_closed 记录各自的
+    // start/end 单独画——如果关闭记录实际是分成好几条相邻的短记录存的，各画各的会漏掉
+    // 拼接处、显示出来比实际关闭时间短一截，跟编辑模式里看到的对不上
+    let closedEventsHtml = '';
+    if (!calCloseMode && !isFullyClosed) {
+      ['guqin', 'tea'].forEach(resource => {
+        calCloseWeekEffectiveRuns(day.getFullYear(), day.getMonth(), day.getDate(), resource).forEach(([s0, s1]) => {
+          const startH = s0 * 0.5, endH = s1 * 0.5;
+          if (endH <= gridStart || startH >= gridEnd) return;
+          const top = (Math.max(startH, gridStart) - gridStart) * pxPerHour;
+          const height = (Math.min(endH, gridEnd) - Math.max(startH, gridStart)) * pxPerHour;
+          const resCls = resource === 'guqin' ? ' res-guqin' : ' res-tea';
+          // 平时不在编辑模式，不写时间文字——只是让人一眼看出"这段关了"，具体几点到几点
+          // 要进"关闭/开放时段"编辑模式才需要看
+          closedEventsHtml += `<div class="cal-week-closed-block${resCls}" style="top:${top}px;height:${height}px"></div>`;
+        });
+      });
+    }
     let closeOverlayHtml = '';
     if (calCloseMode) {
       ['guqin', 'tea'].forEach(resource => {
