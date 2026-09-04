@@ -627,8 +627,16 @@
   .cal-month-weekdays span { text-align: center; font-size: 15px; font-weight: 700; color: var(--ink-muted); padding: 6px 0; }
   .cal-month-cell {
     min-height: 92px; border: 1px solid var(--border); border-top: none; border-left: none;
-    padding: 6px; cursor: pointer; transition: background .15s;
+    padding: 6px; cursor: pointer; transition: background .15s; position: relative;
     touch-action: pan-y; user-select: none;
+  }
+  /* 整天关闭盖一个红色印章，透明底、压一点旋转角度，叠在日期数字/行程条上面，
+     跟"琴课"这种正常行程的列表条区分开，不会看着像备忘录里的一条 */
+  .cal-month-close-stamp {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-14deg);
+    border: 2px solid var(--red); color: var(--red); font-weight: 700; font-size: 13px;
+    padding: 2px 7px; border-radius: 3px; opacity: 0.8; pointer-events: none;
+    letter-spacing: 3px; white-space: nowrap; z-index: 3; background: none;
   }
   .cal-month-grid { border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
   .cal-month-cell:hover { background: var(--bg); }
@@ -3520,7 +3528,12 @@ function renderCalMonth(events) {
     const cellDate = new Date(cellY, cellM, cellD);
     const isToday = calSameDay(cellDate, today);
     const key = `${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`;
-    const dayEvents = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
+    const dayEventsAll = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
+    // 整天都关的日子改盖一个红色印章，不再跟"琴课"这种真行程一样排成一条列表行——
+    // 那样看着像是"今天有一件叫已关闭的事"，容易跟备忘录混在一起，一眼扫过去不够醒目。
+    // 只是部分时段关闭（没关满一整天）还是照常混在行程列表里显示，不单独处理
+    const isFullyClosed = calCloseIsDayFullyClosed(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+    const dayEvents = isFullyClosed ? dayEventsAll.filter(e => !e.isClosed) : dayEventsAll;
     const maxShow = 3;
     const chips = dayEvents.slice(0, maxShow).map(e =>
       `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}${e.isClosed ? ' closed' : ''}" onclick="event.stopPropagation();${calCloseMode ? '' : `openEditEventModal('${e.id}')`}">${e.title}</div>`
@@ -3528,9 +3541,10 @@ function renderCalMonth(events) {
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">还有 ${dayEvents.length - maxShow} 条</div>`
       : '';
+    const closeStamp = isFullyClosed ? `<div class="cal-month-close-stamp">已关闭</div>` : '';
     const lunarInfo = getLunarLabel(cellDate);
     // 关闭时段编辑模式下，只标"这次编辑会话动过、状态跟数据库不一样"的日子——已经存过的关闭状态
-    // 交给上面 chips 里"已关闭"那条灰纹事件条自己显示，这里不重复画
+    // 交给上面的红色印章自己显示，这里不重复画
     let closePendingCls = '';
     if (calCloseMode) {
       const dateKeyC = `${cellDate.getFullYear()}-${cellDate.getMonth()}-${cellDate.getDate()}`;
@@ -3546,7 +3560,7 @@ function renderCalMonth(events) {
         ontouchstart="calMonthCellDown(event,${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">
         <div class="cal-month-daynum">${cellD}</div>
         <div class="cal-month-lunar${lunarInfo.special ? ' special' : ''}">${lunarInfo.text}</div>
-        ${chips}${more}
+        ${chips}${more}${closeStamp}
       </div>`;
   }
   document.getElementById('calBody').innerHTML = `
