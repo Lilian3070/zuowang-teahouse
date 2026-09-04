@@ -746,18 +746,16 @@
   }
   .cal-close-overlay.res-guqin { left: 3px; right: calc(50% + 2px); }
   .cal-close-overlay.res-tea { left: calc(50% + 2px); right: 3px; }
-  /* 琴/茶各占半栏，横向空间很窄（手机上一栏才十几 px），横排文字根本放不下，
-     改成竖排——中文本身竖排就是正的，不用转 90 度，数字/冒号/横线跟着 mixed 一起竖着读。
-     开始时间贴块顶部、结束时间贴块底部（flex space-between），中间空间够的话插一段
-     时长（1小时/1.5小时），跟拖拽预选时间段那套贴顶贴底的布局是同一个视觉语言 */
+  /* 开始时间贴块顶部、结束时间贴块底部（flex space-between），中间空间够的话插一段
+     时长（1小时/1.5小时）——横排文字，跟拖拽预选新行程时那套 .cal-week-selectbox-label
+     白底小标签是同一个视觉语言 */
   .cal-close-overlay-label {
-    writing-mode: vertical-rl; text-orientation: mixed;
-    font-size: 10px; font-weight: 700; color: #595959; background: rgba(255, 255, 255, 0.6);
-    padding: 4px 1px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+    font-size: 10px; font-weight: 700; color: #595959; background: white;
+    padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    white-space: nowrap; line-height: 1.6; flex-shrink: 0;
   }
   .cal-close-overlay-duration {
-    writing-mode: vertical-rl; text-orientation: mixed;
-    font-size: 9px; color: #7d7d7d; white-space: nowrap;
+    font-size: 10px; font-weight: 600; color: #7d7d7d; opacity: 0.8; white-space: nowrap;
   }
   /* 平时（不在编辑模式）看已关闭时段：颜色比编辑模式的预选/预览淡很多——那边整块日历本来就
      压暗降饱和度提醒"在编辑"，这里是日常查看，太深会跟真行程抢注意力；也不写时间文字，
@@ -3451,8 +3449,7 @@ function calCloseOverlayTimeLabelHtml(s0, s1, height) {
   if (height < 36) return '';
   if (s0 === 0 && s1 === 48) return `<span class="cal-close-overlay-label">全天</span>`;
   const fmt = slot => `${String(Math.floor(slot / 2)).padStart(2, '0')}:${slot % 2 ? '30' : '00'}`;
-  const durH = (s1 - s0) * 0.5;
-  const durHtml = height >= 70 ? `<span class="cal-close-overlay-duration">${durH}小时</span>` : '';
+  const durHtml = height >= 70 ? `<span class="cal-close-overlay-duration">${calWeekFormatDuration((s1 - s0) * 0.5)}</span>` : '';
   return `<span class="cal-close-overlay-label">${fmt(s0)}</span>${durHtml}<span class="cal-close-overlay-label">${fmt(s1)}</span>`;
 }
 
