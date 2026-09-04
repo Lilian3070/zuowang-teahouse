@@ -678,10 +678,20 @@
   /* 每隔一天背景深一点点，纯视觉上把七天错开，颜色本身还是浅色系，不抢行程条的注意力 */
   .cal-week-daycol:nth-child(even) { background: #F8EED7; }
   .cal-week-dayhead {
-    height: 44px; display: flex; flex-direction: column;
+    height: 44px; display: flex; flex-direction: column; position: relative;
     align-items: center; justify-content: center; font-size: 12px; color: var(--ink-muted); gap: 2px;
   }
   .cal-week-dayhead.today { color: var(--gold); font-weight: 700; }
+  /* 整天关闭在表头右上角贴一个红色小圆章，时间轴上就不用再单独占一大块"已关闭"了。
+     表头这块地方比月视图的格子窄得多（手机上一格才 40 来 px），塞不下"已关闭"四个字
+     还不挡星期/日期文字，所以改成跟表头下面琴/茶圆形图标同一个视觉语言的小圆章，
+     只放一个"闭"字，够小、不占地方 */
+  .cal-week-close-stamp {
+    position: absolute; top: -3px; right: -3px; width: 17px; height: 17px; border-radius: 50%;
+    border: 1.5px solid var(--red); color: var(--red); font-weight: 700; font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0.9; pointer-events: none; z-index: 3; background: none;
+  }
   .cal-week-dayhead span { font-size: 13px; font-weight: 700; }
   .cal-week-dayhead b { font-size: 13px; color: var(--ink); font-weight: 600; }
   .cal-week-lunar { font-size: 10px; font-weight: 400; color: var(--ink-muted); }
@@ -3622,7 +3632,10 @@ function renderCalWeek(events) {
   let daysHtml = '';
   days.forEach(day => {
     const isToday = calSameDay(day, today);
-    const dayEvents = weekEvents.filter(e => calSameDay(e.start, day) || (e.start < day && e.end > day));
+    // 整天都关的日子，跟月视图一个思路：不在时间格里占一大块"已关闭"，改成表头盖个印章，
+    // 时间轴上留白干净，"关闭"这件事直接在表头上一眼看到
+    const isFullyClosed = calCloseIsDayFullyClosed(day.getFullYear(), day.getMonth(), day.getDate());
+    const dayEvents = weekEvents.filter(e => (calSameDay(e.start, day) || (e.start < day && e.end > day)) && !(isFullyClosed && e.isClosed));
     const eventsHtml = dayEvents.map(e => {
       const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
       const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
@@ -3652,6 +3665,7 @@ function renderCalWeek(events) {
       <div class="cal-week-daycol">
         <div class="cal-week-dayhead${isToday ? ' today' : ''}">
           <span>${CAL_WEEKDAYS[calMondayIndex(day)]}</span><b><span class="cal-week-dayhead-date">${day.getMonth() + 1}/${day.getDate()}</span> <span class="cal-week-lunar${weekLunarInfo.special ? ' special' : ''}">${weekLunarInfo.text}</span></b>
+          ${isFullyClosed ? `<div class="cal-week-close-stamp" title="今天已关闭">闭</div>` : ''}
         </div>
         <div class="cal-week-res-icons">${RES_BADGE_GUQIN}${RES_BADGE_TEA}</div>
         <div class="cal-week-slots" style="height:${bodyHeight}px" data-y="${day.getFullYear()}" data-m="${day.getMonth()}" data-d="${day.getDate()}" onclick="calWeekSlotClick(event, this)" onmousedown="calWeekDragStart(event, this)" ontouchstart="calWeekDragStart(event, this)">
