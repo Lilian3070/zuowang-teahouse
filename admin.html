@@ -112,6 +112,8 @@
   .resource-chip:hover { border-color: var(--gold); }
   .resource-chip.selected { border-color: var(--gold); background: var(--gold-soft); font-weight: 600; }
   .resource-chip .res-badge { width: 30px; height: 30px; }
+  .closed-toggle { width: 100%; justify-content: center; color: var(--ink-muted); }
+  .closed-toggle.selected { border-color: #a3a3a3; background: #ececec; color: #6b6b6b; font-weight: 600; }
   /* 事件条里的"和"标记要缩小，不然比文字行高还夸张 */
   .cal-week-event .res-badge, .cal-event-chip .res-badge { width: 13px; height: 13px; vertical-align: -2px; margin-right: 2px; }
   .btn-primary {
@@ -585,6 +587,12 @@
   .cal-week-event { background: rgba(168, 137, 74, 0.4); }
   .cal-week-event.res-guqin { background: rgba(155, 74, 62, 0.24); }
   .cal-week-event.res-tea { background: rgba(107, 140, 122, 0.4); }
+  /* 手动关闭的时段：跟琴/茶/和三种颜色都不一样，用斜纹灰底一眼认出"这段不是行程，是主理人关闭的"，
+     不管占用哪条资源线都盖成这个样子，优先级要压过上面 res-guqin/res-tea 的颜色规则 */
+  .cal-event-chip.closed, .cal-week-event.closed {
+    background: repeating-linear-gradient(45deg, #e2e2e2, #e2e2e2 6px, #ececec 6px, #ececec 12px);
+    color: #8a8a8a; border-left: 3px solid #a3a3a3;
+  }
   /* 圆形线条框 + 手写小篆字的资源标记：琴/茶/和，日历表头、"添加行程"资源选择、"两者都占"事件条都用这个 */
   .res-badge {
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -1203,6 +1211,9 @@
       <input type="text" id="eventTitle" placeholder="例：古琴课 / 外出采购">
     </div>
     <div class="form-group">
+      <button type="button" class="resource-chip closed-toggle" id="eventClosedToggle" onclick="toggleEventClosed()">手动关闭此时段（客人不可预约，不算"约满"）</button>
+    </div>
+    <div class="form-group" id="eventMemberGroup">
       <label>关联会员（选填）</label>
       <select id="eventMemberSelect"></select>
     </div>
@@ -3087,7 +3098,7 @@ async function renderCalendar(forceRefresh = false) {
     events = (rows || []).map(e => {
       const m = memberMap.get(e.member_id);
       const label = m ? (m.nickname || m.name) : null;
-      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: new Date(e.start_at), end: new Date(e.end_at), hasMember: !!e.member_id, resource: e.resource || 'both' };
+      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: new Date(e.start_at), end: new Date(e.end_at), hasMember: !!e.member_id, resource: e.resource || 'both', isClosed: !!e.is_closed };
     });
     tabProductsCache['schedule'] = events;
   }
@@ -3158,7 +3169,7 @@ function renderCalMonth(events) {
     const dayEvents = (eventsByDay.get(key) || []).sort((a, b) => a.start - b.start);
     const maxShow = 3;
     const chips = dayEvents.slice(0, maxShow).map(e =>
-      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`
+      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}${e.isClosed ? ' closed' : ''}" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`
     ).join('');
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">还有 ${dayEvents.length - maxShow} 条</div>`
@@ -3223,7 +3234,8 @@ function renderCalWeek(events) {
       const height = Math.max((eH - sH) * pxPerHour, 20);
       // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
       const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
-      return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
+      const closedCls = e.isClosed ? ' closed' : '';
+      return `<div class="cal-week-event${resCls}${closedCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
     }).join('');
     const weekLunarInfo = getLunarLabel(day);
     daysHtml += `
@@ -3602,6 +3614,8 @@ document.addEventListener('click', (e) => {
 
 // 行程占用哪条资源线（琴/茶/两者都占），跟周视图里每天的左右分栏一一对应
 let eventResourceValue = null;
+// 这条是不是"主理人手动关闭时段"（不挂会员、不算约满，纯粹拿它占位挡住这段时间不能被约）
+let eventIsClosed = false;
 
 function pickEventResource(val) {
   eventResourceValue = val;
@@ -3609,6 +3623,16 @@ function pickEventResource(val) {
     btn.classList.toggle('selected', btn.dataset.resource === val);
   });
   updateEventTimeConstraints();
+}
+
+function toggleEventClosed() {
+  eventIsClosed = !eventIsClosed;
+  document.getElementById('eventClosedToggle').classList.toggle('selected', eventIsClosed);
+  document.getElementById('eventMemberGroup').style.display = eventIsClosed ? 'none' : '';
+  if (eventIsClosed) document.getElementById('eventMemberSelect').value = '';
+  if (eventIsClosed && !document.getElementById('eventTitle').value.trim()) {
+    document.getElementById('eventTitle').value = '已关闭';
+  }
 }
 
 // 算某一天、某条资源线上已经被占用的时间段（同一天 + 资源线有交集才算冲突，
@@ -3655,6 +3679,9 @@ async function openAddEventModal(memberId, startDate, endDate, defaultResource) 
   document.getElementById('eventDeleteBtn').style.display = 'none';
   document.getElementById('eventTitle').value = '';
   document.getElementById('eventNote').value = '';
+  eventIsClosed = false;
+  document.getElementById('eventClosedToggle').classList.remove('selected');
+  document.getElementById('eventMemberGroup').style.display = '';
   pickEventResource(defaultResource || null);
   dtPickerInit('eventStart', startDate);
   dtPickerInit('eventEnd', endDate);
@@ -3671,6 +3698,9 @@ async function openEditEventModal(id) {
   document.getElementById('eventDeleteBtn').style.display = '';
   document.getElementById('eventTitle').value = data.title;
   document.getElementById('eventNote').value = data.note || '';
+  eventIsClosed = !!data.is_closed;
+  document.getElementById('eventClosedToggle').classList.toggle('selected', eventIsClosed);
+  document.getElementById('eventMemberGroup').style.display = eventIsClosed ? 'none' : '';
   pickEventResource(data.resource || 'both');
   dtPickerInit('eventStart', data.start_at);
   dtPickerInit('eventEnd', data.end_at);
@@ -3694,8 +3724,8 @@ function closeEventModal() {
 
 async function saveEvent() {
   const id = document.getElementById('eventEditId').value;
-  const title = document.getElementById('eventTitle').value.trim();
-  const memberId = document.getElementById('eventMemberSelect').value || null;
+  const title = document.getElementById('eventTitle').value.trim() || (eventIsClosed ? '已关闭' : '');
+  const memberId = eventIsClosed ? null : (document.getElementById('eventMemberSelect').value || null);
   const startDate = dtPickerGetValue('eventStart');
   const endDate = dtPickerGetValue('eventEnd');
   if (!title || !startDate || !endDate) { showToast('请填写标题和起止时间'); return; }
@@ -3704,6 +3734,7 @@ async function saveEvent() {
     title,
     member_id: memberId,
     resource: eventResourceValue,
+    is_closed: eventIsClosed,
     start_at: startDate.toISOString(),
     end_at: endDate.toISOString(),
     note: document.getElementById('eventNote').value.trim() || null,
