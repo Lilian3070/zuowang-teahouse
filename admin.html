@@ -764,9 +764,13 @@
      压暗降饱和度提醒"在编辑"，这里是日常查看，太深会跟真行程抢注意力；也不写时间文字，
      日常只需要一眼看出"这段关了"，具体几点到几点要看要改就进"关闭/开放时段"编辑模式。
      细红色虚线框+细红色斜线底，跟表头/月视图那个红色印章是同一套视觉语言，斜线本身要细、
-     间距留大一点，免得看着像大片阴影压在格子上（之前灰色粗斜纹的问题） */
+     间距留大一点，免得看着像大片阴影压在格子上（之前灰色粗斜纹的问题）。
+     z-index 要压过真行程条（.cal-week-event 是 2）——关闭时段跟这段时间里的个人备忘录/
+     行程同时存在很正常（比如关了店又顺手记一条"有事外出"），之前这块在行程条下面，
+     行程的不透明卡片一盖，关闭框的虚线边框被挡住一截，看着像断了一半；现在盖在上面，
+     整圈虚线框能连续画完，行程卡片透过斜纹底还是看得见 */
   .cal-week-closed-block {
-    position: absolute; pointer-events: none; z-index: 1; box-sizing: border-box;
+    position: absolute; pointer-events: none; z-index: 3; box-sizing: border-box;
     background: repeating-linear-gradient(45deg, rgba(155, 74, 62, 0.28) 0, rgba(155, 74, 62, 0.28) 1px, transparent 1px, transparent 9px);
     border: 1.5px dashed var(--red); border-radius: 3px;
     opacity: 0.85;
