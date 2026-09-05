@@ -3232,9 +3232,6 @@ async function renderCalendar(forceRefresh = false) {
 
   const el = document.getElementById('calendarEl');
   if (!el) return;
-  const todayStart = calDayStart(new Date());
-  if (calView === 'week' && calAnchor < todayStart) calAnchor = todayStart;
-  const weekAtToday = calView === 'week' && calDayStart(calAnchor).getTime() === todayStart.getTime();
   const canCloseHere = calView === 'month' || calView === 'week';
   const rightControls = calCloseMode
     ? `<button class="btn-add-inline close-mode-cancel-btn" onclick="cancelCloseMode()">取消</button><button class="btn-add-inline close-mode-save-btn" onclick="saveCloseMode()">保存关闭设置</button>`
@@ -3242,7 +3239,7 @@ async function renderCalendar(forceRefresh = false) {
   el.innerHTML = `
     <div class="cal-toolbar">
       <div class="cal-toolbar-left">
-        <button class="cal-nav-btn" onclick="calNav(-1)" ${weekAtToday ? 'disabled' : ''}>‹</button>
+        <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
         <button class="cal-today-btn" onclick="calGoToday()">今天</button>
         <button class="cal-nav-btn" onclick="calNav(1)">›</button>
         <span class="cal-title" id="calTitle"></span>
@@ -3382,12 +3379,7 @@ function calGoToday() { calAnchor = new Date(); renderCalendar(); }
 function calNav(dir) {
   if (calView === 'year') calAnchor = new Date(calAnchor.getFullYear() + dir, calAnchor.getMonth(), 1);
   else if (calView === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + dir, 1);
-  else {
-    const todayStart = calDayStart(new Date());
-    if (calDayStart(calAnchor) <= todayStart && dir < 0) return;
-    const next = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), calAnchor.getDate() + dir * 7);
-    calAnchor = next < todayStart ? todayStart : next;
-  }
+  else calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), calAnchor.getDate() + dir * 7);
   renderCalendar();
 }
 function calGoToWeekOfDay(y, m, d) {
