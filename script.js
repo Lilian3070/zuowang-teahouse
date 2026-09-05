@@ -32,6 +32,7 @@ async function fetchWithRetry(queryFn, retries = 2, delayMs = 800) {
 let currentAccountRole = null; // 'admin' | 'member' | null（未登录或还没有角色记录）
 let currentMemberId = null;
 let loginFailCount = 0;
+let bookingModalPageScrollY = 0;
 
 async function refreshAccountNav() {
   const link = document.getElementById('navAccountLink');
@@ -59,9 +60,13 @@ function updateBookingSectionVisibility() {
 
 function openBookingModal() {
   const modal = document.getElementById('bookingModal');
+  bookingModalPageScrollY = window.scrollY;
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   document.body.classList.add('modal-open');
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${bookingModalPageScrollY}px`;
+  document.body.style.width = '100%';
   bwkAnchor = bwkDayStart(new Date());
   renderBwkWeek();
 }
@@ -71,6 +76,10 @@ function closeBookingModal() {
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('modal-open');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, bookingModalPageScrollY);
 }
 
 async function submitBookingRequest(event) {

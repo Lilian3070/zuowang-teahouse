@@ -702,7 +702,13 @@ section {
 
 @media (max-width: 600px) {
   /* 手机端七列必须一屏完整呈现：把每列改为等分，不再保留桌面 58px 的最小宽度。 */
-  .booking-modal-panel { overscroll-behavior: contain; }
+  .booking-modal-panel {
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 28px;
+  }
   .bwk-picker { padding: 8px; }
   .bwk-nav { gap: 4px; }
   .bwk-nav button { padding: 2px 8px; }
@@ -711,8 +717,10 @@ section {
   .bwk-day-col { flex: 1 1 0; min-width: 0; max-width: none; }
   .bwk-col-head { padding: 4px 0; font-size: 0.64rem; }
   .bwk-col-head b { font-size: 0.72rem; }
-  .bwk-cell-time { font-size: 9px; }
-  .bwk-cell:not(.hour-start) .bwk-cell-time { font-size: 8px; }
+  /* 七列等分后每格很窄，时间只是辅助注记，缩小到不会顶出格子。 */
+  .bwk-cell-time { font-size: 7px; letter-spacing: -0.04em; }
+  .bwk-cell:not(.hour-start) .bwk-cell-time { font-size: 6px; }
+  .bwk-table-wrap { max-height: 280px; }
 }
 
 .submit-btn {
