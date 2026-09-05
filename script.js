@@ -149,32 +149,37 @@ function bwkGoToday() {
   renderBwkWeek();
 }
 
-// 查一次这一周的忙闲数据（网络请求），算好每天每格状态后交给 bwkPaintGrid 画——
-// 拆成两步是因为点格子选起点/终点只是重新画一下高亮，不用每点一下就重新查一次数据库
-async function renderBwkWeek() {
-  const wrap = document.getElementById('bwkGrid');
-  const todayMonday = bwkMonday(new Date());
-  document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayMonday.getTime();
+// 每一周的忙闲原始数据按"这周的周一"缓存起来，翻回看过的周直接画、不再请求；
+// 每次画完还会顺手预取上一周/下一周，所以点 ‹ › 绝大多数时候是零等待、不闪一下
+const bwkWeekCache = new Map();
 
-  const weekEnd = new Date(bwkAnchor); weekEnd.setDate(weekEnd.getDate() + 7);
-  const lastDay = new Date(weekEnd); lastDay.setDate(lastDay.getDate() - 1);
-  document.getElementById('bwkRangeLabel').textContent =
-    `${bwkAnchor.getMonth() + 1}月${bwkAnchor.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
-
-  wrap.innerHTML = '<div class="bwk-loading">查询空档中…</div>';
+async function bwkLoadWeek(weekStart) {
+  const key = weekStart.getTime();
+  if (bwkWeekCache.has(key)) return bwkWeekCache.get(key);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
   const { data, error } = await db.rpc('get_tea_busy_ranges', {
-    p_start: bwkAnchor.toISOString(), p_end: weekEnd.toISOString(),
+    p_start: weekStart.toISOString(), p_end: weekEnd.toISOString(),
   });
-  if (error) {
-    wrap.innerHTML = '<div class="bwk-loading">查询失败，请稍后重试，或直接在备注里说明期望时间</div>';
-    return;
-  }
+  if (error) throw error;
+  bwkWeekCache.set(key, data || []);
+  return data || [];
+}
 
+// 在后台悄悄把相邻两周也取回来，用户点 ‹ › 的时候就已经在缓存里了
+function bwkPrefetchNeighbors() {
+  const todayMonday = bwkMonday(new Date());
+  [-7, 7].forEach(off => {
+    const w = new Date(bwkAnchor); w.setDate(w.getDate() + off);
+    if (w >= todayMonday) bwkLoadWeek(w).catch(() => {});
+  });
+}
+
+// 把这一周的原始忙闲区间算成"每天每个半小时格能不能约"。rows 传 null 表示数据还在路上，
+// 先按"暂时都不能点"画出骨架，等数据回来再重画——**绝不能把表清空成一行"加载中"文字**，
+// 那样每翻一周画面都要闪一下（见 不许再犯.md 第 1 条）
+function bwkBuildDays(rows) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const now = new Date();
-
-  // 一周七天整整齐齐都画出来（跟后台周表一样，一眼看得到完整一周），已经过去的日子
-  // 不是不显示，而是整列都算成"不能点"——跟被占用的时段一样是灰色斜纹
   const days = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
@@ -182,16 +187,17 @@ async function renderBwkWeek() {
       date: day, weekday: BWK_WEEKDAYS[i],
       isToday: day.getTime() === today.getTime(),
       isPast: day < today,
+      loading: rows === null,
       // 底色按"星期几"的奇偶交替，色号直接用后台那两个（#F7F3EC 是后台 --bg，
       // #F8EED7 是后台 .cal-week-daycol:nth-child(even) 那条规则里的值），不另配一套
       colTint: i % 2 === 0 ? '#F7F3EC' : '#F8EED7',
     });
   }
   days.forEach(d => {
-    const dayStart = d.date, dayEnd = new Date(d.date); dayEnd.setDate(dayEnd.getDate() + 1);
+    const dayStart = d.date;
     const busy = new Array(48).fill(false);
-    if (d.isPast) { busy.fill(true); d.busy = busy; return; } // 过去的日子整列不能点
-    (data || []).forEach(r => {
+    if (d.isPast || rows === null) { busy.fill(true); d.busy = busy; return; }
+    rows.forEach(r => {
       const s = new Date(r.start_at), e = new Date(r.end_at);
       const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
       const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
@@ -203,9 +209,41 @@ async function renderBwkWeek() {
     }
     d.busy = busy;
   });
+  return days;
+}
 
-  bwkDaysData = days;
+async function renderBwkWeek() {
+  const wrap = document.getElementById('bwkGrid');
+  const todayMonday = bwkMonday(new Date());
+  document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayMonday.getTime();
+
+  const lastDay = new Date(bwkAnchor); lastDay.setDate(lastDay.getDate() + 6);
+  document.getElementById('bwkRangeLabel').textContent =
+    `${bwkAnchor.getMonth() + 1}月${bwkAnchor.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
+
+  const key = bwkAnchor.getTime();
+  if (bwkWeekCache.has(key)) {
+    // 缓存里有：直接画，整个过程没有网络等待，也就不会闪
+    bwkDaysData = bwkBuildDays(bwkWeekCache.get(key));
+    bwkPaintGrid();
+    bwkPrefetchNeighbors();
+    return;
+  }
+
+  // 缓存里没有：先把这一周的骨架画出来（表格结构、日期、时间轴都在，格子暂时不可点），
+  // 数据回来再原地换成真实忙闲，表格不会消失也不会跳
+  bwkDaysData = bwkBuildDays(null);
   bwkPaintGrid();
+  try {
+    const rows = await bwkLoadWeek(bwkAnchor);
+    if (bwkAnchor.getTime() !== key) return; // 用户已经翻到别的周了，这次结果直接丢掉
+    bwkDaysData = bwkBuildDays(rows);
+    bwkPaintGrid();
+    bwkPrefetchNeighbors();
+  } catch (e) {
+    if (bwkAnchor.getTime() !== key) return;
+    wrap.innerHTML = '<div class="bwk-loading">查询失败，请稍后重试，或直接在备注里说明期望时间</div>';
+  }
 }
 
 // 纯画图，不查数据库——用 bwkDaysData 里已经算好的忙闲状态，配合当前选择状态
@@ -242,7 +280,7 @@ function bwkPaintGrid() {
       : (bwkSelected && bwkSameDay(bwkSelected, y, m, dd)
         ? { s0: bwkSelected.startSlot, s1: bwkSelected.endSlot, done: true } : null);
     const selBoxHtml = drag ? bwkSelBoxHtml(drag.s0, drag.s1, drag.done) : '';
-    return `<div class="bwk-day-col${d.isToday ? ' today' : ''}" style="--col-tint:${d.colTint}" data-y="${y}" data-m="${m}" data-d="${dd}">${cellsHtml}${selBoxHtml}</div>`;
+    return `<div class="bwk-day-col${d.isToday ? ' today' : ''}${d.loading ? ' loading' : ''}" style="--col-tint:${d.colTint}" data-y="${y}" data-m="${m}" data-d="${dd}">${cellsHtml}${selBoxHtml}</div>`;
   }).join('');
 
   // 重画（比如点了起点要高亮）会把整块 HTML 换掉，滚动位置会跟着归零——先记下来再还原，
@@ -275,6 +313,23 @@ function bwkFindDay(y, m, d) {
   return bwkDaysData.find(dd => dd.date.getFullYear() === y && dd.date.getMonth() === m && dd.date.getDate() === d);
 }
 function bwkSameDay(o, y, m, d) { return o.y === y && o.m === m && o.d === d; }
+
+// 拖拽/选中变化时只动"选框"这一个元素，不重画整张表——拖的时候每移动一格就重建整棵 DOM
+// 会明显发顿，滚动位置也要来回还原（见 不许再犯.md 第 1 条）
+function bwkUpdateSelBox() {
+  document.querySelectorAll('.bwk-selbox').forEach(el => el.remove());
+  let sel = null;
+  if (bwkDrag && bwkDrag.dragging) {
+    sel = { y: bwkDrag.y, m: bwkDrag.m, d: bwkDrag.d, done: false,
+      s0: Math.min(bwkDrag.anchor, bwkDrag.cur), s1: Math.max(bwkDrag.anchor, bwkDrag.cur) + 1 };
+  } else if (bwkSelected) {
+    sel = { y: bwkSelected.y, m: bwkSelected.m, d: bwkSelected.d, done: true,
+      s0: bwkSelected.startSlot, s1: bwkSelected.endSlot };
+  }
+  if (!sel) return;
+  const col = document.querySelector(`.bwk-day-col[data-y="${sel.y}"][data-m="${sel.m}"][data-d="${sel.d}"]`);
+  if (col) col.insertAdjacentHTML('beforeend', bwkSelBoxHtml(sel.s0, sel.s1, sel.done));
+}
 
 // 拖出来的预选框 / 选定后的时间段：上贴开始时间、下贴结束时间，中间够高就写时长，
 // 跟后台拖拽预选新行程时那个框长一样
@@ -329,7 +384,7 @@ function bwkDragStart(evt) {
     evt.preventDefault();
     bwkDrag.dragging = true;
     bwkSelected = null;
-    bwkPaintGrid();
+    bwkUpdateSelBox();
     document.addEventListener('mousemove', bwkDragMove);
     document.addEventListener('mouseup', bwkDragEnd);
     return;
@@ -342,7 +397,7 @@ function bwkDragStart(evt) {
     if (!bwkDrag) return;
     bwkDrag.dragging = true;
     bwkSelected = null;
-    bwkPaintGrid();
+    bwkUpdateSelBox();
   }, BWK_LONG_PRESS_MS);
   document.addEventListener('touchmove', bwkDragMove, { passive: false });
   document.addEventListener('touchend', bwkDragEnd);
@@ -367,7 +422,7 @@ function bwkDragMove(evt) {
   const dayEl = document.querySelector(`.bwk-day-col[data-y="${bwkDrag.y}"][data-m="${bwkDrag.m}"][data-d="${bwkDrag.d}"]`);
   if (!dayEl) return;
   const next = bwkSlotFromY(dayEl, p.y, bwkDrag.anchor, bwkDrag.dayData);
-  if (next !== bwkDrag.cur) { bwkDrag.cur = next; bwkDrag.moved = true; bwkPaintGrid(); }
+  if (next !== bwkDrag.cur) { bwkDrag.cur = next; bwkDrag.moved = true; bwkUpdateSelBox(); }
 }
 
 function bwkDragEnd() {
@@ -401,7 +456,7 @@ function bwkFinalize(y, m, d, startSlot, endSlot) {
   const selEl = document.getElementById('bwkSelectedLabel');
   selEl.textContent = `已选：${dateLabel} ${label}`;
   selEl.classList.add('picked');
-  bwkPaintGrid();
+  bwkUpdateSelBox();
 }
 
 function resetBwkPicker() {

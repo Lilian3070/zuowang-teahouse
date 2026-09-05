@@ -653,6 +653,9 @@ section {
 .bwk-cell.busy {
   background-image: repeating-linear-gradient(45deg, rgba(43, 40, 34, 0.22) 0, rgba(43, 40, 34, 0.22) 1px, transparent 1px, transparent 7px);
 }
+/* 这一周的数据还在路上：表格结构照常摆着（不清空、不闪），格子先淡一点表示还不能点，
+   数据回来原地换成真实忙闲 */
+.bwk-day-col.loading { opacity: 0.5; transition: opacity .15s; }
 /* 可约的格子**不刷颜色**，就是这一天本身的底色——跟后台一样，空着的时间段是留白的。
    之前给每个可约格子刷了一层红，叠在隔天交替的两种底色上就变成了粉红/肉色两种颜色，
    整张表花掉了，反而看不出哪里是真的被选中 */
