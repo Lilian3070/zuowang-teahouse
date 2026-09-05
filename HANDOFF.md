@@ -19,9 +19,12 @@
    的表格，实时显示茶室真空档，可拖拽选时间段（详见下面那节）
 3. 新建 `不许再犯.md`（重复错误清单），交接文档开头加了硬提醒
 
-**⚠️ 换电脑/重建数据库必须先跑的 SQL**（今天新增的）：`supabase/tea_busy_ranges.sql`
-——建 `get_tea_busy_ranges()` 函数，不跑的话首页预约表格会一直显示"查询失败"。
-（09-03 的 `supabase/schedule_closed.sql`、09-02 的 `supabase/schedule_resource.sql` 现网都已跑过。）
+**SQL 状态：到今天为止的 SQL 现网全部已经跑过，不用再动。** 包括今天新增的
+`supabase/tea_busy_ranges.sql`（建 `get_tea_busy_ranges()` 函数，主理人 2026-09-04 已在
+Supabase SQL Editor 执行，返回 Success）、09-03 的 `supabase/schedule_closed.sql`、
+09-02 的 `supabase/schedule_resource.sql`。
+`supabase/` 目录里这些文件留着只有两个用途：① 以后**换新的 Supabase 项目/从零重建数据库**时，
+照文件名顺序重跑一遍；② 查某个字段/函数当初是怎么建的。日常开发不需要跑任何 SQL。
 
 **当前缓存版本号**：`styles.css?v=34`、`script.js?v=32`（改这两个文件记得 +1，见第 27 行那条）。
 
@@ -123,7 +126,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
 
 **商品图片裁剪框在 canvas 上重新画已上传到 Supabase 的图不会 "tainted canvas"**：本来担心跨域图片（Storage 公开 URL 跟站点不同源）画到 canvas 上再 `toBlob` 会被浏览器当成"污染画布"直接报错，实测只要给 `<img>` 元素设置 `crossOrigin = "anonymous"`（在赋值 `src` 之前），Supabase Storage 的公开 URL 默认就带了正确的 CORS 头，能正常读出像素、正常导出。这也是"编辑老商品时能对着历史图片重新裁剪"这个功能能做的前提——以后如果哪天要对着任何 Supabase Storage 的图片做 canvas 处理（滤镜、水印之类），记得先加这行，別的什么都不用配置。
 
-### 会员/管理员账号体系（2026-08-30 新增，⚠️ 上线前必须先跑一次 SQL）
+### 会员/管理员账号体系（2026-08-30 新增，当时新增 SQL（现网已跑），见本节末）
 
 - 数据库新增 `profiles`（角色：admin/member，member 关联到 members 表）、`invite_codes`（一次性会员注册密钥）两张表，
   以及 `is_admin()` / `redeem_invite_code()` 两个函数，SQL 见 [supabase/member_system.sql](supabase/member_system.sql)
@@ -161,7 +164,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
   （`signOut({scope:'others'})`）就在登录成功的当下直接执行——踩过的坑：如果紧跟着这行代码
   马上用 `location.href` 跳转页面，会把刚建好的本机登录状态一起冲掉，导致跳转过去的页面还要再登一次；
   现在登录后不跳转了，这个坑不存在了，写法上只要记得"别把 signOut 和页面跳转紧挨着写"就行
-### 会员档案与账号解耦（2026-08-30 新增，⚠️ 需要再跑一次 SQL：`supabase/member_profile.sql`）
+### 会员档案与账号解耦（2026-08-30 新增，当时新增 SQL（现网已跑）：`supabase/member_profile.sql`）
 
 - `members` 表新增 `nickname`（备注昵称，主理人填，列表显示优先用这个）、`email`/`address`/`age`
   （客人自己在会员中心「个人信息」里维护的联系方式，跟登录账号是两回事），`name` 允许为空
@@ -172,7 +175,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
 - member.html 新增「个人信息」表单，姓名/电话必填、其余选填，客人自己维护，主理人在后台只能只读查看
 - RLS 补了"会员更新自己的档案"这条 update 策略，没有这条会员中心的个人信息保存不了
 
-### 茶席预约接入真实数据（2026-08-31 新增，⚠️ 需要再跑一次 SQL：`supabase/booking_requests.sql`）
+### 茶席预约接入真实数据（2026-08-31 新增，当时新增 SQL（现网已跑）：`supabase/booking_requests.sql`）
 
 - 新增 `booking_requests` 表：会员提交预约申请（期望到访时间、备注、状态：待确认/已确认/已回绝、主理人回复）。
   **只是"通知主理人人工判断"，不做真实的时段占用/冲突检测**——那一套需要"主理人忙碌时段屏蔽"+"茶室/琴课资源
@@ -208,7 +211,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
   不能再用原生对话框**——这是主理人明确提过的偏好，不是随口一说
 - 桌面新增了两个指向正式线上网址的快捷方式（`坐忘茗舍网站.url` / `坐忘茗舍后台.url`），删掉了之前指向本地文件的旧快捷方式
 
-### 后台体验修补 + 行程日历第一步自制（2026-09-02，⚠️ 需要跑一次 SQL：`supabase/class_package_session_log.sql`，已跑过）
+### 后台体验修补 + 行程日历第一步自制（2026-09-02，当时新增 SQL（现网已跑）：`supabase/class_package_session_log.sql`）
 
 - "全部客户资料"注册状态从文字"代建档·未注册"改成颜色区分（绿=已注册，红=未注册）
 - "琴人档案"列表把"1 个套餐"改成显示还没上完的套餐真实名字，多个用顿号连接，全部用完显示"套餐已用完"
@@ -233,7 +236,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
   做成了通用组件（`dtPickerInit`/`dtPickerGetValue` 等，按 `fieldId` 驱动），**今后任何地方要选
   "日期+时间"都复用这一套，不再用原生 datetime-local**——`newPurDate`/`recordPurDate`（消费记录日期）
   目前还是原生 `type="date"`，是历史遗留，之后顺手处理时也要换成同一套风格
-- **行程加了"占用资源"字段（琴/茶/两者都占），周视图按左右分栏展示**，⚠️ 需要跑一次 SQL：
+- **行程加了"占用资源"字段（琴/茶/两者都占），周视图按左右分栏展示**，当时新增 SQL（现网已跑）：
   `supabase/schedule_resource.sql`（`schedule_events` 新增 `resource` 字段，老数据自动补 `both`）：
   - "添加/编辑行程"弹窗新增"占用资源"三选一：琴（红色伏羲式古琴简笔画图标）／茶（青花瓷盖碗简笔画图标，
     盖子微开）／两者都占，是必选项，不选不让保存
@@ -276,7 +279,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
   但不提供真实功能）——以后如果要做"黄历宜忌"之类更细的功能，得去 6tail/lunar-javascript 仓库重新
   拿完整代码替换对应模块
 
-### 手动关闭时段：从"弹窗开关"返工成"批量框选模式"（2026-09-03，⚠️ 需要跑一次 SQL：`supabase/schedule_closed.sql`）
+### 手动关闭时段：从"弹窗开关"返工成"批量框选模式"（2026-09-03，当时新增 SQL（现网已跑）：`supabase/schedule_closed.sql`）
 
 `schedule_events` 新增 `is_closed` 字段。**第一版**做成"添加/编辑行程"弹窗里的一个开关，主理人反馈
 这是错的设计思路——"关闭时段"是批量的（外出一周、连续几天不开门），不该一天一条手动加。**当天返工成
@@ -304,7 +307,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
   记录各自的 start/end 单独画，而编辑模式用的是"合并所有半小时格生效状态"的算法，关闭记录如果存成
   几条相邻短记录，两套算法结果就对不上。已统一成都用 `calCloseWeekEffectiveRuns` 算
 
-### 首页预约：真实空档的"简化版周表"（2026-09-04，⚠️ 需要跑一次 SQL：`supabase/tea_busy_ranges.sql`）
+### 首页预约：真实空档的"简化版周表"（2026-09-04，当时新增 SQL（现网已跑）：`supabase/tea_busy_ranges.sql`）
 
 "已是知音"卡片里不再平铺表单，只留一个"雅室预约"按钮，点开是站内弹窗（`#bookingModal`，复用
 `.brand-modal` 那套）。弹窗里**照抄 admin.html 周视图的表格骨架**：左边时间轴、右边一周七天分栏、
