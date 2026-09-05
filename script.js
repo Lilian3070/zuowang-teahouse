@@ -67,7 +67,7 @@ function openBookingModal() {
   document.body.style.position = 'fixed';
   document.body.style.top = `-${bookingModalPageScrollY}px`;
   document.body.style.width = '100%';
-  bwkAnchor = bwkDayStart(new Date());
+  bwkAnchor = bwkDayStart(shopNow());
   renderBwkWeek();
 }
 
@@ -93,8 +93,9 @@ async function submitBookingRequest(event) {
   const startAt = new Date(bwkSelected.y, bwkSelected.m, bwkSelected.d, Math.floor(bwkSelected.startSlot / 2), bwkSelected.startSlot % 2 ? 30 : 0);
   const endAt = new Date(bwkSelected.y, bwkSelected.m, bwkSelected.d, Math.floor(bwkSelected.endSlot / 2), bwkSelected.endSlot % 2 ? 30 : 0);
   const base = { member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note };
+  // 客人在周表上选的是茶室那边的钟点，写库前换算成绝对时刻
   let { error } = await db.from('booking_requests').insert({
-    ...base, start_at: startAt.toISOString(), end_at: endAt.toISOString(),
+    ...base, start_at: shopToISO(startAt), end_at: shopToISO(endAt),
   });
   // start_at/end_at 是 supabase/booking_calendar_workflow.sql 加的列。网站是 push 到 GitHub
   // Pages 自动部署的，代码上线和跑那份 SQL 之间必然有个时间差；万一客人正好卡在这个窗口里提交，
@@ -110,11 +111,31 @@ async function submitBookingRequest(event) {
   return false;
 }
 
+// ── 店里的时间（跟 admin.html 里那份保持一致，改一处两处都要改）─────────────
+// 茶室在温州，"上午11点"永远指温州的 11 点，不该跟着看的人所在时区变（网站也只面向国内）。
+// 数据库存的是绝对时刻（timestamptz）。做法是只在**数据库边界**换算：读出来先转成一个
+// "显示用 Date"——它的本地 getHours()/getDate() 读出来正好就是北京时间的钟点；写回去之前
+// 再换算回绝对时刻。这样中间所有画格子/定位/切天的代码一行都不用动。
+// 对身处 UTC+8 的人（主理人）来说换算量正好是 0，结果跟以前完全一样；在别的时区打开也
+// 看到同一个温州钟点。北京时间全年 UTC+8、没有夏令时，用固定偏移就够。
+const SHOP_UTC_OFFSET_MIN = 8 * 60;
+function shopDate(value) {
+  const t = new Date(value);
+  // 先用 t 自己的时区偏移估一次，再用估出来那一刻的偏移修一次——看的人所在时区如果有
+  // 夏令时，这两个偏移可能差一小时，修一次才落在正确的钟点上
+  const approx = new Date(t.getTime() + (SHOP_UTC_OFFSET_MIN + t.getTimezoneOffset()) * 60000);
+  return new Date(t.getTime() + (SHOP_UTC_OFFSET_MIN + approx.getTimezoneOffset()) * 60000);
+}
+function shopToISO(d) {
+  return new Date(d.getTime() - (SHOP_UTC_OFFSET_MIN + d.getTimezoneOffset()) * 60000).toISOString();
+}
+function shopNow() { return shopDate(new Date()); }
+
 // 首页预约表单选时段：照抄后台 admin.html 周视图的表格骨架（时间轴+按天分栏+半小时格），
 // 只是内容做阉割——看不到备忘录/行程标题，格子只剩"能点"（空档）跟"不能点"（占用/关闭/
 // 已过去，统一灰色斜纹，不挂钩具体原因）两种状态；点起点、再点终点选一段时间（跟后台
 // 拖拽预选一个道理，只是这里用点两下代替拖拽，手机上更好操作）
-let bwkAnchor = bwkDayStart(new Date()); // 当前显示的连续七天起始日
+let bwkAnchor = bwkDayStart(shopNow()); // 当前显示的连续七天起始日（按茶室所在地的"今天"）
 let bwkDaysData = [];      // 当前这一周已经算好忙闲的每一天，点格子时直接查这份，不用重新请求
 let bwkSelected = null;    // 起点+终点都选完了：{ y, m, d, startSlot, endSlot }
 const BWK_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
@@ -159,15 +180,15 @@ function bwkFormatSlotParts(slotIdx) {
 function bwkShiftWeek(dir) {
   const next = new Date(bwkAnchor);
   next.setDate(next.getDate() + dir * 7);
-  if (bwkAnchor <= bwkDayStart(new Date()) && dir < 0) return;
-  if (next < bwkDayStart(new Date())) next.setTime(bwkDayStart(new Date()).getTime()); // 跨日后返回也不能显示过去日期
+  if (bwkAnchor <= bwkDayStart(shopNow()) && dir < 0) return;
+  if (next < bwkDayStart(shopNow())) next.setTime(bwkDayStart(shopNow()).getTime()); // 跨日后返回也不能显示过去日期
   bwkAnchor = next;
   renderBwkWeek();
 }
 
 // 跟后台工具栏的"今天"按钮一个道理，翻了好几周之后能一键跳回从今天开始的七天
 function bwkGoToday() {
-  bwkAnchor = bwkDayStart(new Date());
+  bwkAnchor = bwkDayStart(shopNow());
   renderBwkWeek();
 }
 
@@ -179,8 +200,9 @@ async function bwkLoadWeek(weekStart) {
   const key = weekStart.getTime();
   if (bwkWeekCache.has(key)) return bwkWeekCache.get(key);
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
+  // weekStart/weekEnd 是"显示用 Date"（本地钟点=北京钟点），发给数据库前换回绝对时刻
   const { data, error } = await db.rpc('get_tea_busy_ranges', {
-    p_start: weekStart.toISOString(), p_end: weekEnd.toISOString(),
+    p_start: shopToISO(weekStart), p_end: shopToISO(weekEnd),
   });
   if (error) throw error;
   bwkWeekCache.set(key, data || []);
@@ -189,7 +211,7 @@ async function bwkLoadWeek(weekStart) {
 
 // 在后台悄悄把相邻两周也取回来，用户点 ‹ › 的时候就已经在缓存里了
 function bwkPrefetchNeighbors() {
-  const todayStart = bwkDayStart(new Date());
+  const todayStart = bwkDayStart(shopNow());
   [-7, 7].forEach(off => {
     const w = new Date(bwkAnchor); w.setDate(w.getDate() + off);
     if (w >= todayStart) bwkLoadWeek(w).catch(() => {});
@@ -200,8 +222,10 @@ function bwkPrefetchNeighbors() {
 // 先按"暂时都不能点"画出骨架，等数据回来再重画——**绝不能把表清空成一行"加载中"文字**，
 // 那样每翻一周画面都要闪一下（见 不许再犯.md 第 1 条）
 function bwkBuildDays(rows) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const now = new Date();
+  // "今天"和"现在"都按茶室所在地（北京时间）算，不按看的人所在时区——不然人在国外打开，
+  // 会把温州这边其实还没到的时段当成"已过"划掉
+  const now = shopNow();
+  const today = bwkDayStart(now);
   const days = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
@@ -227,7 +251,8 @@ function bwkBuildDays(rows) {
     // 写了等数据回来又变回空档，等于骗了客人一下
     if (rows === null) { busy.fill(true); return; }
     rows.forEach(r => {
-      const s = new Date(r.start_at), e = new Date(r.end_at);
+      // 库里是绝对时刻，转成"显示用 Date"再跟这一天的格子对齐
+      const s = shopDate(r.start_at), e = shopDate(r.end_at);
       const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
       const eSlot = Math.min(48, Math.ceil((e - dayStart) / 60000 / 30));
       for (let k = Math.max(0, sSlot); k < Math.min(48, eSlot); k++) busy[k] = true;
@@ -271,7 +296,7 @@ function bwkBlockedTagHtml(run) {
 
 async function renderBwkWeek() {
   const wrap = document.getElementById('bwkGrid');
-  const todayStart = bwkDayStart(new Date());
+  const todayStart = bwkDayStart(shopNow());
   if (bwkAnchor < todayStart) bwkAnchor = todayStart;
   document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayStart.getTime();
 
@@ -546,7 +571,7 @@ function bwkFinalize(y, m, d, startSlot, endSlot) {
 
 function resetBwkPicker() {
   bwkSelected = null;
-  bwkAnchor = bwkDayStart(new Date());
+  bwkAnchor = bwkDayStart(shopNow());
   document.getElementById('datetime').value = '';
   document.getElementById('slot').value = '';
   const selEl = document.getElementById('bwkSelectedLabel');

@@ -2677,7 +2677,7 @@ let activeBookingId = null;
 
 function esc(value) { return String(value || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]); }
 function bookingRange(r) {
-  if (r.start_at && r.end_at) return { start: new Date(r.start_at), end: new Date(r.end_at) };
+  if (r.start_at && r.end_at) return { start: shopDate(r.start_at), end: shopDate(r.end_at) };
   const m = String(r.preferred_time || '').match(/(\d+)月(\d+)日.*·\s*(凌晨|早上|上午|中午|下午|晚上)(\d+):(\d+)-(凌晨|早上|上午|中午|下午|晚上)(\d+):(\d+)/);
   if (!m) return null;
   const mins = (p, h, n) => { let x = Number(h) % 12; if (p === '中午' && Number(h) === 12) x = 12; if (p === '下午' || p === '晚上') x += 12; return x * 60 + Number(n); };
@@ -2701,7 +2701,7 @@ function sortBookingRequests(list) {
 function bookingIsExpired(r) {
   const range = bookingRange(r);
   if (!range) return false; // 认不出时间的旧数据不敢自动删，留着人工看
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayStart = shopNow(); todayStart.setHours(0, 0, 0, 0); // 按茶室所在地的"今天零点"判断过期
   return range.start < todayStart;
 }
 async function sweepExpiredBookings(list) {
@@ -2771,7 +2771,7 @@ async function setBookingStatus(id, status) {
   if (status === 'confirmed' && !request.schedule_event_id) {
     if (!range) { showToast('这条旧预约没有可识别的时间，请先联系客人确认'); return; }
     const name = request.member ? displayMemberName(request.member) : '客人';
-    const { data, error: eventError } = await db.from('schedule_events').insert({ title: `茶席预约 · ${name}`, member_id: request.member_id, resource: 'tea', start_at: range.start.toISOString(), end_at: range.end.toISOString(), note: [request.note, note.trim()].filter(Boolean).join(' · ') || null }).select('id').single();
+    const { data, error: eventError } = await db.from('schedule_events').insert({ title: `茶席预约 · ${name}`, member_id: request.member_id, resource: 'tea', start_at: shopToISO(range.start), end_at: shopToISO(range.end), note: [request.note, note.trim()].filter(Boolean).join(' · ') || null }).select('id').single();
     if (eventError) { showToast('写入日程失败：' + eventError.message); return; }
     update.schedule_event_id = data.id;
   }
@@ -3210,7 +3210,7 @@ function renderDeductCalendar() {
   const startOffset = (firstDay.getDay() + 6) % 7; // 周一开头，需要补的上月天数
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const prevMonthDays = new Date(y, m, 0).getDate();
-  const todayStr = fmtDateYMD(new Date());
+  const todayStr = fmtDateYMD(shopNow());
   const selStr = deductSelectedDate ? fmtDateYMD(deductSelectedDate) : '';
   let html = '';
   for (let i = startOffset; i > 0; i--) {
@@ -3315,9 +3315,30 @@ async function deletePurchase(id) {
 
 // ── 行程安排 ──────────────────────────────────────────
 
+// ── 店里的时间（跟 script.js 里那份保持一致，改一处两处都要改）─────────────
+// 茶室在温州，"上午11点"永远指温州的 11 点，不该跟着看的人所在时区变（网站也只面向国内）。
+// 数据库存的是绝对时刻（timestamptz）。做法是只在**数据库边界**换算：读出来先转成一个
+// "显示用 Date"——它的本地 getHours()/getDate() 读出来正好就是北京时间的钟点；写回去之前
+// 再换算回绝对时刻。这样中间所有画日历/定位/切天的代码一行都不用动。
+// 对身处 UTC+8 的人（主理人）来说换算量正好是 0，结果跟改之前完全一样；在别的时区打开
+// 也看到同一个温州钟点。北京时间全年 UTC+8、没有夏令时，用固定偏移就够。
+// ⚠️ 凡是新写"读 start_at/end_at"或"写 start_at/end_at"的地方，都要经过这两个函数。
+const SHOP_UTC_OFFSET_MIN = 8 * 60;
+function shopDate(value) {
+  const t = new Date(value);
+  // 先用 t 自己的时区偏移估一次，再用估出来那一刻的偏移修一次——看的人所在时区如果有
+  // 夏令时，这两个偏移可能差一小时，修一次才落在正确的钟点上
+  const approx = new Date(t.getTime() + (SHOP_UTC_OFFSET_MIN + t.getTimezoneOffset()) * 60000);
+  return new Date(t.getTime() + (SHOP_UTC_OFFSET_MIN + approx.getTimezoneOffset()) * 60000);
+}
+function shopToISO(d) {
+  return new Date(d.getTime() - (SHOP_UTC_OFFSET_MIN + d.getTimezoneOffset()) * 60000).toISOString();
+}
+function shopNow() { return shopDate(new Date()); }
+
 // ── 行程日历：自己做的年/月/周三视图（不再套用 FullCalendar，方便以后按需求自由改版式/加花纹） ──
 let calView = 'week'; // 默认从今天开始看连续七天
-let calAnchor = new Date();
+let calAnchor = shopNow();
 let calWeekGridStart = 8.5;
 let calWeekPxPerHour = 48;
 let calWeekExtraEarly = 0; // 手动点"显示更早时段"往前多展开的小时数
@@ -3397,7 +3418,7 @@ async function renderCalendar(forceRefresh = false) {
     events = (rows || []).map(e => {
       const m = memberMap.get(e.member_id);
       const label = m ? (m.nickname || m.name) : null;
-      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: new Date(e.start_at), end: new Date(e.end_at), hasMember: !!e.member_id, resource: e.resource || 'both', isClosed: !!e.is_closed };
+      return { id: e.id, title: label ? `${label} · ${e.title}` : e.title, start: shopDate(e.start_at), end: shopDate(e.end_at), hasMember: !!e.member_id, resource: e.resource || 'both', isClosed: !!e.is_closed };
     });
     tabProductsCache['schedule'] = events;
   }
@@ -3468,7 +3489,7 @@ async function saveCloseModeForDay(dateKey) {
   const dayStart = new Date(y, m, d);
   const dayEnd = new Date(y, m, d + 1);
   const { data: existingRows, error: fetchErr } = await db.from('schedule_events')
-    .select('*').eq('is_closed', true).lt('start_at', dayEnd.toISOString()).gt('end_at', dayStart.toISOString());
+    .select('*').eq('is_closed', true).lt('start_at', shopToISO(dayEnd)).gt('end_at', shopToISO(dayStart));
   if (fetchErr) throw fetchErr;
 
   // 1. 用数据库现有关闭记录，铺出这一天琴/茶两条线各 48 个半小时格的关闭状态网格
@@ -3507,8 +3528,8 @@ async function saveCloseModeForDay(dateKey) {
       const resource = runGuqin && runTea ? 'both' : (runGuqin ? 'guqin' : 'tea');
       newRows.push({
         title: '已关闭', is_closed: true, member_id: null, resource,
-        start_at: new Date(y, m, d, 0, runStart * 30).toISOString(),
-        end_at: new Date(y, m, d, 0, endIdx * 30).toISOString(),
+        start_at: shopToISO(new Date(y, m, d, 0, runStart * 30)),
+        end_at: shopToISO(new Date(y, m, d, 0, endIdx * 30)),
       });
     }
     runStart = null;
@@ -3560,7 +3581,7 @@ async function saveCloseMode() {
 }
 
 function calSetView(v) { calView = v; renderCalendar(); }
-function calGoToday() { calAnchor = new Date(); renderCalendar(); }
+function calGoToday() { calAnchor = shopNow(); renderCalendar(); }
 function calNav(dir) {
   if (calView === 'year') calAnchor = new Date(calAnchor.getFullYear() + dir, calAnchor.getMonth(), 1);
   else if (calView === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + dir, 1);
@@ -3776,7 +3797,7 @@ function calMonthDragEnd() {
 function renderCalMonth(events) {
   const y = calAnchor.getFullYear(), m = calAnchor.getMonth();
   document.getElementById('calTitle').textContent = `${y}年${m + 1}月`;
-  const today = new Date();
+  const today = shopNow(); // "今天"按茶室所在地算
   const firstDay = new Date(y, m, 1);
   const startOffset = calMondayIndex(firstDay);
   const daysInMonth = new Date(y, m + 1, 0).getDate();
@@ -3886,7 +3907,7 @@ function renderCalWeek(events) {
     timeLabels.push(`<div class="cal-week-timelabel${isHour ? '' : ' half'}" style="position:absolute;top:${top}px;right:0"><span class="cal-week-timelabel-period">${parts.period}</span><span class="cal-week-timelabel-time">${parts.time}</span></div>`);
   }
 
-  const today = new Date();
+  const today = shopNow(); // "今天"按茶室所在地算
   let daysHtml = '';
   days.forEach(day => {
     const isToday = calSameDay(day, today);
@@ -4186,7 +4207,7 @@ function applyWeekCloseDrag(s) {
 function renderCalYear(events) {
   const y = calAnchor.getFullYear();
   document.getElementById('calTitle').textContent = `${y}年`;
-  const today = new Date();
+  const today = shopNow(); // "今天"按茶室所在地算
   const eventDaySet = new Set(events.map(e => `${e.start.getFullYear()}-${e.start.getMonth()}-${e.start.getDate()}`));
   let monthsHtml = '';
   for (let m = 0; m < 12; m++) {
@@ -4227,7 +4248,7 @@ const dtPickerState = {}; // { [fieldId]: { date, minutes, calMonth, timeExtraEa
 
 function dtPickerInit(fieldId, initialDate) {
   const d = initialDate ? new Date(initialDate) : null;
-  const monthBase = d || new Date();
+  const monthBase = d || shopNow();
   const minutes = d ? d.getHours() * 60 + d.getMinutes() : null;
   dtPickerState[fieldId] = {
     date: d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null,
@@ -4292,7 +4313,7 @@ function renderDtCalendar(fieldId) {
   const startOffset = (firstDay.getDay() + 6) % 7;
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const prevMonthDays = new Date(y, m, 0).getDate();
-  const todayStr = fmtDateYMD(new Date());
+  const todayStr = fmtDateYMD(shopNow());
   const selStr = s.date ? fmtDateYMD(s.date) : '';
   let html = '';
   for (let i = startOffset; i > 0; i--) html += `<button type="button" class="other-month" disabled>${prevMonthDays - i + 1}</button>`;
@@ -4427,8 +4448,8 @@ async function openEditEventModal(id) {
   document.getElementById('eventTitle').value = data.title;
   document.getElementById('eventNote').value = data.note || '';
   pickEventResource(data.resource || 'both');
-  dtPickerInit('eventStart', data.start_at);
-  dtPickerInit('eventEnd', data.end_at);
+  dtPickerInit('eventStart', shopDate(data.start_at));
+  dtPickerInit('eventEnd', shopDate(data.end_at));
   updateEventTimeConstraints();
   await populateEventMemberSelect(data.member_id);
   document.getElementById('eventModal').classList.add('open');
@@ -4459,8 +4480,8 @@ async function saveEvent() {
     title,
     member_id: memberId,
     resource: eventResourceValue,
-    start_at: startDate.toISOString(),
-    end_at: endDate.toISOString(),
+    start_at: shopToISO(startDate),
+    end_at: shopToISO(endDate),
     note: document.getElementById('eventNote').value.trim() || null,
   };
   const { error } = id
