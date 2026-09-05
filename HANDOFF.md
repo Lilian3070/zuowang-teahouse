@@ -32,7 +32,7 @@
 8. **待确认预约打通后台**（这一节详见下面"茶席预约工作流"）：侧栏红色角标、日历里红色"待确认预约"
    占位、确认/回绝留言、查看日程、按状态+时间排序、到期自动删除
 
-⚠️ **上线前必须先跑一次 `supabase/booking_calendar_workflow.sql`**（见下面"SQL 状态"）。
+这些都已经上线，`supabase/booking_calendar_workflow.sql` 主理人 2026-09-05 也已经跑过并验证。
 
 **2026-09-04 做完的**：
 1. 后台"关闭/开放时段"批量框选模式的全部视觉细调（红色细虚线框+斜纹、月视图虚线角标=部分关闭 /
@@ -41,12 +41,13 @@
    的表格，实时显示茶室真空档，可拖拽选时间段（详见下面那节）
 3. 新建 `不许再犯.md`（重复错误清单），交接文档开头加了硬提醒
 
-**SQL 状态：⚠️ 有一份等着跑 —— `supabase/booking_calendar_workflow.sql`**（2026-09-05 新增，
-给 `booking_requests` 加 `start_at`/`end_at`/`schedule_event_id` 三列 + 回填老数据 + 每天
-北京时间 00:10 的到期清理任务）。**没跑之前**：会员提交预约会退回只写 `preferred_time`
-（前端有兜底，不会报错也不会丢单，后台仍能从那段文字解析出时间），后台"确认预约"会失败。
-在此之前的 SQL 现网全部已跑过：09-04 `tea_busy_ranges.sql`、09-03 `schedule_closed.sql`、
-09-02 `schedule_resource.sql`。
+**SQL 状态：现网全部已经跑过，不用再动。** 最新一份是 09-05 的
+`supabase/booking_calendar_workflow.sql`（给 `booking_requests` 加 `start_at`/`end_at`/
+`schedule_event_id` 三列 + 回填老数据 + 到期清理定时任务），主理人当天已执行并逐项验证过：
+老预约的 `start_at`/`end_at` 都正确回填（"上午11:00-下午1:00" → `11:00`/`13:00`），
+`pg_cron` 扩展已装，定时任务 `cleanup-expired-booking-requests` 已排上（`10 16 * * *`
+= 北京时间次日 00:10，`active = true`）。
+更早的：09-04 `tea_busy_ranges.sql`、09-03 `schedule_closed.sql`、09-02 `schedule_resource.sql`。
 `supabase/` 目录里这些文件留着只有两个用途：① 以后**换新的 Supabase 项目/从零重建数据库**时，
 照文件名顺序重跑一遍；② 查某个字段/函数当初是怎么建的。日常开发不需要跑任何 SQL。
 
@@ -387,7 +388,7 @@ insert/update/delete 调用，把同样"不检查 error 就提示成功"的地�
 **这一轮返工了五六次才做对**（下拉 → 合并大区间 chip → 半小时 chip 列表 → 表格骨架 → 参数逐项
 对齐 → 拖拽和流畅度），教训已经收进 `不许再犯.md` 第 1、3 条。
 
-### 茶席预约工作流：红点提醒 + 接入日程 + 到期自动删（2026-09-05，⚠️ 需跑 `supabase/booking_calendar_workflow.sql`）
+### 茶席预约工作流：红点提醒 + 接入日程 + 到期自动删（2026-09-05，SQL `supabase/booking_calendar_workflow.sql` 现网已跑）
 
 客人提交的预约不再只是列表里一行字，而是贯穿"提醒 → 核对行程 → 确认/回绝 → 自动清理"整条链路。
 代码都在 `admin.html`（`booking*` 一组函数 + `.booking-*` 样式），前台只改了 `submitBookingRequest`。
