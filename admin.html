@@ -562,6 +562,7 @@
   }
   .cal-nav-btn:hover, .cal-today-btn:hover { border-color: var(--gold); color: var(--gold); }
   .cal-title { font-size: 17px; font-weight: 700; color: var(--ink); margin: 0 4px; }
+  .cal-nav-btn:disabled { opacity: .35; cursor: default; }
   .cal-toolbar-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   /* .btn-add-inline 原本的底色/圆角只写在 .add-inline-form .btn-add-inline 里，日历工具栏这几个
      按钮不在那个表单容器下，之前一直是没有底色圆角的原生按钮样式，这次顺手一起补上 */
@@ -3143,7 +3144,7 @@ async function deletePurchase(id) {
 // ── 行程安排 ──────────────────────────────────────────
 
 // ── 行程日历：自己做的年/月/周三视图（不再套用 FullCalendar，方便以后按需求自由改版式/加花纹） ──
-let calView = 'month';
+let calView = 'week'; // 默认从今天开始看连续七天
 let calAnchor = new Date();
 let calWeekGridStart = 8.5;
 let calWeekPxPerHour = 48;
@@ -3207,10 +3208,8 @@ function getLunarLabel(date) {
 }
 
 function calMondayIndex(d) { return (d.getDay() + 6) % 7; }
-function calStartOfWeek(d) {
-  const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  r.setDate(r.getDate() - calMondayIndex(r));
-  return r;
+function calDayStart(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 function calSameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
@@ -3233,6 +3232,9 @@ async function renderCalendar(forceRefresh = false) {
 
   const el = document.getElementById('calendarEl');
   if (!el) return;
+  const todayStart = calDayStart(new Date());
+  if (calView === 'week' && calAnchor < todayStart) calAnchor = todayStart;
+  const weekAtToday = calView === 'week' && calDayStart(calAnchor).getTime() === todayStart.getTime();
   const canCloseHere = calView === 'month' || calView === 'week';
   const rightControls = calCloseMode
     ? `<button class="btn-add-inline close-mode-cancel-btn" onclick="cancelCloseMode()">取消</button><button class="btn-add-inline close-mode-save-btn" onclick="saveCloseMode()">保存关闭设置</button>`
@@ -3240,7 +3242,7 @@ async function renderCalendar(forceRefresh = false) {
   el.innerHTML = `
     <div class="cal-toolbar">
       <div class="cal-toolbar-left">
-        <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+        <button class="cal-nav-btn" onclick="calNav(-1)" ${weekAtToday ? 'disabled' : ''}>‹</button>
         <button class="cal-today-btn" onclick="calGoToday()">今天</button>
         <button class="cal-nav-btn" onclick="calNav(1)">›</button>
         <span class="cal-title" id="calTitle"></span>
@@ -3380,7 +3382,12 @@ function calGoToday() { calAnchor = new Date(); renderCalendar(); }
 function calNav(dir) {
   if (calView === 'year') calAnchor = new Date(calAnchor.getFullYear() + dir, calAnchor.getMonth(), 1);
   else if (calView === 'month') calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + dir, 1);
-  else calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), calAnchor.getDate() + dir * 7);
+  else {
+    const todayStart = calDayStart(new Date());
+    if (calDayStart(calAnchor) <= todayStart && dir < 0) return;
+    const next = new Date(calAnchor.getFullYear(), calAnchor.getMonth(), calAnchor.getDate() + dir * 7);
+    calAnchor = next < todayStart ? todayStart : next;
+  }
   renderCalendar();
 }
 function calGoToWeekOfDay(y, m, d) {
@@ -3664,7 +3671,7 @@ function renderCalMonth(events) {
 
 // 周视图：默认只画营业主时段 8:30-23:30，哪天行程超出这个范围会自动往外扩，不会把行程截断看不见
 function renderCalWeek(events) {
-  const weekStart = calStartOfWeek(calAnchor);
+  const weekStart = calDayStart(calAnchor); // 连续七天，不按周一截断
   const weekEndExclusive = new Date(weekStart); weekEndExclusive.setDate(weekEndExclusive.getDate() + 7);
   const weekEndLabel = new Date(weekStart); weekEndLabel.setDate(weekEndLabel.getDate() + 6);
   document.getElementById('calTitle').textContent = `${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月${weekStart.getDate()}日 - ${weekEndLabel.getMonth() + 1}月${weekEndLabel.getDate()}日`;
