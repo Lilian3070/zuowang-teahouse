@@ -606,9 +606,27 @@
   }
   .booking-review-text { display: flex; flex-direction: column; }
   .booking-review-text span { font-weight: 400; opacity: 0.85; }
-  .booking-review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .booking-review-decline { border-color: var(--red); color: var(--red); }
-  .booking-review-dismiss { border-color: #cfcfcf; color: #777; }
+  .booking-review-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  /* ⚠️ .btn-add-inline 的底色/圆角只写在 `.add-inline-form .btn-add-inline` 和
+     `.cal-toolbar-right .btn-add-inline` 这两个**带父级**的选择器里，光挂类名是拿不到样式的，
+     会退回成浏览器原生按钮（这条横幅一开始就是这么错的）。这里把工具栏那份参数原样抄过来。
+     配色沿用站内既有语言：金=主操作（同"+ 添加行程"）、白底红边=危险操作（同 .btn-delete
+     的 hover 态）、白底灰边=次要（同 .close-mode-cancel-btn） */
+  .booking-review-actions .btn-add-inline {
+    padding: 8px 14px; background: var(--gold); color: white; border: none;
+    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .booking-review-actions .btn-add-inline:hover { background: #96793f; }
+  .booking-review-decline {
+    background: white !important; color: var(--red) !important;
+    border: 1px solid var(--red) !important;
+  }
+  .booking-review-decline:hover { background: var(--red-soft) !important; }
+  .booking-review-dismiss {
+    background: white !important; color: var(--ink-muted) !important;
+    border: 1px solid var(--border) !important;
+  }
+  .booking-review-dismiss:hover { border-color: var(--ink-muted) !important; }
   /* 关闭时段编辑模式：整块日历降低饱和度、压暗一点，一眼看出跟平时的正常模式不一样，
      不会误以为自己还在正常模式里点了空白格却什么都没弹出来 */
   .cal-body.close-mode { filter: grayscale(0.8) brightness(0.97); user-select: none; }
