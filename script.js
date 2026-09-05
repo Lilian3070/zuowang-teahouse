@@ -61,7 +61,7 @@ function openBookingModal() {
   const modal = document.getElementById('bookingModal');
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
-  bwkAnchor = bwkMonday(new Date());
+  bwkAnchor = bwkDayStart(new Date());
   renderBwkWeek();
 }
 
@@ -92,16 +92,15 @@ async function submitBookingRequest(event) {
 // 只是内容做阉割——看不到备忘录/行程标题，格子只剩"能点"（空档）跟"不能点"（占用/关闭/
 // 已过去，统一灰色斜纹，不挂钩具体原因）两种状态；点起点、再点终点选一段时间（跟后台
 // 拖拽预选一个道理，只是这里用点两下代替拖拽，手机上更好操作）
-let bwkAnchor = bwkMonday(new Date()); // 当前显示这一周的周一
+let bwkAnchor = bwkDayStart(new Date()); // 当前显示的连续七天起始日
 let bwkDaysData = [];      // 当前这一周已经算好忙闲的每一天，点格子时直接查这份，不用重新请求
 let bwkSelected = null;    // 起点+终点都选完了：{ y, m, d, startSlot, endSlot }
 const BWK_WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
-function bwkMonday(d) {
-  const monday = new Date(d);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  return monday;
+function bwkDayStart(d) {
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  return day;
 }
 
 // 营业时间是 9:30-23:30——跟后台日历默认显示窗口的 8:30 不是一回事，那只是后台自己
@@ -138,18 +137,19 @@ function bwkFormatSlotParts(slotIdx) {
 function bwkShiftWeek(dir) {
   const next = new Date(bwkAnchor);
   next.setDate(next.getDate() + dir * 7);
-  if (next < bwkMonday(new Date())) return; // 不能翻到已经完全过去的那一周
+  if (bwkAnchor <= bwkDayStart(new Date()) && dir < 0) return;
+  if (next < bwkDayStart(new Date())) next.setTime(bwkDayStart(new Date()).getTime()); // 跨日后返回也不能显示过去日期
   bwkAnchor = next;
   renderBwkWeek();
 }
 
-// 跟后台工具栏的"今天"按钮一个道理，翻了好几周之后能一键跳回本周
+// 跟后台工具栏的"今天"按钮一个道理，翻了好几周之后能一键跳回从今天开始的七天
 function bwkGoToday() {
-  bwkAnchor = bwkMonday(new Date());
+  bwkAnchor = bwkDayStart(new Date());
   renderBwkWeek();
 }
 
-// 每一周的忙闲原始数据按"这周的周一"缓存起来，翻回看过的周直接画、不再请求；
+// 每一周的忙闲原始数据按"七天的起始日"缓存起来，翻回看过的周直接画、不再请求；
 // 每次画完还会顺手预取上一周/下一周，所以点 ‹ › 绝大多数时候是零等待、不闪一下
 const bwkWeekCache = new Map();
 
@@ -167,10 +167,10 @@ async function bwkLoadWeek(weekStart) {
 
 // 在后台悄悄把相邻两周也取回来，用户点 ‹ › 的时候就已经在缓存里了
 function bwkPrefetchNeighbors() {
-  const todayMonday = bwkMonday(new Date());
+  const todayStart = bwkDayStart(new Date());
   [-7, 7].forEach(off => {
     const w = new Date(bwkAnchor); w.setDate(w.getDate() + off);
-    if (w >= todayMonday) bwkLoadWeek(w).catch(() => {});
+    if (w >= todayStart) bwkLoadWeek(w).catch(() => {});
   });
 }
 
@@ -183,19 +183,15 @@ function bwkBuildDays(rows) {
   const days = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
-    // 已经过去的日子整栏都不画——客人打开就是从今天开始往后看，不用先划过几栏
-    // 点不了的日子。本周因此会少几栏（比如周五打开只剩周五/六/日 3 栏），
-    // 往后翻的周照常是完整 7 栏
-    if (day < today) continue;
+    const weekdayIndex = (day.getDay() + 6) % 7;
     days.push({
-      date: day, weekday: BWK_WEEKDAYS[i],
+      date: day, weekday: BWK_WEEKDAYS[weekdayIndex],
       isToday: day.getTime() === today.getTime(),
       loading: rows === null,
       // 底色按"星期几"的奇偶交替，色号直接用后台那两个（#F7F3EC 是后台 --bg，
       // #F8EED7 是后台 .cal-week-daycol:nth-child(even) 那条规则里的值），不另配一套。
-      // ⚠️ 必须用 i（离周一几天）算，不能用它在 days 里排第几——跳过过去的日子之后
-      // 栏位会往前挪，按位置算会让同一个星期几这周和下周显示成不同底色
-      colTint: i % 2 === 0 ? '#F7F3EC' : '#F8EED7',
+      // 按真实星期几配色，起始日不再固定为周一。
+      colTint: weekdayIndex % 2 === 0 ? '#F7F3EC' : '#F8EED7',
     });
   }
   days.forEach(d => {
@@ -254,13 +250,12 @@ function bwkBlockedTagHtml(run) {
 
 async function renderBwkWeek() {
   const wrap = document.getElementById('bwkGrid');
-  const todayMonday = bwkMonday(new Date());
-  document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayMonday.getTime();
+  const todayStart = bwkDayStart(new Date());
+  if (bwkAnchor < todayStart) bwkAnchor = todayStart;
+  document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayStart.getTime();
 
-  // 标的是**实际画出来的**范围，不是这一周的周一到周日——本周前面几天已经过去、
-  // 整栏都没画，标题却还写着周一的日期就对不上了（第一栏是 9/4，标题写"8月31日 -"）
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const firstDay = bwkAnchor < todayStart ? todayStart : bwkAnchor;
+  // 连续七天，可跨周、跨月和跨年。
+  const firstDay = bwkAnchor;
   const lastDay = new Date(bwkAnchor); lastDay.setDate(lastDay.getDate() + 6);
   document.getElementById('bwkRangeLabel').textContent =
     `${firstDay.getMonth() + 1}月${firstDay.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
@@ -530,7 +525,7 @@ function bwkFinalize(y, m, d, startSlot, endSlot) {
 
 function resetBwkPicker() {
   bwkSelected = null;
-  bwkAnchor = bwkMonday(new Date());
+  bwkAnchor = bwkDayStart(new Date());
   document.getElementById('datetime').value = '';
   document.getElementById('slot').value = '';
   const selEl = document.getElementById('bwkSelectedLabel');
