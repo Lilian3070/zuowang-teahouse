@@ -578,8 +578,39 @@ section {
    行程标题这些隐私细节，格子只剩"能点"（空档，点了选中）跟"不能点"（灰色，占用/关闭/已过去，
    统一不显示原因）两种状态，营业时段之外的时间根本不画格子 */
 .booking-modal-panel { max-width: 640px; }
+.booking-modal-title { flex: 0 0 auto; padding-right: 36px; }
+.booking-modal-title h3 { margin: 0 0 16px; }
+.booking-modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 .bwk-picker {
   border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--paper-deep);
+}
+
+@media (max-width: 860px) {
+  /* 手机小窗口统一不让内容被截断；预约窗口保持标题固定、内容单独滚动。 */
+  .brand-modal-panel:not(.booking-modal-panel) {
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .brand-modal-panel.booking-modal-panel {
+    max-height: calc(100dvh - 32px);
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+  .booking-modal-title {
+    position: relative;
+    z-index: 1;
+    background: var(--paper);
+    padding-top: 0;
+  }
+  .booking-modal-content { padding-bottom: 28px; }
 }
 .bwk-nav {
   display: flex; align-items: center; gap: 8px; margin-bottom: 10px;

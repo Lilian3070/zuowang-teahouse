@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>坐忘茗舍 · 茶 · 器 · 琴</title>
-<link rel="stylesheet" href="styles.css?v=38">
+<link rel="stylesheet" href="styles.css?v=39">
 </head>
 <body>
 
@@ -156,31 +156,32 @@
   <div class="brand-modal-overlay" id="bookingModalOverlay"></div>
   <div class="brand-modal-panel booking-modal-panel" role="dialog" aria-modal="true">
     <button class="modal-close" id="bookingModalClose" type="button" aria-label="关闭">✕</button>
-    <h3 style="margin:0 0 16px">雅室预约</h3>
-
-    <label style="display:block;font-size:0.85rem;color:var(--ink-soft);margin:0 0 4px">选择到访时间</label>
-    <p style="font-size:0.78rem;color:var(--ink-soft);margin:0 0 6px">在空白格子上按住往下拖，拉出想约的时间段（轻点一下＝半小时）</p>
-    <div class="bwk-picker" id="bwkPicker">
-      <div class="bwk-nav">
-        <button type="button" id="bwkPrevBtn" onclick="bwkShiftWeek(-1)">‹</button>
-        <button type="button" class="bwk-today-btn" onclick="bwkGoToday()">今天</button>
-        <span id="bwkRangeLabel"></span>
-        <button type="button" onclick="bwkShiftWeek(1)">›</button>
+    <div class="booking-modal-title"><h3>雅室预约</h3></div>
+    <div class="booking-modal-content">
+      <label style="display:block;font-size:0.85rem;color:var(--ink-soft);margin:0 0 4px">选择到访时间</label>
+      <p style="font-size:0.78rem;color:var(--ink-soft);margin:0 0 6px">在空白格子上按住往下拖，拉出想约的时间段（轻点一下＝半小时）</p>
+      <div class="bwk-picker" id="bwkPicker">
+        <div class="bwk-nav">
+          <button type="button" id="bwkPrevBtn" onclick="bwkShiftWeek(-1)">‹</button>
+          <button type="button" class="bwk-today-btn" onclick="bwkGoToday()">今天</button>
+          <span id="bwkRangeLabel"></span>
+          <button type="button" onclick="bwkShiftWeek(1)">›</button>
+        </div>
+        <div class="bwk-grid" id="bwkGrid"></div>
       </div>
-      <div class="bwk-grid" id="bwkGrid"></div>
+      <p id="bwkSelectedLabel" class="bwk-selected-label">尚未选择时间</p>
+
+      <form class="booking-form real-booking-form" id="realBookingForm" onsubmit="return submitBookingRequest(event)">
+        <input type="hidden" id="datetime" name="datetime">
+        <input type="hidden" id="slot" name="slot">
+
+        <label for="note">备注</label>
+        <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
+
+        <button type="submit" class="submit-btn">提交预约申请</button>
+        <p id="bookingFormStatus" style="margin-top:12px;font-size:0.85rem;min-height:1.2em"></p>
+      </form>
     </div>
-    <p id="bwkSelectedLabel" class="bwk-selected-label">尚未选择时间</p>
-
-    <form class="booking-form real-booking-form" id="realBookingForm" onsubmit="return submitBookingRequest(event)">
-      <input type="hidden" id="datetime" name="datetime">
-      <input type="hidden" id="slot" name="slot">
-
-      <label for="note">备注</label>
-      <textarea id="note" name="note" placeholder="人数、特殊需求等"></textarea>
-
-      <button type="submit" class="submit-btn">提交预约申请</button>
-      <p id="bookingFormStatus" style="margin-top:12px;font-size:0.85rem;min-height:1.2em"></p>
-    </form>
   </div>
 </div>
 
