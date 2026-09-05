@@ -192,6 +192,19 @@
   }
   .sidebar-item:hover { background: var(--bg); color: var(--ink); }
   .sidebar-item.active { background: var(--gold-soft); color: var(--gold); font-weight: 600; }
+  .booking-notice-dot {
+    display: none; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
+    border-radius: 10px; background: var(--red); color: white; font-size: 11px; line-height: 18px;
+    text-align: center; font-weight: 700;
+  }
+  .booking-notice-dot.show { display: inline-block; }
+  .booking-status { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; margin-left: 6px; }
+  .booking-status.pending { color: var(--red); background: var(--red-soft); }
+  .booking-status.confirmed { color: #3f7652; background: #e3efe5; }
+  .booking-status.declined { color: #777; background: #eceae6; }
+  .booking-contact { color: var(--red); font-size: 12px; margin-top: 2px; }
+  .btn-booking-calendar { border-color: var(--sage); color: var(--sage); }
+  .btn-booking-calendar:hover { background: var(--sage); color: white; }
 
   /* 主内容 */
   .main-content { flex: 1; padding: 32px; overflow-auto; }
@@ -604,6 +617,9 @@
   .cal-week-event { background: rgba(168, 137, 74, 0.4); }
   .cal-week-event.res-guqin { background: rgba(155, 74, 62, 0.24); }
   .cal-week-event.res-tea { background: rgba(107, 140, 122, 0.4); }
+  /* 待确认预约不是正式行程：固定用红色，避免被茶室的绿色正式行程误认。 */
+  .cal-event-chip.pending-booking { background: var(--red-soft); color: var(--red); border-left-color: var(--red); font-weight: 700; }
+  .cal-week-event.pending-booking { background: rgba(163, 49, 42, 0.18); color: var(--red); border-left-color: var(--red); font-weight: 700; }
   /* 手动关闭的时段：月视图列表里跟琴/茶/和三种颜色都不一样，用斜纹灰底一眼认出"这段不是行程，
      是主理人关闭的"；周视图不再用这个卡片样式画（改用 .cal-close-overlay，见下面），这条规则
      只剩月视图在用 */
@@ -971,11 +987,11 @@
         <button class="sidebar-item" onclick="switchTab('allmembers')">全部客户资料</button>
         <button class="sidebar-item" onclick="switchTab('qinren')">琴人档案</button>
         <button class="sidebar-item" onclick="switchTab('guests')">茗客档案</button>
-        <button class="sidebar-item" onclick="switchTab('bookings')">茶席预约</button>
+        <button class="sidebar-item" id="sidebar-bookings" onclick="switchTab('bookings')">茶席预约<span class="booking-notice-dot" id="bookingNoticeDot"></span></button>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">行程安排</div>
-        <button class="sidebar-item" onclick="switchTab('schedule')">日程日历</button>
+        <button class="sidebar-item" id="sidebar-schedule" onclick="switchTab('schedule')">日程日历</button>
       </div>
     </div>
 
@@ -1452,6 +1468,24 @@
   </div>
 </div>
 
+<!-- 待确认预约：从预约列表或日程日历都能打开同一套处理入口 -->
+<div class="modal-overlay" id="bookingActionModal">
+  <div class="modal" style="width:440px">
+    <div class="modal-header">
+      <div class="modal-title">处理茶席预约</div>
+      <button type="button" class="modal-close-x" onclick="closeBookingActionModal()" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="bookingActionInfo" style="font-size:14px;line-height:1.8;color:var(--ink)"></div>
+      <div class="modal-actions" style="flex-wrap:wrap">
+        <button class="btn-cancel btn-booking-calendar" onclick="openActiveBookingWeek()">查看日程</button>
+        <button class="btn-delete" onclick="handleActiveBooking('declined')">回绝并留言</button>
+        <button class="btn-save" onclick="handleActiveBooking('confirmed')">确认预约</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 扣课时前确认弹窗：选上课日期，防误点误扣；日期只记录给主理人自己追踪，不显示给客人 -->
 <div class="modal-overlay" id="deductModal">
   <div class="modal" style="width:380px">
@@ -1554,6 +1588,7 @@ const tabConfig = {
 
 async function doLogout() {
   stopSessionWatch();
+  stopBookingNoticeWatch();
   await db.auth.signOut({ scope: 'local' });
   document.getElementById('adminPage').style.display = 'none';
   document.getElementById('loginPage').style.display = 'flex';
@@ -1577,6 +1612,20 @@ function stopSessionWatch() {
   if (sessionWatchTimer) { clearInterval(sessionWatchTimer); sessionWatchTimer = null; }
 }
 
+let bookingNoticeTimer = null;
+function startBookingNoticeWatch() {
+  if (bookingNoticeTimer) return;
+  bookingNoticeTimer = setInterval(async () => {
+    delete tabProductsCache['bookings'];
+    await refreshBookingNotice();
+    if (currentTab === 'schedule') renderCalendar();
+    if (currentTab === 'bookings') loadBookingRequests();
+  }, 60 * 1000);
+}
+function stopBookingNoticeWatch() {
+  if (bookingNoticeTimer) { clearInterval(bookingNoticeTimer); bookingNoticeTimer = null; }
+}
+
 async function showAdmin() {
   const { data: { user } } = await db.auth.getUser();
   if (!user) { document.getElementById('loginPage').style.display = 'flex'; return; }
@@ -1594,6 +1643,8 @@ async function showAdmin() {
   startSessionWatch();
   await loadCategories();
   await loadProducts();
+  refreshBookingNotice();
+  startBookingNoticeWatch();
 }
 
 // 密钥超过 3 天未使用会被自动清理——这个不在网页代码里做，改由 Supabase 自带的
@@ -2586,8 +2637,98 @@ async function saveNewMember() {
 }
 
 // ── 茶席预约申请 ──────────────────────────────────────────
-// 跟会员列表同理，跟 members 分开单独查再前端拼，避免内嵌 join 在 RLS 下漏数据
+const BOOKING_STATUS_LABEL = { pending: '待确认', confirmed: '已确认', declined: '已回绝' };
+const BOOKING_STATUS_ORDER = { pending: 0, confirmed: 1, declined: 2 };
+let activeBookingId = null;
+
+function esc(value) { return String(value || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]); }
+function bookingRange(r) {
+  if (r.start_at && r.end_at) return { start: new Date(r.start_at), end: new Date(r.end_at) };
+  const m = String(r.preferred_time || '').match(/(\d+)月(\d+)日.*·\s*(凌晨|早上|上午|中午|下午|晚上)(\d+):(\d+)-(凌晨|早上|上午|中午|下午|晚上)(\d+):(\d+)/);
+  if (!m) return null;
+  const mins = (p, h, n) => { let x = Number(h) % 12; if (p === '中午' && Number(h) === 12) x = 12; if (p === '下午' || p === '晚上') x += 12; return x * 60 + Number(n); };
+  const y = new Date(r.created_at || Date.now()).getFullYear(), s = mins(m[3], m[4], m[5]), e = mins(m[6], m[7], m[8]);
+  return { start: new Date(y, Number(m[1]) - 1, Number(m[2]), Math.floor(s / 60), s % 60), end: new Date(y, Number(m[1]) - 1, Number(m[2]), Math.floor(e / 60), e % 60) };
+}
+function bookingContact(r) { return [r.member?.phone, r.member?.email].filter(Boolean).join(' · ') || '未填写联系方式'; }
+function findBooking(id) { return (tabProductsCache['bookings'] || []).find(r => r.id === id); }
+function sortBookingRequests(list) { return [...list].sort((a, b) => BOOKING_STATUS_ORDER[a.status] - BOOKING_STATUS_ORDER[b.status] || ((bookingRange(a)?.start || Infinity) - (bookingRange(b)?.start || Infinity))); }
+async function fetchBookingRequests(forceRefresh = false) {
+  if (tabProductsCache['bookings'] && !forceRefresh) return tabProductsCache['bookings'];
+  const [{ data: requests, error }, { data: members }] = await Promise.all([
+    db.from('booking_requests').select('*'), db.from('members').select('id, name, nickname, phone, email'),
+  ]);
+  if (error) throw error;
+  const map = new Map((members || []).map(m => [m.id, m]));
+  return tabProductsCache['bookings'] = (requests || []).map(r => ({ ...r, member: map.get(r.member_id) || null }));
+}
+async function refreshBookingNotice() {
+  try {
+    const pending = (await fetchBookingRequests(true)).filter(r => r.status === 'pending').length;
+    const dot = document.getElementById('bookingNoticeDot');
+    if (dot) { dot.textContent = pending; dot.classList.toggle('show', pending > 0); }
+  } catch (e) {}
+}
 async function loadBookingRequests(forceRefresh = false) {
+  const myTab = currentTab;
+  try {
+    const list = await fetchBookingRequests(forceRefresh);
+    if (currentTab !== myTab) return;
+    renderBookingRequests(sortBookingRequests(list));
+    refreshBookingNotice();
+  } catch (e) { showToast('加载失败：' + e.message); }
+}
+function renderBookingRequests(list) {
+  const el = document.getElementById('productList');
+  if (!list.length) { el.innerHTML = '<div class="empty-state"><div style="font-size:32px">🍵</div><p>暂无预约申请</p></div>'; return; }
+  el.innerHTML = list.map(r => {
+    const name = r.member ? displayMemberName(r.member) : '（会员已删除）';
+    return `<div class="member-row" style="align-items:flex-start;flex-wrap:wrap">
+      <div class="member-avatar">${esc(name).slice(0,1)}</div><div class="member-info">
+      <div class="member-name" style="white-space:normal">${esc(name)}<span class="booking-contact"> · ${esc(bookingContact(r))}</span><span class="booking-status ${r.status}">${BOOKING_STATUS_LABEL[r.status]}</span></div>
+      <div class="member-meta">期望时间：${esc(r.preferred_time || '未填写')}${r.note ? ' · ' + esc(r.note) : ''}</div>
+      ${r.admin_note ? `<div class="member-meta">已回复：${esc(r.admin_note)}</div>` : ''}</div>
+      <div class="product-actions"><button class="btn-edit btn-booking-calendar" onclick="openBookingWeek('${r.id}')">查看日程</button>
+      ${r.status === 'pending' ? `<button class="btn-edit" onclick="setBookingStatus('${r.id}','confirmed')">确认</button><button class="btn-delete" onclick="setBookingStatus('${r.id}','declined')">回绝</button>` : ''}</div></div>`;
+  }).join('');
+}
+async function setBookingStatus(id, status) {
+  const request = findBooking(id) || (await fetchBookingRequests(true)).find(r => r.id === id);
+  if (!request) return;
+  const note = await customPrompt(status === 'confirmed' ? '确认预约' : '回绝预约', status === 'confirmed' ? '给客人留句回复（选填）' : '请给客人留句回绝说明（选填）');
+  if (note === null) return;
+  const update = { status, admin_note: note.trim() || null }, range = bookingRange(request);
+  if (status === 'confirmed' && !request.schedule_event_id) {
+    if (!range) { showToast('这条旧预约没有可识别的时间，请先联系客人确认'); return; }
+    const name = request.member ? displayMemberName(request.member) : '客人';
+    const { data, error: eventError } = await db.from('schedule_events').insert({ title: `茶席预约 · ${name}`, member_id: request.member_id, resource: 'tea', start_at: range.start.toISOString(), end_at: range.end.toISOString(), note: [request.note, note.trim()].filter(Boolean).join(' · ') || null }).select('id').single();
+    if (eventError) { showToast('写入日程失败：' + eventError.message); return; }
+    update.schedule_event_id = data.id;
+  }
+  const { error } = await db.from('booking_requests').update(update).eq('id', id);
+  if (error) { showToast('操作失败：' + error.message); return; }
+  delete tabProductsCache['bookings']; delete tabProductsCache['bookingCalendar']; delete tabProductsCache['schedule'];
+  await refreshBookingNotice();
+  if (currentTab === 'bookings') loadBookingRequests(); else if (currentTab === 'schedule') renderCalendar(true);
+  showToast(status === 'confirmed' ? '已确认，并已写入茶室日程' : '已回绝');
+}
+function openBookingWeek(id) {
+  const r = findBooking(id), range = r && bookingRange(r);
+  if (!range) { showToast('这条旧预约没有可识别的时间'); return; }
+  activeBookingId = id; calAnchor = new Date(range.start); calAnchor.setDate(calAnchor.getDate() - 3); switchTab('schedule', null);
+}
+function openBookingActionModal(id) {
+  const r = findBooking(id); if (!r) return;
+  activeBookingId = id; const name = r.member ? displayMemberName(r.member) : '（会员已删除）';
+  document.getElementById('bookingActionInfo').innerHTML = `<b>${esc(name)}</b><br>联系方式：${esc(bookingContact(r))}<br>期望时间：${esc(r.preferred_time || '未填写')}${r.note ? `<br>备注：${esc(r.note)}` : ''}`;
+  document.getElementById('bookingActionModal').classList.add('open');
+}
+function closeBookingActionModal() { document.getElementById('bookingActionModal').classList.remove('open'); activeBookingId = null; }
+function openActiveBookingWeek() { const id = activeBookingId; closeBookingActionModal(); if (id) openBookingWeek(id); }
+async function handleActiveBooking(status) { const id = activeBookingId; closeBookingActionModal(); if (id) await setBookingStatus(id, status); }
+
+// 跟会员列表同理，跟 members 分开单独查再前端拼，避免内嵌 join 在 RLS 下漏数据
+async function legacyLoadBookingRequests(forceRefresh = false) {
   const myTab = currentTab;
   let list = tabProductsCache['bookings'];
   if (!list || forceRefresh) {
@@ -2604,7 +2745,7 @@ async function loadBookingRequests(forceRefresh = false) {
   renderBookingRequests(list);
 }
 
-function renderBookingRequests(list) {
+function legacyRenderBookingRequests(list) {
   const el = document.getElementById('productList');
   if (!list.length) {
     el.innerHTML = '<div class="empty-state"><div style="font-size:32px">🍵</div><p>暂无预约申请</p></div>';
@@ -2630,7 +2771,7 @@ function renderBookingRequests(list) {
   }).join('');
 }
 
-async function setBookingStatus(id, status) {
+async function legacySetBookingStatus(id, status) {
   const update = { status };
   if (status === 'confirmed') {
     const adminNote = await customPrompt('确认预约', '给客人留句回复（选填，比如确认的具体时间）');
@@ -2642,7 +2783,7 @@ async function setBookingStatus(id, status) {
   loadBookingRequests();
 }
 
-async function deleteBookingRequest(id) {
+async function legacyDeleteBookingRequest(id) {
   if (!(await customConfirm('确定删除这条预约申请吗？'))) return;
   const { error } = await db.from('booking_requests').delete().eq('id', id);
   if (error) { showToast('删除失败：' + error.message); return; }
@@ -3230,6 +3371,19 @@ async function renderCalendar(forceRefresh = false) {
     tabProductsCache['schedule'] = events;
   }
 
+  // 待确认预约不是正式行程，不能写进 schedule_events；但必须叠加到日历，避免主理人
+  // 没先看预约列表就误以为茶室空着。点击红色条可直接确认、回绝或查看完整预约资料。
+  try {
+    const bookings = await fetchBookingRequests();
+    const pendingEvents = bookings.filter(r => r.status === 'pending').map(r => {
+      const range = bookingRange(r);
+      if (!range) return null;
+      const name = r.member ? displayMemberName(r.member) : '客人';
+      return { id: `booking:${r.id}`, bookingId: r.id, title: `待确认预约 · ${name}`, start: range.start, end: range.end, resource: 'tea', isBookingPending: true, isClosed: false };
+    }).filter(Boolean);
+    events = [...events, ...pendingEvents];
+  } catch (e) { /* 预约提示加载失败时，原有日历仍可正常使用 */ }
+
   const el = document.getElementById('calendarEl');
   if (!el) return;
   const canCloseHere = calView === 'month' || calView === 'week';
@@ -3621,9 +3775,11 @@ function renderCalMonth(events) {
     const hasPartialClose = !isFullyClosed && dayEventsAll.some(e => e.isClosed);
     const dayEvents = dayEventsAll.filter(e => !e.isClosed);
     const maxShow = 3;
-    const chips = dayEvents.slice(0, maxShow).map(e =>
-      `<div class="cal-event-chip${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}" onclick="event.stopPropagation();${calCloseMode ? '' : `openEditEventModal('${e.id}')`}">${e.title}</div>`
-    ).join('');
+    const chips = dayEvents.slice(0, maxShow).map(e => {
+      const cls = `${e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : ''}${e.isBookingPending ? ' pending-booking' : ''}`;
+      const action = calCloseMode ? '' : e.isBookingPending ? `openBookingActionModal('${e.bookingId}')` : `openEditEventModal('${e.id}')`;
+      return `<div class="cal-event-chip${cls}" onclick="event.stopPropagation();${action}">${e.title}</div>`;
+    }).join('');
     const more = dayEvents.length > maxShow
       ? `<div class="cal-month-more" onclick="event.stopPropagation();calGoToWeekOfDay(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()})">还有 ${dayEvents.length - maxShow} 条</div>`
       : '';
@@ -3720,7 +3876,9 @@ function renderCalWeek(events) {
       const height = Math.max((eH - sH) * pxPerHour, 20);
       // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
       const resCls = e.resource === 'guqin' ? ' res-guqin' : e.resource === 'tea' ? ' res-tea' : '';
-      return `<div class="cal-week-event${resCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();openEditEventModal('${e.id}')">${e.title}</div>`;
+      const pendingCls = e.isBookingPending ? ' pending-booking' : '';
+      const action = e.isBookingPending ? `openBookingActionModal('${e.bookingId}')` : `openEditEventModal('${e.id}')`;
+      return `<div class="cal-week-event${resCls}${pendingCls}" style="top:${top}px;height:${height}px" onclick="event.stopPropagation();${action}">${e.title}</div>`;
     }).join('');
     // 平时不在编辑模式，画关闭时段用的数据源改成跟编辑模式一样的"合并后的生效区间"
     // （calCloseWeekEffectiveRuns），不再直接按数据库里每一条 is_closed 记录各自的
@@ -4324,11 +4482,12 @@ function quickAddEventForMember() {
   openAddEventModal(currentMemberId);
 }
 
-function switchTab(tab) {
+function switchTab(tab, source = undefined) {
   currentTab = tab;
   currentFilter = null;
   document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-  event.target.classList.add('active');
+  const trigger = source === undefined && typeof event !== 'undefined' ? event.currentTarget : (source || document.getElementById(`sidebar-${tab}`));
+  if (trigger) trigger.classList.add('active');
   document.getElementById('pageTitle').textContent = tabConfig[tab].title;
   document.getElementById('pageSubtitle').textContent = tabConfig[tab].subtitle;
   resetCatPanel();

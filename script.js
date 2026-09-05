@@ -88,9 +88,17 @@ async function submitBookingRequest(event) {
   if (!currentMemberId) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先登录会员账号'; return false; }
   const datetime = document.getElementById('datetime').value.trim();
   const slot = document.getElementById('slot').value;
-  if (!datetime || !slot) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先在上方选择到访时间'; return false; }
+  if (!datetime || !slot || !bwkSelected) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '请先在上方选择到访时间'; return false; }
   const note = document.getElementById('note').value.trim();
-  const { error } = await db.from('booking_requests').insert({ member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note });
+  const startAt = new Date(bwkSelected.y, bwkSelected.m, bwkSelected.d, Math.floor(bwkSelected.startSlot / 2), bwkSelected.startSlot % 2 ? 30 : 0);
+  const endAt = new Date(bwkSelected.y, bwkSelected.m, bwkSelected.d, Math.floor(bwkSelected.endSlot / 2), bwkSelected.endSlot % 2 ? 30 : 0);
+  const { error } = await db.from('booking_requests').insert({
+    member_id: currentMemberId,
+    preferred_time: datetime + ' · ' + slot,
+    note,
+    start_at: startAt.toISOString(),
+    end_at: endAt.toISOString(),
+  });
   if (error) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '提交失败：' + error.message; return false; }
   statusEl.style.color = '#cfe0b8';
   statusEl.textContent = '已收到您的预约申请，我们会尽快与您确认。';
