@@ -595,63 +595,78 @@ section {
 .bwk-nav button:hover:not(:disabled) { border-color: var(--seal); color: var(--seal); }
 .bwk-nav button:disabled { opacity: 0.35; cursor: default; }
 
-/* 整张表（时间轴 + 每天一列）放在一个能上下、左右都滚动的框里，表头行和时间轴列各自
-   position:sticky，滚动的时候始终看得到"这是星期几/几点"，跟后台周视图翻看长列表时
-   的体验是一个道理 */
+/* 整张表（每天一列）放在一个能上下、左右都滚动的框里，表头行 position:sticky，
+   滚动时始终看得到"这是星期几"。
+   跟后台周视图最大的结构差别：**没有左边那根时间轴列**——客人不像主理人那样要对着时间轴
+   读一条条行程，时间直接印在每个能约的格子里，省下来的 46px 全部分给七天那几列。 */
 /* ⚠️ 下面这些数值不是随手定的，是照抄 admin.html 后台周视图的真实参数，改之前先去那边对一眼：
    边框色 #D8D0C0（后台 --border）、隔天底色 #F8EED7（后台 .cal-week-daycol:nth-child(even)）、
-   半小时格高 24px（后台 calWeekPxPerHour = 48）、时间标 9px/10px 两行（后台手机版 @media 那套）、
+   半小时格高 24px（后台 calWeekPxPerHour = 48）、时间文字 9px/10px（后台手机版 @media 那套）、
    半点线 dashed + 更淡。目的是让客人看到的这张表跟主理人后台那张是同一个组件，不是"长得像"。 */
 .bwk-table-wrap { position: relative; max-height: 360px; overflow: auto; border: 1px solid #D8D0C0; border-radius: 6px; }
-/* 结构跟后台 .cal-week-wrap 一样：左边一整根时间轴列 + 右边七天各一列。
-   不能用 CSS Grid 平铺格子——那样时间轴列的 position:sticky 会失效（grid 子项的包含块
-   就是它自己那一格，没有可以"吸"的余量），横向一滚时间轴就跑没了 */
+/* ⚠️ 不能改用 CSS Grid 平铺格子——那样表头 .bwk-col-head 的 position:sticky 会失效
+   （grid 子项的包含块就是它自己那一格，没有可以"吸"的余量），纵向一滚"星期几"就跑没了 */
 .bwk-table { display: flex; min-width: min-content; }
-.bwk-timecol {
-  position: sticky; left: 0; z-index: 4; flex: 0 0 46px; width: 46px;
-  background: var(--paper-deep); border-right: 1px solid #D8D0C0;
-}
 .bwk-days { display: flex; flex: 1; }
-.bwk-day-col { position: relative; flex: 1 0 46px; min-width: 46px; background: var(--col-tint, #F7F3EC); }
-.bwk-corner, .bwk-col-head {
+/* 列宽从 46px 提到 58px：格子里现在要装得下"晚上10:30"这种完整时间标（10px 字号约
+   48px 宽 + 左右留白）。因为同时砍掉了 46px 的时间轴列，一屏能看到的天数反而没变少 */
+.bwk-day-col { position: relative; flex: 1 0 58px; min-width: 58px; background: var(--col-tint, #F7F3EC); }
+.bwk-col-head {
   position: sticky; top: 0; background: var(--paper-deep); z-index: 3;
   height: 40px; box-sizing: border-box;
   padding: 4px 2px; text-align: center; font-size: 0.7rem; color: var(--ink-soft);
   border-bottom: 1px solid #D8D0C0;
+  white-space: nowrap;
 }
-.bwk-col-head { white-space: nowrap; }
 .bwk-col-head b { display: block; font-size: 0.78rem; color: var(--ink); }
 .bwk-col-head.today b { color: var(--seal); }
 /* 已经过去的日子这一列还是照画（一周七天要完整），只是整列都不能点，表头也跟着淡下去 */
 .bwk-col-head.past { opacity: 0.45; }
 
-/* 时间标：跟后台一样每半小时都标，整点正常、半点小一号且淡一点；文字跨在网格线上
-   （后台是 transform: translateY(-6px)，这里放在内层 span 上做，免得影响外层的 sticky） */
-.bwk-time-label {
-  height: 24px; box-sizing: border-box; color: #4A5C5A; padding: 0 4px;
-  display: flex; align-items: flex-start; justify-content: flex-end;
-  border-top: 1px dashed rgba(74, 92, 90, 0.4);
-}
-.bwk-time-txt {
-  display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15;
-  transform: translateY(-6px);
-}
-.bwk-time-txt .p { font-size: 9px; }
-.bwk-time-txt .t { font-size: 10px; }
-.bwk-time-label.half .bwk-time-txt { opacity: 0.7; }
-.bwk-time-label.half .bwk-time-txt .t { font-size: 9px; }
-
 /* 每天列自己的底色（单双日交替，--col-tint 由 JS 传进来，值直接用后台那两个色号），
    忙/闲状态再叠一层上去，不是拿纯灰/纯红盖住整格——这样还看得出"这是哪一天" */
-/* 高度必须跟 .bwk-time-label 一模一样（24px，后台 pxPerHour 48 的一半），
-   两边是各自独立的列，靠固定行高对齐，差一点点整张表的横线就会错开 */
-.bwk-cell { height: 24px; box-sizing: border-box; border-top: 1px dashed rgba(74, 92, 90, 0.4); border-left: 1px solid #D8D0C0; }
-.bwk-cell.hour-start, .bwk-time-label.hour { border-top: 1px solid #D8D0C0; }
-/* 灰=不能点（占用/关闭/已过去，客人不需要知道具体哪种），斜纹阴影跟后台"关闭时段"
-   那套是同一个视觉语言；红=能点，点了变实心红；点了起点还没点终点的格子描一圈虚线框，
-   提示"这是起点，再点一下同一天更晚的格子选终点" */
+/* 24px = 后台 pxPerHour 48 的一半；这个高度同时被 JS 里的 BWK_SLOT_H 用来算"手指落在
+   第几格"和预选框的定位，改这里必须同步改那边 */
+.bwk-cell {
+  height: 24px; box-sizing: border-box;
+  border-top: 1px dashed rgba(74, 92, 90, 0.4); border-left: 1px solid #D8D0C0;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.bwk-cell.hour-start { border-top: 1px solid #D8D0C0; }
+/* 格子里的时间：淡灰色，不要正文那种深墨色——它是"这一格是几点"的注解，
+   真正要一眼看出来的是"哪几格能点、哪几段不能点"，时间字太黑会盖过这件事。
+   半点那行跟后台时间轴一样再小一号、再淡一点，保留整点/半点两级的层次 */
+.bwk-cell-time {
+  font-size: 10px; line-height: 1; white-space: nowrap;
+  color: rgba(74, 92, 90, 0.55);
+  user-select: none; -webkit-user-select: none;
+}
+.bwk-cell:not(.hour-start) .bwk-cell-time { font-size: 9px; opacity: 0.75; }
+/* 被预选框盖住的格子藏掉时间文字——那一段的时间由框上的"开始/时长/结束"三个标负责，
+   逐格再印一遍会跟它们叠在一起糊掉（用 visibility 不用 display，格子高度不变） */
+.bwk-cell.masked .bwk-cell-time { visibility: hidden; }
+/* 灰斜纹=不能约（被占用、主理人关了、或者已经过去），斜纹跟后台"关闭时段"是同一套
+   视觉语言。具体是哪种原因客人看不到，只在整段上盖一个"已约满"／"已过"的字 */
 .bwk-cell.busy {
   background-image: repeating-linear-gradient(45deg, rgba(43, 40, 34, 0.22) 0, rgba(43, 40, 34, 0.22) 1px, transparent 1px, transparent 7px);
+}
+/* 不能约的那一整段上盖一个说明标：连着的格子只写一次，不是每格都写。
+   文字是 position:sticky——一段很长（比如一整天都已经过去）时往下滚也一直贴在可视区
+   顶下方跟着走，不会滚到中段就不知道这一片是什么状态。top 取 40px 正好卡在表头下沿 */
+/* ⚠️ 这里绝对不能加 overflow:hidden——sticky 元素只要有一个 overflow 不是 visible 的
+   祖先，就会改用那个祖先当滚动容器；那个容器自己不滚动，于是 sticky 完全失效，
+   文字又变回死死钉在这一段的顶端。踩过一次，去掉才吸得住 */
+.bwk-blocked-tag {
+  position: absolute; left: 0; right: 0; z-index: 2;
+  pointer-events: none; text-align: center;
+}
+/* 文字底下垫一层这一天自己的底色（--col-tint 从 .bwk-day-col 继承下来），
+   把斜纹压住，不然细斜线横穿字面，"已约满"三个字糊在纹路里不好认 */
+.bwk-blocked-tag span {
+  display: inline-block; position: sticky; top: 40px;
+  font-size: 10px; line-height: 24px; font-weight: 600;
+  letter-spacing: 0.04em; white-space: nowrap; color: rgba(74, 92, 90, 0.78);
+  background: var(--col-tint, #F7F3EC); padding: 0 5px; border-radius: 3px;
 }
 /* 这一周的数据还在路上：表格结构照常摆着（不清空、不闪），格子先淡一点表示还不能点，
    数据回来原地换成真实忙闲 */

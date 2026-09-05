@@ -196,7 +196,15 @@ function bwkBuildDays(rows) {
   days.forEach(d => {
     const dayStart = d.date;
     const busy = new Array(48).fill(false);
-    if (d.isPast || rows === null) { busy.fill(true); d.busy = busy; return; }
+    // reason 记的是"这格为什么不能约"：'past'=已经过去了、'full'=被占用或主理人关了。
+    // 客人只看得到这两种说法，看不出到底是别人订了还是主理人关店（那是隐私，见
+    // get_tea_busy_ranges 只返回起止时间的设计）；null=能约，或者数据还在路上还不知道
+    const reason = new Array(48).fill(null);
+    d.busy = busy; d.reason = reason;
+    if (d.isPast) { busy.fill(true); reason.fill('past'); return; }
+    // 数据还没回来：整列先按"不可点"画骨架，但不写"已约满"——还不知道满没满，
+    // 写了等数据回来又变回空档，等于骗了客人一下
+    if (rows === null) { busy.fill(true); return; }
     rows.forEach(r => {
       const s = new Date(r.start_at), e = new Date(r.end_at);
       const sSlot = Math.max(0, Math.floor((s - dayStart) / 60000 / 30));
@@ -205,11 +213,39 @@ function bwkBuildDays(rows) {
     });
     if (d.isToday) {
       const nowSlot = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30);
-      for (let k = 0; k < Math.min(48, nowSlot); k++) busy[k] = true;
+      // 今天已经过去的那几格标 'past' 而不是 'full'——哪怕它同时也被行程占着，
+      // 对客人来说"已过"才是更有用的说法
+      for (let k = 0; k < Math.min(48, nowSlot); k++) { busy[k] = true; reason[k] = 'past'; }
     }
-    d.busy = busy;
+    for (let k = 0; k < 48; k++) if (busy[k] && !reason[k]) reason[k] = 'full';
   });
   return days;
+}
+
+// 把一列里连续的不可约格子合并成"一段"，好在整段中间写一次"已约满"／"已过"，
+// 而不是每格都写一遍（每格都写既啰嗦又看不出这一整段是连着的）
+function bwkBlockedRuns(d) {
+  const runs = [];
+  let k = BOOKING_BUSINESS_START_SLOT;
+  while (k < BOOKING_BUSINESS_END_SLOT) {
+    const r = d.reason[k];
+    if (!r) { k++; continue; }
+    let j = k;
+    while (j < BOOKING_BUSINESS_END_SLOT && d.reason[j] === r) j++;
+    runs.push({ s0: k, s1: j, reason: r });
+    k = j;
+  }
+  return runs;
+}
+
+// 不可约那一段上盖的说明标：绝对定位盖住整段，pointer-events:none 不挡下面的格子。
+// 文字本身在 CSS 里是 position:sticky，一段很长（比如整天已过去）时向下滚也一直跟着，
+// 不会滚到中间就看不见这段是什么状态
+function bwkBlockedTagHtml(run) {
+  const top = BWK_HEAD_H + (run.s0 - BOOKING_BUSINESS_START_SLOT) * BWK_SLOT_H;
+  const height = (run.s1 - run.s0) * BWK_SLOT_H;
+  const text = run.reason === 'past' ? '已过' : '已约满';
+  return `<div class="bwk-blocked-tag" style="top:${top}px;height:${height}px"><span>${text}</span></div>`;
 }
 
 async function renderBwkWeek() {
@@ -252,35 +288,42 @@ function bwkPaintGrid() {
   const wrap = document.getElementById('bwkGrid');
   const days = bwkDaysData;
 
-  // DOM 结构也照后台来：左边一整根时间轴列 + 右边七天各自一列（后台是 .cal-week-timecol +
-  // .cal-week-days > .cal-week-daycol）。之前用 CSS Grid 平铺所有格子，结果时间轴列的
-  // position:sticky 失效——grid 子项的包含块是它自己那一格，根本没有可以"吸"的空间，
-  // 横向一滚时间轴就跟着跑没了。改成 flex 分列之后，时间轴列的包含块是整张表，才吸得住。
-  let timeColHtml = '<div class="bwk-corner"></div>';
-  for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
-    // 跟后台一样每半小时都标时间（半点那行小一号、淡一点），不是只标整点
-    const tp = bwkFormatSlotParts(k);
-    timeColHtml += `<div class="bwk-time-label${k % 2 === 0 ? ' hour' : ' half'}"><span class="bwk-time-txt"><span class="p">${tp.period}</span><span class="t">${tp.time}</span></span></div>`;
-  }
-
+  // DOM 结构：七天各自一列，flex 分列（后台是 .cal-week-timecol + .cal-week-days >
+  // .cal-week-daycol，这里砍掉了左边那根时间轴列——客人不写备忘录、不用对着时间轴读行程，
+  // 时间直接印在每个能约的格子里，省下的宽度分给七天）。
+  // ⚠️ 仍然不能改用 CSS Grid 平铺格子：表头 .bwk-col-head 的 position:sticky 会失效
+  // （grid 子项的包含块是它自己那一格，没有可以"吸"的余量），纵向一滚"星期几"就跑没了。
   const daysHtml = days.map(d => {
     const y = d.date.getFullYear(), m = d.date.getMonth(), dd = d.date.getDate();
-    let cellsHtml = `<div class="bwk-col-head${d.isToday ? ' today' : ''}${d.isPast ? ' past' : ''}"><span>星期${d.weekday}</span><b>${m + 1}/${dd}</b></div>`;
-    for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
-      const isHour = k % 2 === 0;
-      if (d.busy[k]) {
-        cellsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}"></div>`;
-        continue;
-      }
-      cellsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}" data-slot="${k}"></div>`;
-    }
-    // 这一天有没有正在拖的预选、或者已经选定的时间段——有的话盖一个带起止时间和时长的框
+    // 先算这一天有没有正在拖的预选／已经选定的时间段——被选中盖住的格子不再印时间，
+    // 那个框上已经写了开始时间、结束时间和总时长，格子里再逐格印一遍会糊成一片
     const drag = bwkDrag && bwkDrag.dragging && bwkSameDay(bwkDrag, y, m, dd)
       ? { s0: Math.min(bwkDrag.anchor, bwkDrag.cur), s1: Math.max(bwkDrag.anchor, bwkDrag.cur) + 1, done: false }
       : (bwkSelected && bwkSameDay(bwkSelected, y, m, dd)
         ? { s0: bwkSelected.startSlot, s1: bwkSelected.endSlot, done: true } : null);
+
+    let cellsHtml = `<div class="bwk-col-head${d.isToday ? ' today' : ''}${d.isPast ? ' past' : ''}"><span>星期${d.weekday}</span><b>${m + 1}/${dd}</b></div>`;
+    for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
+      const isHour = k % 2 === 0;
+      // 时间印在格子里，格式跟原来那根时间轴一模一样（早上/上午/中午/下午/晚上 + 12 小时制，
+      // 跟后台 periodWordForHour 同一套），只是颜色淡成灰的，不跟"哪里能点"抢注意力
+      const tp = bwkFormatSlotParts(k);
+      const timeHtml = `<span class="bwk-cell-time">${tp.period}${tp.time}</span>`;
+      if (d.busy[k]) {
+        // 已经确定不能约的格子不写时间（写了也点不了，只是噪音），整段上面统一盖一个
+        // "已约满"／"已过"。但 reason 还是空的意味着数据没回来、还不知道能不能约——
+        // 那种情况照样把时间印出来，表格一开始就是完整的样子，等数据到了只是"哪几格
+        // 能点"变一下，不会有一片文字凭空长出来（不许再犯.md 第 1 条）
+        cellsHtml += `<div class="bwk-cell busy${isHour ? ' hour-start' : ''}">${d.reason[k] ? '' : timeHtml}</div>`;
+        continue;
+      }
+      const masked = drag && k >= drag.s0 && k < drag.s1 ? ' masked' : '';
+      cellsHtml += `<div class="bwk-cell open${isHour ? ' hour-start' : ''}${masked}" data-slot="${k}">${timeHtml}</div>`;
+    }
+    // 数据还在路上时 reason 全是空的（见 bwkBuildDays），这里自然一个标也不画
+    const blockedHtml = bwkBlockedRuns(d).map(bwkBlockedTagHtml).join('');
     const selBoxHtml = drag ? bwkSelBoxHtml(drag.s0, drag.s1, drag.done) : '';
-    return `<div class="bwk-day-col${d.isToday ? ' today' : ''}${d.loading ? ' loading' : ''}" style="--col-tint:${d.colTint}" data-y="${y}" data-m="${m}" data-d="${dd}">${cellsHtml}${selBoxHtml}</div>`;
+    return `<div class="bwk-day-col${d.isToday ? ' today' : ''}${d.loading ? ' loading' : ''}" style="--col-tint:${d.colTint}" data-y="${y}" data-m="${m}" data-d="${dd}">${cellsHtml}${blockedHtml}${selBoxHtml}</div>`;
   }).join('');
 
   // 重画（比如点了起点要高亮）会把整块 HTML 换掉，滚动位置会跟着归零——先记下来再还原，
@@ -289,7 +332,7 @@ function bwkPaintGrid() {
   const keepTop = prevWrap ? prevWrap.scrollTop : null;
   const keepLeft = prevWrap ? prevWrap.scrollLeft : null;
 
-  wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table"><div class="bwk-timecol">${timeColHtml}</div><div class="bwk-days">${daysHtml}</div></div></div>`;
+  wrap.innerHTML = `<div class="bwk-table-wrap"><div class="bwk-table"><div class="bwk-days">${daysHtml}</div></div></div>`;
 
   const tableWrap = wrap.querySelector('.bwk-table-wrap');
   // 拖拽的起手式挂在整张表上（事件委托），重画之后不用一个个格子重新绑
@@ -303,9 +346,10 @@ function bwkPaintGrid() {
   } else {
     // 头一次画这一周：本周的话前面几列是已经过去的日子，默认横向滚到"今天"这一列，
     // 免得一打开看到的全是灰掉的过去几天，还得自己往右划才找得到能约的日子
+    // 原来这里要减掉 46px（左边那根时间轴列的宽度），现在没有时间轴列了，直接对齐列本身
     const firstPickable = tableWrap.querySelector('.bwk-day-col.today') ||
       [...tableWrap.querySelectorAll('.bwk-day-col')].find(c => !c.querySelector('.bwk-col-head.past'));
-    if (firstPickable) tableWrap.scrollLeft = Math.max(0, firstPickable.offsetLeft - 46);
+    if (firstPickable) tableWrap.scrollLeft = Math.max(0, firstPickable.offsetLeft);
   }
 }
 
@@ -318,6 +362,9 @@ function bwkSameDay(o, y, m, d) { return o.y === y && o.m === m && o.d === d; }
 // 会明显发顿，滚动位置也要来回还原（见 不许再犯.md 第 1 条）
 function bwkUpdateSelBox() {
   document.querySelectorAll('.bwk-selbox').forEach(el => el.remove());
+  // 上一次被选框盖住、藏起了时间文字的格子先还原（数量就是上次选了几格，很少，
+  // 不是遍历整张表重建）
+  document.querySelectorAll('.bwk-cell.masked').forEach(el => el.classList.remove('masked'));
   let sel = null;
   if (bwkDrag && bwkDrag.dragging) {
     sel = { y: bwkDrag.y, m: bwkDrag.m, d: bwkDrag.d, done: false,
@@ -328,7 +375,14 @@ function bwkUpdateSelBox() {
   }
   if (!sel) return;
   const col = document.querySelector(`.bwk-day-col[data-y="${sel.y}"][data-m="${sel.m}"][data-d="${sel.d}"]`);
-  if (col) col.insertAdjacentHTML('beforeend', bwkSelBoxHtml(sel.s0, sel.s1, sel.done));
+  if (!col) return;
+  col.insertAdjacentHTML('beforeend', bwkSelBoxHtml(sel.s0, sel.s1, sel.done));
+  // 选中范围内的格子藏掉各自的时间文字：这一段的时间信息由选框上的
+  // "开始时间 / 时长 / 结束时间"三个标负责，格子里再逐格印一遍会跟它叠在一起看不清
+  for (let k = sel.s0; k < sel.s1; k++) {
+    const cell = col.querySelector(`.bwk-cell[data-slot="${k}"]`);
+    if (cell) cell.classList.add('masked');
+  }
 }
 
 // 拖出来的预选框 / 选定后的时间段：上贴开始时间、下贴结束时间，中间够高就写时长，
@@ -336,11 +390,20 @@ function bwkUpdateSelBox() {
 function bwkSelBoxHtml(s0, s1, done) {
   const top = BWK_HEAD_H + (s0 - BOOKING_BUSINESS_START_SLOT) * BWK_SLOT_H;
   const height = (s1 - s0) * BWK_SLOT_H;
-  const hours = (s1 - s0) * 0.5;
-  const durHtml = height >= 56 ? `<span class="bwk-selbox-duration">${hours}小时</span>` : '';
+  // 两个时间标各占 15px（10px 字 × line-height 1.5）、时长标约 12px、上下内边距 4px：
+  // 48px（选了 1 小时）就装得下三样，24px（只选了半小时）连两个时间标都放不下——
+  // 硬塞会被 overflow:hidden 从中间裁掉半行，那种情况只写开始时间，
+  // 完整的"起-止 · 共多久"由表格下面那行"已选：…"负责交代
+  const durHtml = height >= 48 ? `<span class="bwk-selbox-duration">${bwkFormatDuration(s0, s1)}</span>` : '';
+  const endHtml = height >= 48 ? `<span class="bwk-selbox-label">${bwkFormatSlot(s1)}</span>` : '';
   return `<div class="bwk-selbox${done ? ' done' : ''}" style="top:${top}px;height:${height}px">` +
-    `<span class="bwk-selbox-label">${bwkFormatSlot(s0)}</span>${durHtml}` +
-    `<span class="bwk-selbox-label">${bwkFormatSlot(s1)}</span></div>`;
+    `<span class="bwk-selbox-label">${bwkFormatSlot(s0)}</span>${durHtml}${endHtml}</div>`;
+}
+
+// 半小时的整数倍：0.5 说成"30分钟"更顺口，其余照旧"1小时"/"1.5小时"
+function bwkFormatDuration(s0, s1) {
+  const hours = (s1 - s0) * 0.5;
+  return hours < 1 ? '30分钟' : `${hours}小时`;
 }
 
 // ── 拖拽选时间段（跟后台周视图一样的手势）──
@@ -454,7 +517,8 @@ function bwkFinalize(y, m, d, startSlot, endSlot) {
   document.getElementById('datetime').value = dateLabel;
   document.getElementById('slot').value = label;
   const selEl = document.getElementById('bwkSelectedLabel');
-  selEl.textContent = `已选：${dateLabel} ${label}`;
+  // 这行永远写全"起-止 · 共多久"——选框太矮时框里只写得下开始时间，靠这行兜底
+  selEl.textContent = `已选：${dateLabel} ${label} · 共 ${bwkFormatDuration(startSlot, endSlot)}`;
   selEl.classList.add('picked');
   bwkUpdateSelBox();
 }
