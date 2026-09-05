@@ -603,7 +603,7 @@ section {
    边框色 #D8D0C0（后台 --border）、隔天底色 #F8EED7（后台 .cal-week-daycol:nth-child(even)）、
    半小时格高 24px（后台 calWeekPxPerHour = 48）、时间文字 9px/10px（后台手机版 @media 那套）、
    半点线 dashed + 更淡。目的是让客人看到的这张表跟主理人后台那张是同一个组件，不是"长得像"。 */
-.bwk-table-wrap { position: relative; max-height: 360px; overflow: auto; border: 1px solid #D8D0C0; border-radius: 6px; }
+.bwk-table-wrap { position: relative; max-height: 360px; overflow: auto; overscroll-behavior: contain; border: 1px solid #D8D0C0; border-radius: 6px; }
 /* ⚠️ 不能改用 CSS Grid 平铺格子——那样表头 .bwk-col-head 的 position:sticky 会失效
    （grid 子项的包含块就是它自己那一格，没有可以"吸"的余量），纵向一滚"星期几"就跑没了 */
 .bwk-table { display: flex; min-width: min-content; }
@@ -699,6 +699,21 @@ section {
 .bwk-loading { text-align: center; font-size: 0.85rem; color: var(--ink-soft); padding: 20px 0; }
 .bwk-selected-label { font-size: 0.85rem; color: var(--ink-soft); margin: 10px 0 16px; }
 .bwk-selected-label.picked { color: var(--seal); font-weight: 600; }
+
+@media (max-width: 600px) {
+  /* 手机端七列必须一屏完整呈现：把每列改为等分，不再保留桌面 58px 的最小宽度。 */
+  .booking-modal-panel { overscroll-behavior: contain; }
+  .bwk-picker { padding: 8px; }
+  .bwk-nav { gap: 4px; }
+  .bwk-nav button { padding: 2px 8px; }
+  .bwk-table { width: 100%; min-width: 0; }
+  .bwk-days { min-width: 0; }
+  .bwk-day-col { flex: 1 1 0; min-width: 0; max-width: none; }
+  .bwk-col-head { padding: 4px 0; font-size: 0.64rem; }
+  .bwk-col-head b { font-size: 0.72rem; }
+  .bwk-cell-time { font-size: 9px; }
+  .bwk-cell:not(.hour-start) .bwk-cell-time { font-size: 8px; }
+}
 
 .submit-btn {
   margin-top: 22px;

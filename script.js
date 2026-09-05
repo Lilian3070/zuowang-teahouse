@@ -61,6 +61,7 @@ function openBookingModal() {
   const modal = document.getElementById('bookingModal');
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
   bwkAnchor = bwkDayStart(new Date());
   renderBwkWeek();
 }
@@ -69,6 +70,7 @@ function closeBookingModal() {
   const modal = document.getElementById('bookingModal');
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
 }
 
 async function submitBookingRequest(event) {
@@ -188,10 +190,9 @@ function bwkBuildDays(rows) {
       date: day, weekday: BWK_WEEKDAYS[weekdayIndex],
       isToday: day.getTime() === today.getTime(),
       loading: rows === null,
-      // 底色按"星期几"的奇偶交替，色号直接用后台那两个（#F7F3EC 是后台 --bg，
-      // #F8EED7 是后台 .cal-week-daycol:nth-child(even) 那条规则里的值），不另配一套。
-      // 按真实星期几配色，起始日不再固定为周一。
-      colTint: weekdayIndex % 2 === 0 ? '#F7F3EC' : '#F8EED7',
+      // 客人看到的七天从今天起排开，因此底色也从第一栏开始严格黄白交替；
+      // 不跟星期几绑定，否则从周六开始会出现黄、白、白、黄的错位。
+      colTint: i % 2 === 0 ? '#F8EED7' : '#F7F3EC',
     });
   }
   days.forEach(d => {
