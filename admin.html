@@ -3900,9 +3900,17 @@ function renderCalWeek(events) {
     // 关闭状态"，也不会挡住背后的格线
     const dayEventsAll = weekEvents.filter(e => calSameDay(e.start, day) || (e.start < day && e.end > day));
     const normalEvents = dayEventsAll.filter(e => !e.isClosed);
+    // 跨午夜的行程会同时被前一天和后一天捞进来，所以必须先把它**裁到当天**再算位置。
+    // 原来直接用 e.start.getHours()：在"后一天"那一段上算出来还是起点那个钟点（比如 23 点），
+    // 于是第二天的 23 点又冒出一个 20px 的残块。平时营业 9:30-23:30 跨不了午夜所以没露出来，
+    // 一旦有跨午夜的行程（或者时区把时间推过午夜）就会看到同一条行程画成两块
+    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
     const eventsHtml = normalEvents.map(e => {
-      const sH = Math.max(e.start.getHours() + e.start.getMinutes() / 60, gridStart);
-      const eH = Math.min(e.end.getHours() + e.end.getMinutes() / 60, gridEnd);
+      const clipStart = Math.max(e.start.getTime(), day.getTime());
+      const clipEnd = Math.min(e.end.getTime(), dayEnd.getTime());
+      const sH = Math.max((clipStart - day.getTime()) / 3600000, gridStart);
+      const eH = Math.min((clipEnd - day.getTime()) / 3600000, gridEnd);
+      if (eH <= sH) return ''; // 裁完之后完全落在可见时间轴之外，这一天不用画
       const top = (sH - gridStart) * pxPerHour;
       const height = Math.max((eH - sH) * pxPerHour, 20);
       // 琴占左半栏、茶占右半栏、两者都占就通栏，跟每天表头的琴/茶图标对应
