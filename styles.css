@@ -607,10 +607,16 @@ section {
 /* ⚠️ 不能改用 CSS Grid 平铺格子——那样表头 .bwk-col-head 的 position:sticky 会失效
    （grid 子项的包含块就是它自己那一格，没有可以"吸"的余量），纵向一滚"星期几"就跑没了 */
 .bwk-table { display: flex; min-width: min-content; }
-.bwk-days { display: flex; flex: 1; }
+/* 过去的日子整栏不画，所以本周栏数会变少（周六打开只剩两栏）。栏少的时候让它们
+   居中、并且限一个最大宽度——不然 flex 会把仅剩的一两栏拉到满框宽，24px 高的格子
+   被抻成几百像素的长条就不像张表了 */
+.bwk-days { display: flex; flex: 1; justify-content: center; }
 /* 列宽从 46px 提到 58px：格子里现在要装得下"晚上10:30"这种完整时间标（10px 字号约
    48px 宽 + 左右留白）。因为同时砍掉了 46px 的时间轴列，一屏能看到的天数反而没变少 */
-.bwk-day-col { position: relative; flex: 1 0 58px; min-width: 58px; background: var(--col-tint, #F7F3EC); }
+.bwk-day-col {
+  position: relative; flex: 1 1 58px; min-width: 58px; max-width: 150px;
+  background: var(--col-tint, #F7F3EC);
+}
 .bwk-col-head {
   position: sticky; top: 0; background: var(--paper-deep); z-index: 3;
   height: 40px; box-sizing: border-box;
@@ -620,8 +626,6 @@ section {
 }
 .bwk-col-head b { display: block; font-size: 0.78rem; color: var(--ink); }
 .bwk-col-head.today b { color: var(--seal); }
-/* 已经过去的日子这一列还是照画（一周七天要完整），只是整列都不能点，表头也跟着淡下去 */
-.bwk-col-head.past { opacity: 0.45; }
 
 /* 每天列自己的底色（单双日交替，--col-tint 由 JS 传进来，值直接用后台那两个色号），
    忙/闲状态再叠一层上去，不是拿纯灰/纯红盖住整格——这样还看得出"这是哪一天" */

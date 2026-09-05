@@ -183,13 +183,18 @@ function bwkBuildDays(rows) {
   const days = [];
   for (let i = 0; i < 7; i++) {
     const day = new Date(bwkAnchor); day.setDate(day.getDate() + i);
+    // 已经过去的日子整栏都不画——客人打开就是从今天开始往后看，不用先划过几栏
+    // 点不了的日子。本周因此会少几栏（比如周五打开只剩周五/六/日 3 栏），
+    // 往后翻的周照常是完整 7 栏
+    if (day < today) continue;
     days.push({
       date: day, weekday: BWK_WEEKDAYS[i],
       isToday: day.getTime() === today.getTime(),
-      isPast: day < today,
       loading: rows === null,
       // 底色按"星期几"的奇偶交替，色号直接用后台那两个（#F7F3EC 是后台 --bg，
-      // #F8EED7 是后台 .cal-week-daycol:nth-child(even) 那条规则里的值），不另配一套
+      // #F8EED7 是后台 .cal-week-daycol:nth-child(even) 那条规则里的值），不另配一套。
+      // ⚠️ 必须用 i（离周一几天）算，不能用它在 days 里排第几——跳过过去的日子之后
+      // 栏位会往前挪，按位置算会让同一个星期几这周和下周显示成不同底色
       colTint: i % 2 === 0 ? '#F7F3EC' : '#F8EED7',
     });
   }
@@ -201,7 +206,6 @@ function bwkBuildDays(rows) {
     // get_tea_busy_ranges 只返回起止时间的设计）；null=能约，或者数据还在路上还不知道
     const reason = new Array(48).fill(null);
     d.busy = busy; d.reason = reason;
-    if (d.isPast) { busy.fill(true); reason.fill('past'); return; }
     // 数据还没回来：整列先按"不可点"画骨架，但不写"已约满"——还不知道满没满，
     // 写了等数据回来又变回空档，等于骗了客人一下
     if (rows === null) { busy.fill(true); return; }
@@ -253,9 +257,13 @@ async function renderBwkWeek() {
   const todayMonday = bwkMonday(new Date());
   document.getElementById('bwkPrevBtn').disabled = bwkAnchor.getTime() <= todayMonday.getTime();
 
+  // 标的是**实际画出来的**范围，不是这一周的周一到周日——本周前面几天已经过去、
+  // 整栏都没画，标题却还写着周一的日期就对不上了（第一栏是 9/4，标题写"8月31日 -"）
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const firstDay = bwkAnchor < todayStart ? todayStart : bwkAnchor;
   const lastDay = new Date(bwkAnchor); lastDay.setDate(lastDay.getDate() + 6);
   document.getElementById('bwkRangeLabel').textContent =
-    `${bwkAnchor.getMonth() + 1}月${bwkAnchor.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
+    `${firstDay.getMonth() + 1}月${firstDay.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
 
   const key = bwkAnchor.getTime();
   if (bwkWeekCache.has(key)) {
@@ -302,7 +310,7 @@ function bwkPaintGrid() {
       : (bwkSelected && bwkSameDay(bwkSelected, y, m, dd)
         ? { s0: bwkSelected.startSlot, s1: bwkSelected.endSlot, done: true } : null);
 
-    let cellsHtml = `<div class="bwk-col-head${d.isToday ? ' today' : ''}${d.isPast ? ' past' : ''}"><span>星期${d.weekday}</span><b>${m + 1}/${dd}</b></div>`;
+    let cellsHtml = `<div class="bwk-col-head${d.isToday ? ' today' : ''}"><span>星期${d.weekday}</span><b>${m + 1}/${dd}</b></div>`;
     for (let k = BOOKING_BUSINESS_START_SLOT; k < BOOKING_BUSINESS_END_SLOT; k++) {
       const isHour = k % 2 === 0;
       // 时间印在格子里，格式跟原来那根时间轴一模一样（早上/上午/中午/下午/晚上 + 12 小时制，
@@ -344,12 +352,9 @@ function bwkPaintGrid() {
     tableWrap.scrollTop = keepTop;
     tableWrap.scrollLeft = keepLeft;
   } else {
-    // 头一次画这一周：本周的话前面几列是已经过去的日子，默认横向滚到"今天"这一列，
-    // 免得一打开看到的全是灰掉的过去几天，还得自己往右划才找得到能约的日子
-    // 原来这里要减掉 46px（左边那根时间轴列的宽度），现在没有时间轴列了，直接对齐列本身
-    const firstPickable = tableWrap.querySelector('.bwk-day-col.today') ||
-      [...tableWrap.querySelectorAll('.bwk-day-col')].find(c => !c.querySelector('.bwk-col-head.past'));
-    if (firstPickable) tableWrap.scrollLeft = Math.max(0, firstPickable.offsetLeft);
+    // 头一次画这一周：第一栏本来就是今天（过去的日子整栏都没画，见 bwkBuildDays），
+    // 所以直接停在最左边就行，不用再去找"今天"是第几栏往那儿滚
+    tableWrap.scrollLeft = 0;
   }
 }
 
