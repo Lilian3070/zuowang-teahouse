@@ -92,13 +92,16 @@ async function submitBookingRequest(event) {
   const note = document.getElementById('note').value.trim();
   const startAt = new Date(bwkSelected.y, bwkSelected.m, bwkSelected.d, Math.floor(bwkSelected.startSlot / 2), bwkSelected.startSlot % 2 ? 30 : 0);
   const endAt = new Date(bwkSelected.y, bwkSelected.m, bwkSelected.d, Math.floor(bwkSelected.endSlot / 2), bwkSelected.endSlot % 2 ? 30 : 0);
-  const { error } = await db.from('booking_requests').insert({
-    member_id: currentMemberId,
-    preferred_time: datetime + ' · ' + slot,
-    note,
-    start_at: startAt.toISOString(),
-    end_at: endAt.toISOString(),
+  const base = { member_id: currentMemberId, preferred_time: datetime + ' · ' + slot, note };
+  let { error } = await db.from('booking_requests').insert({
+    ...base, start_at: startAt.toISOString(), end_at: endAt.toISOString(),
   });
+  // start_at/end_at 是 supabase/booking_calendar_workflow.sql 加的列。网站是 push 到 GitHub
+  // Pages 自动部署的，代码上线和跑那份 SQL 之间必然有个时间差；万一客人正好卡在这个窗口里提交，
+  // 少了这两列不该让她整个约不成——退回只写 preferred_time 那份（后台仍能从这段文字解析出时间）
+  if (error && /start_at|end_at/.test(error.message || '')) {
+    ({ error } = await db.from('booking_requests').insert(base));
+  }
   if (error) { statusEl.style.color = '#e7a39c'; statusEl.textContent = '提交失败：' + error.message; return false; }
   statusEl.style.color = '#cfe0b8';
   statusEl.textContent = '已收到您的预约申请，我们会尽快与您确认。';

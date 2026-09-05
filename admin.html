@@ -203,6 +203,11 @@
   .booking-status.confirmed { color: #3f7652; background: #e3efe5; }
   .booking-status.declined { color: #777; background: #eceae6; }
   .booking-contact { color: var(--red); font-size: 12px; margin-top: 2px; }
+  /* 会员列表那套 .member-name/.member-meta 是 nowrap + 省略号（那边第二行只是摘要，截了无所谓）。
+     预约这边"期望时间"恰恰是最要紧的一行，按钮多一个就会被截成"上午10:0…"，必须让它换行显示 */
+  .booking-row .member-name, .booking-row .member-meta {
+    white-space: normal; overflow: visible; text-overflow: clip;
+  }
   .btn-booking-calendar { border-color: var(--sage); color: var(--sage); }
   .btn-booking-calendar:hover { background: var(--sage); color: white; }
 
@@ -592,6 +597,18 @@
     background: #ececec; border: 1px solid #cfcfcf; color: #595959; font-size: 13px;
     padding: 8px 14px; border-radius: 6px; margin: 10px 0; line-height: 1.6;
   }
+  /* 从预约列表点"查看日程"过来时挂在日历顶上的核对条：尺寸/圆角/间距照抄上面那条
+     .cal-close-banner，只把配色换成待确认预约那套红色，保持是同一个组件的两种状态 */
+  .booking-review-banner {
+    background: var(--red-soft); border: 1px solid var(--red); color: var(--red); font-size: 13px;
+    padding: 8px 14px; border-radius: 6px; margin: 10px 0; line-height: 1.6;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .booking-review-text { display: flex; flex-direction: column; }
+  .booking-review-text span { font-weight: 400; opacity: 0.85; }
+  .booking-review-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .booking-review-decline { border-color: var(--red); color: var(--red); }
+  .booking-review-dismiss { border-color: #cfcfcf; color: #777; }
   /* 关闭时段编辑模式：整块日历降低饱和度、压暗一点，一眼看出跟平时的正常模式不一样，
      不会误以为自己还在正常模式里点了空白格却什么都没弹出来 */
   .cal-body.close-mode { filter: grayscale(0.8) brightness(0.97); user-select: none; }
@@ -1613,13 +1630,30 @@ function stopSessionWatch() {
 }
 
 let bookingNoticeTimer = null;
+// 待确认那几条的"指纹"：只有它真的变了（来了新预约、或者别处处理掉了一条）才值得重画界面
+let bookingPendingSig = null;
+function bookingPendingSignature(list) {
+  return list.filter(r => r.status === 'pending')
+    .map(r => `${r.id}@${r.start_at || r.preferred_time || ''}`).sort().join('|');
+}
 function startBookingNoticeWatch() {
   if (bookingNoticeTimer) return;
   bookingNoticeTimer = setInterval(async () => {
-    delete tabProductsCache['bookings'];
-    await refreshBookingNotice();
+    // ⚠️ 关闭时段的框选模式下绝对不能重画日历——那些选中状态只存在内存里还没提交，
+    // 重画等于把主理人选了一半的东西清空
+    if (calCloseMode) return;
+    // 有弹窗开着也先不动：列表在背后被换掉，关掉弹窗看到的内容会对不上
+    if (document.querySelector('.modal-overlay.open')) return;
+    let list;
+    try { list = await fetchBookingRequests(true); } catch (e) { return; }
+    updateBookingNoticeDot(list);
+    const sig = bookingPendingSignature(list);
+    // 待确认的还是原来那几条：只更新角标数字，界面一个节点都不动
+    // （不许再犯.md 第 1 条——不许无缘无故整块重刷，滚动位置也会跟着归零）
+    if (sig === bookingPendingSig) return;
+    bookingPendingSig = sig;
     if (currentTab === 'schedule') renderCalendar();
-    if (currentTab === 'bookings') loadBookingRequests();
+    else if (currentTab === 'bookings') loadBookingRequests();
   }, 60 * 1000);
 }
 function stopBookingNoticeWatch() {
@@ -2652,7 +2686,31 @@ function bookingRange(r) {
 }
 function bookingContact(r) { return [r.member?.phone, r.member?.email].filter(Boolean).join(' · ') || '未填写联系方式'; }
 function findBooking(id) { return (tabProductsCache['bookings'] || []).find(r => r.id === id); }
-function sortBookingRequests(list) { return [...list].sort((a, b) => BOOKING_STATUS_ORDER[a.status] - BOOKING_STATUS_ORDER[b.status] || ((bookingRange(a)?.start || Infinity) - (bookingRange(b)?.start || Infinity))); }
+// 排序：待确认 → 已确认 → 已回绝；同一组里到访时间早的排前面（待确认的最早那条要最先处理）。
+// 时间取不到的旧数据统一沉到最后，不能让 Infinity-Infinity 算出 NaN——比较函数一旦返回 NaN，
+// 排序结果就是未定义的，列表顺序会时对时错
+function bookingStartMs(r) { const range = bookingRange(r); return range ? range.start.getTime() : Number.MAX_SAFE_INTEGER; }
+function sortBookingRequests(list) {
+  return [...list].sort((a, b) =>
+    (BOOKING_STATUS_ORDER[a.status] - BOOKING_STATUS_ORDER[b.status]) || (bookingStartMs(a) - bookingStartMs(b)));
+}
+// 到访日期已经过去的申请自动清理掉（不设删除按钮，全靠自动删）。正经的清理是数据库那边
+// 每天北京时间 00:10 跑的定时任务（supabase/booking_calendar_workflow.sql）；这里再补一道
+// 前端兜底——万一 pg_cron 没启用或者任务被停掉，后台一打开也会把过期的扫干净。
+// 已确认的申请删掉不影响任何东西：确认时已经在 schedule_events 里生成了正式行程，那条会留着
+function bookingIsExpired(r) {
+  const range = bookingRange(r);
+  if (!range) return false; // 认不出时间的旧数据不敢自动删，留着人工看
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  return range.start < todayStart;
+}
+async function sweepExpiredBookings(list) {
+  const expired = list.filter(bookingIsExpired);
+  if (!expired.length) return list;
+  const { error } = await db.from('booking_requests').delete().in('id', expired.map(r => r.id));
+  if (error) return list; // 删不掉就照常显示，不影响使用
+  return list.filter(r => !bookingIsExpired(r));
+}
 async function fetchBookingRequests(forceRefresh = false) {
   if (tabProductsCache['bookings'] && !forceRefresh) return tabProductsCache['bookings'];
   const [{ data: requests, error }, { data: members }] = await Promise.all([
@@ -2660,22 +2718,34 @@ async function fetchBookingRequests(forceRefresh = false) {
   ]);
   if (error) throw error;
   const map = new Map((members || []).map(m => [m.id, m]));
-  return tabProductsCache['bookings'] = (requests || []).map(r => ({ ...r, member: map.get(r.member_id) || null }));
+  const list = await sweepExpiredBookings((requests || []).map(r => ({ ...r, member: map.get(r.member_id) || null })));
+  return tabProductsCache['bookings'] = list;
+}
+// 侧栏"茶席预约"右边那个红色角标：有几条待确认就显示几，没有就整个藏起来
+function updateBookingNoticeDot(list) {
+  const dot = document.getElementById('bookingNoticeDot');
+  if (!dot) return;
+  const pending = list.filter(r => r.status === 'pending').length;
+  dot.textContent = pending;
+  dot.classList.toggle('show', pending > 0);
 }
 async function refreshBookingNotice() {
   try {
-    const pending = (await fetchBookingRequests(true)).filter(r => r.status === 'pending').length;
-    const dot = document.getElementById('bookingNoticeDot');
-    if (dot) { dot.textContent = pending; dot.classList.toggle('show', pending > 0); }
+    const list = await fetchBookingRequests(true);
+    updateBookingNoticeDot(list);
+    bookingPendingSig = bookingPendingSignature(list);
   } catch (e) {}
 }
 async function loadBookingRequests(forceRefresh = false) {
   const myTab = currentTab;
   try {
     const list = await fetchBookingRequests(forceRefresh);
+    // 异步结果回来先确认没切走（不许再犯.md 第 5 条）
     if (currentTab !== myTab) return;
     renderBookingRequests(sortBookingRequests(list));
-    refreshBookingNotice();
+    // 角标直接用刚拿到的这份数据算，不再另发一次请求
+    updateBookingNoticeDot(list);
+    bookingPendingSig = bookingPendingSignature(list);
   } catch (e) { showToast('加载失败：' + e.message); }
 }
 function renderBookingRequests(list) {
@@ -2683,9 +2753,9 @@ function renderBookingRequests(list) {
   if (!list.length) { el.innerHTML = '<div class="empty-state"><div style="font-size:32px">🍵</div><p>暂无预约申请</p></div>'; return; }
   el.innerHTML = list.map(r => {
     const name = r.member ? displayMemberName(r.member) : '（会员已删除）';
-    return `<div class="member-row" style="align-items:flex-start;flex-wrap:wrap">
+    return `<div class="member-row booking-row" style="align-items:flex-start;flex-wrap:wrap">
       <div class="member-avatar">${esc(name).slice(0,1)}</div><div class="member-info">
-      <div class="member-name" style="white-space:normal">${esc(name)}<span class="booking-contact"> · ${esc(bookingContact(r))}</span><span class="booking-status ${r.status}">${BOOKING_STATUS_LABEL[r.status]}</span></div>
+      <div class="member-name">${esc(name)}<span class="booking-contact"> · ${esc(bookingContact(r))}</span><span class="booking-status ${r.status}">${BOOKING_STATUS_LABEL[r.status]}</span></div>
       <div class="member-meta">期望时间：${esc(r.preferred_time || '未填写')}${r.note ? ' · ' + esc(r.note) : ''}</div>
       ${r.admin_note ? `<div class="member-meta">已回复：${esc(r.admin_note)}</div>` : ''}</div>
       <div class="product-actions"><button class="btn-edit btn-booking-calendar" onclick="openBookingWeek('${r.id}')">查看日程</button>
@@ -2708,15 +2778,40 @@ async function setBookingStatus(id, status) {
   const { error } = await db.from('booking_requests').update(update).eq('id', id);
   if (error) { showToast('操作失败：' + error.message); return; }
   delete tabProductsCache['bookings']; delete tabProductsCache['bookingCalendar']; delete tabProductsCache['schedule'];
+  if (activeBookingId === id) activeBookingId = null; // 处理完就撤掉日历上那条提示横幅
   await refreshBookingNotice();
   if (currentTab === 'bookings') loadBookingRequests(); else if (currentTab === 'schedule') renderCalendar(true);
   showToast(status === 'confirmed' ? '已确认，并已写入茶室日程' : '已回绝');
 }
+// 「查看日程」：跳到日程日历，把客人选的那天摆在七天的正中间（-3 天 → 它是第 4 栏），
+// 主理人对着自己的真实行程再判断一次要不要接
 function openBookingWeek(id) {
   const r = findBooking(id), range = r && bookingRange(r);
   if (!range) { showToast('这条旧预约没有可识别的时间'); return; }
-  activeBookingId = id; calAnchor = new Date(range.start); calAnchor.setDate(calAnchor.getDate() - 3); switchTab('schedule', null);
+  activeBookingId = id;
+  // ⚠️ 必须显式切成周视图：calView 是全局状态，上次停在月/年视图的话，光设 calAnchor
+  // 点过来看到的还是月历，根本没有要看的那张周表
+  calView = 'week';
+  if (calCloseMode) cancelCloseMode(); // 关闭时段的框选模式下日历是灰的、点了也不弹窗，先退出来
+  calAnchor = new Date(range.start); calAnchor.setDate(calAnchor.getDate() - 3);
+  switchTab('schedule', null);
 }
+// 从预约列表点「查看日程」过来之后，日历顶上挂一条横幅：写清是谁、什么时间、联系方式，
+// 并且直接带确认/回绝按钮——不然主理人看完行程还要自己去找那根红条才能做决定
+function bookingBannerHtml() {
+  const r = activeBookingId && findBooking(activeBookingId);
+  if (!r || r.status !== 'pending') return '';
+  const name = r.member ? displayMemberName(r.member) : '（会员已删除）';
+  return `<div class="booking-review-banner">
+    <div class="booking-review-text"><b>正在核对预约：${esc(name)}</b>
+      <span>${esc(r.preferred_time || '未填写时间')} · ${esc(bookingContact(r))}</span></div>
+    <div class="booking-review-actions">
+      <button class="btn-add-inline" onclick="setBookingStatus('${r.id}','confirmed')">确认预约</button>
+      <button class="btn-add-inline booking-review-decline" onclick="setBookingStatus('${r.id}','declined')">回绝并留言</button>
+      <button class="btn-add-inline booking-review-dismiss" onclick="dismissBookingBanner()">稍后再说</button>
+    </div></div>`;
+}
+function dismissBookingBanner() { activeBookingId = null; renderCalendar(); }
 function openBookingActionModal(id) {
   const r = findBooking(id); if (!r) return;
   activeBookingId = id; const name = r.member ? displayMemberName(r.member) : '（会员已删除）';
@@ -2726,70 +2821,6 @@ function openBookingActionModal(id) {
 function closeBookingActionModal() { document.getElementById('bookingActionModal').classList.remove('open'); activeBookingId = null; }
 function openActiveBookingWeek() { const id = activeBookingId; closeBookingActionModal(); if (id) openBookingWeek(id); }
 async function handleActiveBooking(status) { const id = activeBookingId; closeBookingActionModal(); if (id) await setBookingStatus(id, status); }
-
-// 跟会员列表同理，跟 members 分开单独查再前端拼，避免内嵌 join 在 RLS 下漏数据
-async function legacyLoadBookingRequests(forceRefresh = false) {
-  const myTab = currentTab;
-  let list = tabProductsCache['bookings'];
-  if (!list || forceRefresh) {
-    const [{ data: requests, error }, { data: members }] = await Promise.all([
-      db.from('booking_requests').select('*').order('created_at', { ascending: false }),
-      db.from('members').select('id, name, nickname, phone'),
-    ]);
-    if (error) { showToast('加载失败：' + error.message); }
-    if (currentTab !== myTab) return; // 等结果的时候用户已经切走了，这批数据不该再画出来
-    const memberMap = new Map((members || []).map(m => [m.id, m]));
-    list = (requests || []).map(r => ({ ...r, member: memberMap.get(r.member_id) || null }));
-    tabProductsCache['bookings'] = list;
-  }
-  renderBookingRequests(list);
-}
-
-function legacyRenderBookingRequests(list) {
-  const el = document.getElementById('productList');
-  if (!list.length) {
-    el.innerHTML = '<div class="empty-state"><div style="font-size:32px">🍵</div><p>暂无预约申请</p></div>';
-    return;
-  }
-  const statusLabel = { pending: '待确认', confirmed: '已确认', declined: '已回绝' };
-  el.innerHTML = list.map(r => {
-    const name = r.member ? displayMemberName(r.member) : '（会员已删除）';
-    return `
-    <div class="member-row" style="align-items:flex-start;flex-wrap:wrap">
-      <div class="member-avatar">${name.slice(0, 1)}</div>
-      <div class="member-info">
-        <div class="member-name">${name}<span style="font-weight:400;font-size:12px;color:var(--ink-muted)"> · ${statusLabel[r.status] || r.status}</span></div>
-        <div class="member-meta">期望时间：${r.preferred_time || '未填写'}${r.note ? ' · ' + r.note : ''}</div>
-        ${r.admin_note ? `<div class="member-meta">已回复：${r.admin_note}</div>` : ''}
-      </div>
-      <div class="product-actions">
-        ${r.status !== 'confirmed' ? `<button class="btn-edit" onclick="setBookingStatus('${r.id}','confirmed')">确认</button>` : ''}
-        ${r.status !== 'declined' ? `<button class="btn-delete" onclick="setBookingStatus('${r.id}','declined')">回绝</button>` : ''}
-        <button class="btn-mini-delete" onclick="deleteBookingRequest('${r.id}')">删除</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function legacySetBookingStatus(id, status) {
-  const update = { status };
-  if (status === 'confirmed') {
-    const adminNote = await customPrompt('确认预约', '给客人留句回复（选填，比如确认的具体时间）');
-    if (adminNote) update.admin_note = adminNote;
-  }
-  const { error } = await db.from('booking_requests').update(update).eq('id', id);
-  if (error) { showToast('操作失败：' + error.message); return; }
-  delete tabProductsCache['bookings'];
-  loadBookingRequests();
-}
-
-async function legacyDeleteBookingRequest(id) {
-  if (!(await customConfirm('确定删除这条预约申请吗？'))) return;
-  const { error } = await db.from('booking_requests').delete().eq('id', id);
-  if (error) { showToast('删除失败：' + error.message); return; }
-  delete tabProductsCache['bookings'];
-  loadBookingRequests();
-}
 
 // 不挂靠任何已有档案的注册密钥：给完全没在系统里出现过的新客人用，
 // 她注册时 redeem_invite_code() 会自动新建一条空白档案绑定给她。
@@ -3405,7 +3436,7 @@ async function renderCalendar(forceRefresh = false) {
         ${rightControls}
       </div>
     </div>
-    ${calCloseMode ? `<div class="cal-close-banner">关闭时段编辑模式——点击或拖拽选择要关闭/重新开放的日期或时段，选完点"保存关闭设置"才会生效</div>` : ''}
+    ${calCloseMode ? `<div class="cal-close-banner">关闭时段编辑模式——点击或拖拽选择要关闭/重新开放的日期或时段，选完点"保存关闭设置"才会生效</div>` : bookingBannerHtml()}
     <div class="cal-body${calCloseMode ? ' close-mode' : ''}" id="calBody"></div>
   `;
   document.querySelectorAll('.cal-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === calView));
